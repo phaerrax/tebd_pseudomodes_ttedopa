@@ -8,7 +8,7 @@ using Plots
 
 let
   total_time = 50
-  n_steps = 100
+  n_steps = 500
   time_step = total_time / n_steps
 
   max_err = 1e-8
@@ -20,6 +20,9 @@ let
   sites = siteinds("S=1/2", n_sites)
   # Lo stato iniziale ha un'eccitazione nel primo sito
   init_state = productMPS(sites, n -> n == 1 ? "Up" : "Dn")
+
+  # Stati di singola eccitazione
+  single_ex_states = MPS[productMPS(sites, n -> n == i ? "Up" : "Dn") for i = 1:n_sites] #???
 
   # Nuovi operatori di ITensors
   # ===========================
@@ -42,24 +45,24 @@ let
   s2 = sites[2]
   #h_loc = 1/2 * epsilon * op("Z", s1) * op("id", s2) +
   #        1/4 * epsilon * op("id", s1) * op("Z", s2) +
-  h_loc = 1/2 * op("S+", s1) * op("S-", s2) +
-          1/2 * op("S-", s1) * op("S+", s2)
+  h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+          -1/2 * op("S-", s1) * op("S+", s2)
   push!(links_odd, exp(-1.0im * time_step * h_loc))
   for j = 3:2:n_sites-3
     s1 = sites[j]
     s2 = sites[j+1]
     #h_loc = 1/4 * epsilon * op("Z", s1) * op("id", s2) +
     #        1/4 * epsilon * op("id", s1) * op("Z", s2) +
-    h_loc = 1/2 * op("S+", s1) * op("S-", s2) +
-            1/2 * op("S-", s1) * op("S+", s2)
+    h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+            -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_odd, exp(-1.0im * time_step * h_loc))
   end
   s1 = sites[end-1] # j = n_sites-1
   s2 = sites[end] # j = n_sites
   #h_loc = 1/4 * epsilon * op("Z", s1) * op("id", s2) +
   #        1/2 * epsilon * op("id", s1) * op("Z", s2) +
-  h_loc = 1/2 * op("S+", s1) * op("S-", s2) +
-          1/2 * op("S-", s1) * op("S+", s2)
+  h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+          -1/2 * op("S-", s1) * op("S+", s2)
   push!(links_odd, exp(-1.0im * time_step * h_loc))
   
   links_even = ITensor[]
@@ -68,21 +71,33 @@ let
     s2 = sites[j+1]
     #h_loc = 1/4 * epsilon * op("Z", s1) * op("id", s2) +
     #        1/4 * epsilon * op("id", s1) * op("Z", s2) +
-    h_loc = 1/2 * op("S+", s1) * op("S-", s2) +
-            1/2 * op("S-", s1) * op("S+", s2)
+    h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+            -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_even, exp(-1.0im * time_step * h_loc))
   end
 
   time_evolution_oplist = vcat(links_odd, links_even)
 
   current_state = init_state
-  sz = []
+  occ_n = [[abs2(inner(s, current_state)) for s in single_ex_states]]
+
   for step = 1:n_steps
     current_state = apply(time_evolution_oplist, current_state; cutoff=max_err)
-    append!(sz, abs(inner(init_state, current_state))^2)
+    occ_n = vcat(occ_n, [[abs2(inner(s, current_state)) for s in single_ex_states]])
   end
 
-  plot(sz)
-  png("sz.png")
+  row = Vector{Float64}(undef, length(occ_n))
+  for i = 1:length(occ_n)
+    row[i] = occ_n[i][1]
+  end
+  plot(row)
+  for i = 2:n_sites
+    for j = 1:length(occ_n)
+      row[j] = occ_n[j][i]
+    end
+    plot!(row)
+  end
+
+  png("occ_n.png")
   return
 end
