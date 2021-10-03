@@ -2,6 +2,7 @@
 
 using ITensors
 using Plots
+using LaTeXStrings
 
 # Questo programma calcola l'evoluzione della catena di spin isolata,
 # usando le tecniche dei MPS ed MPO.
@@ -92,23 +93,27 @@ let
 
   # Grafici
   # =================================
+  base_dir = "simple_chain/"
   # - grafico dei numeri di occupazione
   row = Vector{Float64}(undef, length(occ_n))
   for i = 1:length(occ_n)
     row[i] = occ_n[i][1]
   end
-  plot(row)
+  occ_n_plot = plot(row, title="Numero di occupazione dei siti", label="1")
   for i = 2:n_sites
     for j = 1:length(occ_n)
       row[j] = occ_n[j][i]
     end
-    plot!(row)
+    plot!(occ_n_plot, row, label=string(i))
   end
-  png("occ_n.png")
+  xlabel!(occ_n_plot, L"$\lambda\,t$")
+  ylabel!(occ_n_plot, L"$\langle n_i\rangle$")
+  savefig(occ_n_plot, base_dir * "occ_n.png")
 
   # - grafico dei ranghi dell'MPS
-  plot(maxdim_monitor)
-  png("maxdim_monitor.png")
+  maxdim_monitor_plot = plot(maxdim_monitor)
+  xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
+  savefig(maxdim_monitor_plot, base_dir * "maxdim_monitor.png")
 
   return
 end
