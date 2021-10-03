@@ -82,12 +82,17 @@ let
 
   current_state = init_state
   occ_n = [[abs2(inner(s, current_state)) for s in single_ex_states]]
+  maxdim_monitor = Int[]
 
   for step = 1:n_steps
     current_state = apply(time_evolution_oplist, current_state; cutoff=max_err)
     occ_n = vcat(occ_n, [[abs2(inner(s, current_state)) for s in single_ex_states]])
+    push!(maxdim_monitor, maxlinkdim(current_state))
   end
 
+  # Grafici
+  # =================================
+  # - grafico dei numeri di occupazione
   row = Vector{Float64}(undef, length(occ_n))
   for i = 1:length(occ_n)
     row[i] = occ_n[i][1]
@@ -99,7 +104,11 @@ let
     end
     plot!(row)
   end
-
   png("occ_n.png")
+
+  # - grafico dei ranghi dell'MPS
+  plot(maxdim_monitor)
+  png("maxdim_monitor.png")
+
   return
 end
