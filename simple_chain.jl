@@ -7,11 +7,11 @@ using Plots
 # usando le tecniche dei MPS ed MPO.
 
 let
-  total_time = 50
-  n_steps = 500
-  time_step = total_time / n_steps
+  total_time = 10
+  # Al variare di epsilon devo cambiare anche n_steps se no non
+  # tornano i risultati... quindi lo definisco in seguito.
 
-  max_err = 1e-8
+  max_err = 1e-10
 
   # Costruzione della catena
   # ========================
@@ -22,7 +22,7 @@ let
   init_state = productMPS(sites, n -> n == 1 ? "Up" : "Dn")
 
   # Stati di singola eccitazione
-  single_ex_states = MPS[productMPS(sites, n -> n == i ? "Up" : "Dn") for i = 1:n_sites] #???
+  single_ex_states = MPS[productMPS(sites, n -> n == i ? "Up" : "Dn") for i = 1:n_sites]
 
   # Nuovi operatori di ITensors
   # ===========================
@@ -34,34 +34,36 @@ let
     
   # Costruzione dell'operatore di evoluzione
   # ========================================
-  epsilon = 150
+  epsilon = 50
+  n_steps = Int(total_time * epsilon)
+  time_step = total_time / n_steps
   # lambda = 1
   # Ricorda:
   # - gli h_loc agli estremi della catena vanno trattati separatamente
-  # - Sz è 1/2*sigma_z, la matrice sigma_z si chiama Z, e così per le
+  # - Sz è 1/2*sigma_z, la matrice sigma_z si chiama id, e così per le
   #   altre matrici di Pauli
   links_odd = ITensor[]
   s1 = sites[1]
   s2 = sites[2]
-  #h_loc = 1/2 * epsilon * op("Z", s1) * op("id", s2) +
-  #        1/4 * epsilon * op("id", s1) * op("Z", s2) +
-  h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+  h_loc = epsilon * op("Sz", s1) * op("id*id", s2) +
+          1/2 * epsilon * op("id*id", s1) * op("Sz", s2) +
+          -1/2 * op("S+", s1) * op("S-", s2) +
           -1/2 * op("S-", s1) * op("S+", s2)
   push!(links_odd, exp(-1.0im * time_step * h_loc))
   for j = 3:2:n_sites-3
     s1 = sites[j]
     s2 = sites[j+1]
-    #h_loc = 1/4 * epsilon * op("Z", s1) * op("id", s2) +
-    #        1/4 * epsilon * op("id", s1) * op("Z", s2) +
-    h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+    h_loc = 1/2 * epsilon * op("Sz", s1) * op("id*id", s2) +
+            1/2 * epsilon * op("id*id", s1) * op("Sz", s2) +
+            -1/2 * op("S+", s1) * op("S-", s2) +
             -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_odd, exp(-1.0im * time_step * h_loc))
   end
   s1 = sites[end-1] # j = n_sites-1
   s2 = sites[end] # j = n_sites
-  #h_loc = 1/4 * epsilon * op("Z", s1) * op("id", s2) +
-  #        1/2 * epsilon * op("id", s1) * op("Z", s2) +
-  h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+  h_loc = 1/2 * epsilon * op("Sz", s1) * op("id*id", s2) +
+          epsilon * op("id*id", s1) * op("Sz", s2) +
+          -1/2 * op("S+", s1) * op("S-", s2) +
           -1/2 * op("S-", s1) * op("S+", s2)
   push!(links_odd, exp(-1.0im * time_step * h_loc))
   
@@ -69,9 +71,9 @@ let
   for j = 2:2:n_sites-2
     s1 = sites[j]
     s2 = sites[j+1]
-    #h_loc = 1/4 * epsilon * op("Z", s1) * op("id", s2) +
-    #        1/4 * epsilon * op("id", s1) * op("Z", s2) +
-    h_loc = -1/2 * op("S+", s1) * op("S-", s2) +
+    h_loc = 1/2 * epsilon * op("Sz", s1) * op("id*id", s2) +
+            1/2 * epsilon * op("id*id", s1) * op("Sz", s2) +
+            -1/2 * op("S+", s1) * op("S-", s2) +
             -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_even, exp(-1.0im * time_step * h_loc))
   end
