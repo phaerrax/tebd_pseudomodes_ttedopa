@@ -16,12 +16,12 @@ let
   # ========================================
   ITensors.space(::SiteType"vecS=1/2") = 4
 
-  ITensors.state(::StateName"Up:Up", ::SiteType"vecS=1/2") = [
-    1 0 0 0
-  ]
-  ITensors.state(::StateName"Dn:Dn", ::SiteType"vecS=1/2") = [
-    0 0 0 1
-  ]
+  ITensors.state(::StateName"Up:Up", ::SiteType"vecS=1/2") = [ 1 0 0 0 ]
+  ITensors.state(::StateName"Dn:Dn", ::SiteType"vecS=1/2") = [ 0 0 0 1 ]
+  ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2") = [ 0 1 1 0 ]
+  ITensors.state(::StateName"vecσy", ::SiteType"vecS=1/2") = [ 0 im -im 0 ]
+  ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2") = [ 1 0 0 -1 ]
+  ITensors.state(::StateName"vecid", ::SiteType"vecS=1/2") = [ 1 0 0 1 ]
 
   ITensors.op(::OpName"id:id", ::SiteType"vecS=1/2") = [
     # (I₂:I₂)
@@ -170,16 +170,55 @@ let
 
   time_evolution_oplist = vcat(links_odd, links_even)
 
-  # Lo stato iniziale ha un'eccitazione nel primo sito
+  # Osservabili da misurare
+  # =======================
+  # - la corrente di spin
+  #   Il metodo per calcolarla è questo, finché non mi viene in mente
+  #   qualcosa di più comodo: l'operatore della corrente,
+  #   J_k = λ/2 (σ ˣ⊗ σ ʸ-σ ʸ⊗ σ ˣ),
+  #   viene separato nei suoi due addendi, che sono applicati allo
+  #   stato corrente in tempi diversi; in seguito sottraggo il secondo
+  #   al primo, e moltiplico tutto per λ/2 (che è 1/2).
+  function current_1(i::Int, obs_index::Int)
+    if i == obs_index
+      str = "vecσy"
+    elseif i == obs_index+1
+      str = "vecσx"
+    else
+      str = "vecid"
+    end
+    return str
+  end
+  function current_2(i::Int, obs_index::Int)
+    if i == obs_index
+      str = "vecσx"
+    elseif i == obs_index+1
+      str = "vecσy"
+    else
+      str = "vecid"
+    end
+    return str
+  end
+  #
+  current_op_list_1 = MPS[productMPS(sites, n -> current_1(n, i)) for i = 1:n_sites-1]
+  current_op_list_2 = MPS[productMPS(sites, n -> current_2(n, i)) for i = 1:n_sites-1]
+
+  # Simulazione
+  # ===========
+  # Stato iniziale: c'è un'eccitazione nel primo sito
   current_state = single_ex_states[1]
+
+  # Misuro le osservabili sullo stato iniziale
   occ_n = [[inner(s, current_state) for s in single_ex_states]]
   maxdim_monitor = Int[maxlinkdim(current_state)]
+  current = [[0.5 * (inner(J1, current_state) - inner(J2, current_state)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]]
 
-  # ..via!
+  # ...e si parte!
   progress = Progress(n_steps, 1, "Simulazione in corso ", 20)
   for step in time_step_list[2:end]
     current_state = apply(time_evolution_oplist, current_state; cutoff=max_err)
     occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in single_ex_states]])
+    current = vcat(current, [[0.5 * real(inner(J1, current_state) - inner(J2, current_state)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]])
     push!(maxdim_monitor, maxlinkdim(current_state))
     next!(progress)
   end
@@ -207,6 +246,22 @@ let
   maxdim_monitor_plot = plot(time_step_list, maxdim_monitor)
   xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
   savefig(maxdim_monitor_plot, base_dir * "maxdim_monitor.png")
+
+  # - grafico della corrente di spin
+  row = Vector{Float64}(undef, length(current))
+  for i = 1:length(current)
+    row[i] = current[i][1]
+  end
+  current_plot = plot(time_step_list, row, title="Corrente di spin", label="(1,2)")
+  for i = 2:n_sites-1
+    for j = 1:length(current)
+      row[j] = current[j][i]
+    end
+    plot!(current_plot, time_step_list, row, label="("*string(i)*","*string(i+1)*")")
+  end
+  xlabel!(current_plot, L"$\lambda\,t$")
+  ylabel!(current_plot, L"$j_{k,k+1}$")
+  savefig(current_plot, base_dir * "spin_current.png")
 
   return
 end
