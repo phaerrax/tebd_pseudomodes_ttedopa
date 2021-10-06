@@ -16,6 +16,9 @@ let
   # ========================================
   ITensors.space(::SiteType"vecS=1/2") = 4
 
+  # Questi "stati" contengono sia degli stati veri e propri, come Up:Up e Dn:Dn,
+  # sia la vettorizzazione di alcuni operatori che mi servono per calcolare le
+  # osservabili sugli MPS (siccome sono vettori, devo definirli per forza così)
   ITensors.state(::StateName"Up:Up", ::SiteType"vecS=1/2") = [ 1 0 0 0 ]
   ITensors.state(::StateName"Dn:Dn", ::SiteType"vecS=1/2") = [ 0 0 0 1 ]
   ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2") = [ 0 1 1 0 ]
@@ -23,6 +26,7 @@ let
   ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2") = [ 1 0 0 -1 ]
   ITensors.state(::StateName"vecid", ::SiteType"vecS=1/2") = [ 1 0 0 1 ]
 
+  # - operatori "semplici"
   ITensors.op(::OpName"id:id", ::SiteType"vecS=1/2") = [
     # (I₂:I₂)
     1 0 0 0
@@ -79,6 +83,25 @@ let
     0 1 0 0
     1 0 0 0
   ]
+  # Operatori composti:
+  # - termine locale dell'Hamiltoniano
+  function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
+    h = op("σz:id", s) - op("id:σz", s)
+    return 0.5im * h
+  end
+  # - termine bilocale dell'Hamiltoniano
+  function ITensors.op(::OpName"H2loc", ::SiteType"vecS=1/2", s1::Index, s2::Index)
+    h = op("id:σ-", s1) * op("id:σ+", s2) +
+        op("id:σ+", s1) * op("id:σ-", s2) -
+        op("σ-:id", s1) * op("σ+:id", s2) -
+        op("σ+:id", s1) * op("σ-:id", s2)
+    return 0.5im * h
+  end
+  # - termine di smorzamento
+  function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
+    d = op("σx:σx", s) - op("id:id", s)
+    return d
+  end
 
   # Impostazione dei parametri della simulazione
   # ============================================
@@ -117,58 +140,36 @@ let
 
   s1 = sites[1]
   s2 = sites[2]
-  L = im/4 * ε * (
-    2 * (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
-    op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
-  ) - im/2 * (
-    op("σ-:id", s1) * op("σ+:id", s2) +
-    op("σ+:id", s1) * op("σ-:id", s2) -
-    op("id:σ+", s1) * op("id:σ-", s2) -
-    op("id:σ-", s1) * op("id:σ+", s2)
-   ) + ξL/2 * (op("σx:σx", s1) - op("id:id", s1)) * op("id:id", s2)
+  L = ε * op("H1loc", s1) * op("id:id", s2) +
+      0.5ε * op("id:id", s1) * op("H1loc", s2) +
+      op("H2loc", s1, s2) +
+      ξL * op("damping", s1) * op("id:id", s2)
   push!(links_odd, exp(time_step * L))
 
   for j = 3:2:n_sites-3
     s1 = sites[j]
     s2 = sites[j+1]
-    L = im/4 * ε * (
-      (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
-      op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
-    ) - im/2 * (
-      op("σ-:id", s1) * op("σ+:id", s2) +
-      op("σ+:id", s1) * op("σ-:id", s2) -
-      op("id:σ+", s1) * op("id:σ-", s2) -
-      op("id:σ-", s1) * op("id:σ+", s2)
-    )
+    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
+        0.5ε * op("id:id", s1) * op("H1loc", s2) +
+        op("H2loc", s1, s2)
     push!(links_odd, exp(time_step * L))
   end
 
   s1 = sites[end-1] # j = n_sites-1
   s2 = sites[end] # j = n_sites
-  L = im/4 * ε * (
-    (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
-    2 * op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
-  ) - im/2 * (
-    op("σ-:id", s1) * op("σ+:id", s2) +
-    op("σ+:id", s1) * op("σ-:id", s2) -
-    op("id:σ+", s1) * op("id:σ-", s2) -
-    op("id:σ-", s1) * op("id:σ+", s2)
-  ) + ξR/2 * op("id:id", s1) * (op("σx:σx", s2) - op("id:id", s2))
+  L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
+      ε * op("id:id", s1) * op("H1loc", s2) +
+      op("H2loc", s1, s2) +
+      ξR * op("id:id", s1) * op("damping", s2)
   push!(links_odd, exp(time_step * L))
   
   links_even = ITensor[]
   for j = 2:2:n_sites-2
     s1 = sites[j]
     s2 = sites[j+1]
-    L = im/4 * ε * (
-      (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
-      op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
-    ) - im/2 * (
-      op("σ-:id", s1) * op("σ+:id", s2) +
-      op("σ+:id", s1) * op("σ-:id", s2) -
-      op("id:σ+", s1) * op("id:σ-", s2) -
-      op("id:σ-", s1) * op("id:σ+", s2)
-    )
+    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
+        0.5ε * op("id:id", s1) * op("H1loc", s2) +
+        op("H2loc", s1, s2)
     push!(links_even, exp(time_step * L))
   end
 
