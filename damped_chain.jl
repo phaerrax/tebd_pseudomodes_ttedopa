@@ -206,6 +206,13 @@ let
   #
   current_op_list_1 = MPS[productMPS(sites, n -> current_1(n, i)) for i = 1:n_sites-1]
   current_op_list_2 = MPS[productMPS(sites, n -> current_2(n, i)) for i = 1:n_sites-1]
+  # Definisco la funzione che misura la corrente di uno stato MPS in modo
+  # da poterla riusare dopo in maniera consistente
+  # Restituisce una lista di n_sites-1 numeri che sono la corrente tra un
+  # sito e il successivo.
+  function measure_current(s::MPS)
+    return [0.5 * real(inner(J1, s) - inner(J2, s)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]
+  end
 
   # Simulazione
   # ===========
@@ -215,14 +222,14 @@ let
   # Misuro le osservabili sullo stato iniziale
   occ_n = [[inner(s, current_state) for s in single_ex_states]]
   maxdim_monitor = Int[maxlinkdim(current_state)]
-  current = [[0.5 * (inner(J1, current_state) - inner(J2, current_state)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]]
+  current = [measure_current(current_state)]
 
   # ...e si parte!
   progress = Progress(n_steps, 1, "Simulazione in corso ", 20)
   for step in time_step_list[2:end]
     current_state = apply(time_evolution_oplist, current_state; cutoff=max_err)
     occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in single_ex_states]])
-    current = vcat(current, [[0.5 * real(inner(J1, current_state) - inner(J2, current_state)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]])
+    current = vcat(current, [measure_current(current_state)])
     push!(maxdim_monitor, maxlinkdim(current_state))
     next!(progress)
   end
