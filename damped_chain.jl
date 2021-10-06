@@ -87,16 +87,16 @@ let
 
   max_err = 1e-10
 
-  epsilon = 150
-  # lambda = 1
-  kappa = 0.1
+  ε = 150
+  # λ = 1
+  κ = 0.1
   T = 10
 
   total_time = 15
-  n_steps = Int(4 * total_time * epsilon)
+  n_steps = Int(4 * total_time * ε)
   time_step_list = collect(LinRange(0, total_time, n_steps))
   time_step = time_step_list[2] - time_step_list[1]
-  # Al variare di epsilon devo cambiare anche n_steps se no non
+  # Al variare di ε devo cambiare anche n_steps se no non
   # tornano i risultati...
 
   # Costruzione della catena
@@ -112,12 +112,12 @@ let
   # ========================================
   links_odd = ITensor[]
 
-  xi_L = kappa * (1 + 2 / (ℯ^(epsilon/T) - 1))
-  xi_R = kappa
+  ξL = κ * (1 + 2 / (ℯ^(ε/T) - 1))
+  ξR = κ
 
   s1 = sites[1]
   s2 = sites[2]
-  L = im/4 * epsilon * (
+  L = im/4 * ε * (
     2 * (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
     op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
   ) - im/2 * (
@@ -125,13 +125,13 @@ let
     op("σ+:id", s1) * op("σ-:id", s2) -
     op("id:σ+", s1) * op("id:σ-", s2) -
     op("id:σ-", s1) * op("id:σ+", s2)
-   ) + xi_L/2 * (op("σx:σx", s1) - op("id:id", s1)) * op("id:id", s2)
+   ) + ξL/2 * (op("σx:σx", s1) - op("id:id", s1)) * op("id:id", s2)
   push!(links_odd, exp(time_step * L))
 
   for j = 3:2:n_sites-3
     s1 = sites[j]
     s2 = sites[j+1]
-    L = im/4 * epsilon * (
+    L = im/4 * ε * (
       (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
       op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
     ) - im/2 * (
@@ -145,7 +145,7 @@ let
 
   s1 = sites[end-1] # j = n_sites-1
   s2 = sites[end] # j = n_sites
-  L = im/4 * epsilon * (
+  L = im/4 * ε * (
     (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
     2 * op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
   ) - im/2 * (
@@ -153,14 +153,14 @@ let
     op("σ+:id", s1) * op("σ-:id", s2) -
     op("id:σ+", s1) * op("id:σ-", s2) -
     op("id:σ-", s1) * op("id:σ+", s2)
-  ) + xi_R/2 * op("id:id", s1) * (op("σx:σx", s2) - op("id:id", s2))
+  ) + ξR/2 * op("id:id", s1) * (op("σx:σx", s2) - op("id:id", s2))
   push!(links_odd, exp(time_step * L))
   
   links_even = ITensor[]
   for j = 2:2:n_sites-2
     s1 = sites[j]
     s2 = sites[j+1]
-    L = im/4 * epsilon * (
+    L = im/4 * ε * (
       (op("σz:id", s1) - op("id:σz", s1)) * op("id:id", s2) +
       op("id:id", s1) * (op("σz:id", s2) - op("id:σz", s2))
     ) - im/2 * (
