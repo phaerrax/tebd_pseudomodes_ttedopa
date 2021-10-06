@@ -89,10 +89,11 @@ let
 
   epsilon = 150
   # lambda = 1
-  xi = 0
+  kappa = 0.1
+  T = 10
 
-  total_time = 10
-  n_steps = Int(2 * total_time * epsilon)
+  total_time = 15
+  n_steps = Int(4 * total_time * epsilon)
   time_step_list = collect(LinRange(0, total_time, n_steps))
   time_step = time_step_list[2] - time_step_list[1]
   # Al variare di epsilon devo cambiare anche n_steps se no non
@@ -111,6 +112,9 @@ let
   # ========================================
   links_odd = ITensor[]
 
+  xi_L = kappa * (1 + 2 / (ℯ^(epsilon/T) - 1))
+  xi_R = kappa
+
   s1 = sites[1]
   s2 = sites[2]
   L = im/4 * epsilon * (
@@ -121,7 +125,7 @@ let
     op("σ+:id", s1) * op("σ-:id", s2) -
     op("id:σ+", s1) * op("id:σ-", s2) -
     op("id:σ-", s1) * op("id:σ+", s2)
-   ) + xi/2 * (op("σx:σx", s1) - op("id:id", s1)) * op("id:id", s2)
+   ) + xi_L/2 * (op("σx:σx", s1) - op("id:id", s1)) * op("id:id", s2)
   push!(links_odd, exp(time_step * L))
 
   for j = 3:2:n_sites-3
@@ -149,7 +153,7 @@ let
     op("σ+:id", s1) * op("σ-:id", s2) -
     op("id:σ+", s1) * op("id:σ-", s2) -
     op("id:σ-", s1) * op("id:σ+", s2)
-  ) + xi/2 * op("id:id", s1) * (op("σx:σx", s2) - op("id:id", s2))
+  ) + xi_R/2 * op("id:id", s1) * (op("σx:σx", s2) - op("id:id", s2))
   push!(links_odd, exp(time_step * L))
   
   links_even = ITensor[]
