@@ -4,6 +4,9 @@ using ITensors
 using Plots
 using LaTeXStrings
 using ProgressMeter
+using LinearAlgebra
+
+include("spin_chain_space.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -12,78 +15,8 @@ using ProgressMeter
 # di Lindblad.
 
 let
-  # Definizione degli operatori vettorizzati
-  # ========================================
-  ITensors.space(::SiteType"vecS=1/2") = 4
-
-  # Questi "stati" contengono sia degli stati veri e propri, come Up:Up e Dn:Dn,
-  # sia la vettorizzazione di alcuni operatori che mi servono per calcolare le
-  # osservabili sugli MPS (siccome sono vettori, devo definirli per forza così)
-  ITensors.state(::StateName"Up:Up", ::SiteType"vecS=1/2") = [ 1 0 0 0 ]
-  ITensors.state(::StateName"Dn:Dn", ::SiteType"vecS=1/2") = [ 0 0 0 1 ]
-  ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2") = [ 0 1 1 0 ]
-  ITensors.state(::StateName"vecσy", ::SiteType"vecS=1/2") = [ 0 im -im 0 ]
-  ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2") = [ 1 0 0 -1 ]
-  ITensors.state(::StateName"vecid", ::SiteType"vecS=1/2") = [ 1 0 0 1 ]
-
-  # - operatori "semplici"
-  ITensors.op(::OpName"id:id", ::SiteType"vecS=1/2") = [
-    # (I₂:I₂)
-    1 0 0 0
-    0 1 0 0
-    0 0 1 0
-    0 0 0 1
-  ]
-  ITensors.op(::OpName"σz:id", ::SiteType"vecS=1/2") = [
-    # (σ ᶻ:I₂)
-    1 0  0  0
-    0 1  0  0
-    0 0 -1  0
-    0 0  0 -1
-  ]
-  ITensors.op(::OpName"id:σz", ::SiteType"vecS=1/2") = [
-    # (I₂:σ ᶻ)
-    1  0 0  0
-    0 -1 0  0
-    0  0 1  0
-    0  0 0 -1
-  ]
-  ITensors.op(::OpName"id:σ+", ::SiteType"vecS=1/2") = [
-    # (I₂:σ ⁺)
-    0 1 0 0
-    0 0 0 0
-    0 0 0 1
-    0 0 0 0
-  ]
-  ITensors.op(::OpName"σ+:id", ::SiteType"vecS=1/2") = [
-    # (σ ⁺:I₂)
-    0 0 1 0
-    0 0 0 1
-    0 0 0 0
-    0 0 0 0
-  ]
-  ITensors.op(::OpName"id:σ-", ::SiteType"vecS=1/2") = [
-    # (I₂:σ ⁻)
-    0 0 0 0
-    1 0 0 0
-    0 0 0 0
-    0 0 1 0
-  ]
-  ITensors.op(::OpName"σ-:id", ::SiteType"vecS=1/2") = [
-    # (σ ⁻:I₂)
-    0 0 0 0
-    0 0 0 0
-    1 0 0 0
-    0 1 0 0
-  ]
-  ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = [
-    # (σ ˣ:σ ˣ)
-    0 0 0 1
-    0 0 1 0
-    0 1 0 0
-    1 0 0 0
-  ]
-  # Operatori composti:
+  # Definizione degli operatori nell'equazione di Lindblad
+  # ======================================================
   # - termine locale dell'Hamiltoniano
   function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
     h = op("σz:id", s) - op("id:σz", s)
