@@ -102,21 +102,45 @@ let
     d = op("σx:σx", s) - op("id:id", s)
     return d
   end
+  # e rispettivi termini per l'operatore di evoluzione:
+  # - quello per le coppie di siti non agli estremi
+  function ITensors.op(::OpName"expL", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number)
+    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
+        0.5ε * op("id:id", s1) * op("H1loc", s2) +
+        op("H2loc", s1, s2)
+    return exp(t * L)
+  end
+  # - quello per la coppia (1,2)
+  function ITensors.op(::OpName"expL_sx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
+    L = ε * op("H1loc", s1) * op("id:id", s2) +
+        0.5ε * op("id:id", s1) * op("H1loc", s2) +
+        op("H2loc", s1, s2) +
+        ξ * op("damping", s1) * op("id:id", s2)
+    return exp(t * L)
+  end
+  # - quello per la coppia (n-1,n)
+  function ITensors.op(::OpName"expL_dx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
+    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
+        ε * op("id:id", s1) * op("H1loc", s2) +
+        op("H2loc", s1, s2) +
+        ξ * op("id:id", s1) * op("damping", s2)
+    return exp(t * L)
+  end
 
   # Impostazione dei parametri della simulazione
   # ============================================
   # Cartella che conterrà i file prodotti
   base_dir = "damped_chain/"
 
-  max_err = 1e-10
+  max_err = 1e-8
 
   ε = 150
   # λ = 1
   κ = 0.1
   T = 10
 
-  total_time = 15
-  n_steps = Int(4 * total_time * ε)
+  total_time = 20
+  n_steps = Int(total_time * ε)
   time_step_list = collect(LinRange(0, total_time, n_steps))
   time_step = time_step_list[2] - time_step_list[1]
   # Al variare di ε devo cambiare anche n_steps se no non
@@ -133,47 +157,26 @@ let
 
   # Costruzione dell'operatore di evoluzione
   # ========================================
-  links_odd = ITensor[]
-
   ξL = κ * (1 + 2 / (ℯ^(ε/T) - 1))
   ξR = κ
 
-  s1 = sites[1]
-  s2 = sites[2]
-  L = ε * op("H1loc", s1) * op("id:id", s2) +
-      0.5ε * op("id:id", s1) * op("H1loc", s2) +
-      op("H2loc", s1, s2) +
-      ξL * op("damping", s1) * op("id:id", s2)
-  push!(links_odd, exp(time_step * L))
+  links_odd = vcat(
+    [op("expL_sx", sites[1], sites[2]; t=time_step, ε=ε, ξ=ξL)],
+    [op("expL", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 3:2:n_sites-3],
+    [op("expL_dx", sites[n_sites-1], sites[n_sites]; t=time_step, ε=ε, ξ=ξR)]
+  )
+  links_even = [op("expL", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites-2]
 
-  for j = 3:2:n_sites-3
-    s1 = sites[j]
-    s2 = sites[j+1]
-    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-        0.5ε * op("id:id", s1) * op("H1loc", s2) +
-        op("H2loc", s1, s2)
-    push!(links_odd, exp(time_step * L))
-  end
+  #links_odd = vcat(
+  #  [("expL_sx", (1, 2), (t=time_step, ε=ε, ξ=ξL,))],
+  #  [("expL", (j, j+1), (t=time_step, ε=ε,)) for j = 3:2:n_sites-3],
+  #  [("expL_dx", (n_sites-1, n_sites), (t=time_step, ε=ε, ξ=ξR,))]
+  #)
 
-  s1 = sites[end-1] # j = n_sites-1
-  s2 = sites[end] # j = n_sites
-  L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-      ε * op("id:id", s1) * op("H1loc", s2) +
-      op("H2loc", s1, s2) +
-      ξR * op("id:id", s1) * op("damping", s2)
-  push!(links_odd, exp(time_step * L))
-  
-  links_even = ITensor[]
-  for j = 2:2:n_sites-2
-    s1 = sites[j]
-    s2 = sites[j+1]
-    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-        0.5ε * op("id:id", s1) * op("H1loc", s2) +
-        op("H2loc", s1, s2)
-    push!(links_even, exp(time_step * L))
-  end
+  #links_even = [("expL", (j, j+1), (t=time_step, ε=ε,)) for j = 2:2:n_sites-2]
 
-  time_evolution_oplist = vcat(links_odd, links_even)
+  #evol_op_odd_links = MPO(ops(links_odd, sites))
+  #evol_op_even_links = MPO(ops(links_even, sites))
 
   # Osservabili da misurare
   # =======================
@@ -228,7 +231,8 @@ let
   # ...e si parte!
   progress = Progress(n_steps, 1, "Simulazione in corso ", 20)
   for step in time_step_list[2:end]
-    current_state = apply(time_evolution_oplist, current_state; cutoff=max_err)
+    current_state = apply(vcat(links_even, links_odd), current_state, cutoff=max_err, maxdim=32)
+    #
     occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in single_ex_states]])
     current = vcat(current, [measure_current(current_state)])
     push!(maxdim_monitor, maxlinkdim(current_state))
