@@ -30,14 +30,17 @@ I₂ = [1 0
       0 1]
 
 # Operatori semplici sullo spazio degli spin
+# - identità
 ITensors.op(::OpName"id:id", ::SiteType"vecS=1/2") = kron(I₂, I₂)
-
+# - termini per l'Hamiltoniano locale
 ITensors.op(::OpName"σz:id", ::SiteType"vecS=1/2") = kron(σᶻ, I₂)
 ITensors.op(::OpName"id:σz", ::SiteType"vecS=1/2") = kron(I₂, σᶻ)
-
+# - termini per l'Hamiltoniano bilocale
 ITensors.op(::OpName"id:σ+", ::SiteType"vecS=1/2") = kron(I₂, σ⁺)
 ITensors.op(::OpName"σ+:id", ::SiteType"vecS=1/2") = kron(σ⁺, I₂)
 ITensors.op(::OpName"id:σ-", ::SiteType"vecS=1/2") = kron(I₂, σ⁻)
 ITensors.op(::OpName"σ-:id", ::SiteType"vecS=1/2") = kron(σ⁻, I₂)
-
-ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = kron(σˣ,σˣ)
+# - termini di smorzamento
+ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = kron(σˣ, σˣ)
+ITensors.op(::OpName"σx:id", ::SiteType"vecS=1/2") = kron(σˣ, I₂)
+ITensors.op(::OpName"id:σx", ::SiteType"vecS=1/2") = kron(I₂, σˣ)
