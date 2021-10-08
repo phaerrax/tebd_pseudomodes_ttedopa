@@ -161,7 +161,6 @@ let
   ))
   occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
 
-  #=
   # - la corrente di spin
   #   Il metodo per calcolarla è questo, finché non mi viene in mente
   #   qualcosa di più comodo: l'operatore della corrente,
@@ -190,16 +189,18 @@ let
     return str
   end
   #
-  current_op_list_1 = MPS[productMPS(sites, n -> current_1(n, i)) for i = 1:n_sites-1]
-  current_op_list_2 = MPS[productMPS(sites, n -> current_2(n, i)) for i = 1:n_sites-1]
-  # Definisco la funzione che misura la corrente di uno stato MPS in modo
-  # da poterla riusare dopo in maniera consistente
-  # Restituisce una lista di n_sites-1 numeri che sono la corrente tra un
-  # sito e il successivo.
-  function measure_current(s::MPS)
-    return [0.5 * real(inner(J1, s) - inner(J2, s)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]
-  end
-  =#
+  current_op_list_1 = [MPS(sites, vcat(
+    ["Emp:Emp"],
+    [current_1(i, k) for i = 1:n_sites],
+    ["Emp:Emp"]
+  )) for k = 1:n_sites-1]
+  current_op_list_2 = [MPS(sites, vcat(
+    ["Emp:Emp"],
+    [current_2(i, k) for i = 1:n_sites],
+    ["Emp:Emp"]
+  )) for k = 1:n_sites-1]
+  current_op_list = [0.5 * (J₊ - J₋) for (J₊,J₋) in zip(current_op_list_1, current_op_list_2)]
+  # Ora per misurare la corrente basta prendere il prodotto interno con questi.
 
   # Simulazione
   # ===========
@@ -222,7 +223,7 @@ let
   # Misuro le osservabili sullo stato iniziale
   occ_n = [[inner(s, current_state) for s in occ_n_list]]
   maxdim_monitor = Int[maxlinkdim(current_state)]
-  #current = [measure_current(current_state)]
+  current = [[real(inner(j, current_state)) for j in current_op_list]]
 
   # ...e si parte!
   progress = Progress(n_steps, 1, "Simulazione in corso ", 20)
@@ -231,13 +232,13 @@ let
     current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
     #
     occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in occ_n_list]])
-    #current = vcat(current, [measure_current(current_state)])
+    current = vcat(current, [[real(inner(j, current_state)) for j in current_op_list]])
     push!(maxdim_monitor, maxlinkdim(current_state))
     next!(progress)
   end
 
   # Grafici
-  # =================================
+  # =======
   # - grafico dei numeri di occupazione
   row = Vector{Float64}(undef, length(occ_n))
   for j = 1:length(occ_n)
@@ -265,7 +266,6 @@ let
   savefig(maxdim_monitor_plot, base_path * "maxdim_monitor.png")
 
   # - grafico della corrente di spin
-  #=
   row = Vector{Float64}(undef, length(current))
   for i = 1:length(current)
     row[i] = current[i][1]
@@ -280,7 +280,6 @@ let
   xlabel!(current_plot, L"$\lambda\,t$")
   ylabel!(current_plot, L"$j_{k,k+1}$")
   savefig(current_plot, base_path * "spin_current.png")
-  =#
 
   return
 end
