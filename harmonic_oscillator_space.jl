@@ -28,7 +28,7 @@ ITensors.state(::StateName"vecid", ::SiteType"vecOsc") = vcat(Iₒ[:])
 ITensors.op(::OpName"id:id", ::SiteType"vecOsc") = kron(Iₒ, Iₒ)
 # - interazione con la catena
 ITensors.op(::OpName"id:asum", ::SiteType"vecOsc") = kron(Iₒ, a⁺ + a⁻)
-ITensors.op(::OpName"asumT:id", ::SiteType"vecOsc") = kron(transpose(a⁺ + a⁻), Iₒ)
+ITensors.op(::OpName"asum:id", ::SiteType"vecOsc") = kron(a⁺ + a⁻, Iₒ)
 # - Hamiltoniano del sistema libero
 ITensors.op(::OpName"num:id", ::SiteType"vecOsc") = kron(num, Iₒ)
 ITensors.op(::OpName"id:num", ::SiteType"vecOsc") = kron(Iₒ, num)
