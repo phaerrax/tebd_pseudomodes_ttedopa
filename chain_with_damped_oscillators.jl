@@ -237,18 +237,18 @@ let
   for j = 1:length(occ_n)
     row[j] = occ_n[j][1]
   end
-  occ_n_plot = plot(time_step_list, row, title="Numero di occupazione dei siti", label="L")
-  for i = 1:n_sites+1 # comprende anche l'oscillatore dx
+  occ_n_plot = plot(time_step_list, row, title="Numero di occupazione dei siti", label="L", linestyle=:dash)
+  for i = 1:n_sites
     for j = 1:length(occ_n)
       row[j] = occ_n[j][1+i]
     end
-    if i == n_sites+1
-      label = "R"
-    else
-      label = string(i)
-    end
-    plot!(occ_n_plot, time_step_list, row, label=label)
+    plot!(occ_n_plot, time_step_list, row, label=string(i))
   end
+  for j = 1:length(occ_n)
+    row[j] = occ_n[j][end]
+  end
+  plot!(occ_n_plot, time_step_list, row, label="R", linestyle=:dash)
+  #
   xlabel!(occ_n_plot, L"$\lambda\,t$")
   ylabel!(occ_n_plot, L"$\langle n_i\rangle$")
   savefig(occ_n_plot, base_path * "occ_n.png")
