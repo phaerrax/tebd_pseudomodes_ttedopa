@@ -57,9 +57,9 @@ let
 
   # Stati di singola eccitazione
   single_ex_state_tags = [vcat(
-    ["Emp:Emp"],
+    ["vecid"],
     [i == n ? "Up:Up" : "Dn:Dn" for i = 1:n_sites],
-    ["Emp:Emp"]
+    ["vecid"]
   ) for n = 1:n_sites]
   single_ex_states = [MPS(sites, tags) for tags in single_ex_state_tags]
 
@@ -151,12 +151,12 @@ let
   #   oscillatori, invece, uso
   osc_num_sx = MPS(sites, vcat(
     ["vecnum"],
-    repeat(["Dn:Dn"], n_sites),
-    ["Emp:Emp"]
+    repeat(["vecid"], n_sites),
+    ["vecid"]
   ))
   osc_num_dx = MPS(sites, vcat(
-    ["Emp:Emp"],
-    repeat(["Dn:Dn"], n_sites),
+    ["vecid"],
+    repeat(["vecid"], n_sites),
     ["vecnum"]
   ))
   occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
