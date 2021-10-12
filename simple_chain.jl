@@ -3,20 +3,36 @@
 using ITensors
 using Plots
 using LaTeXStrings
+using JSON
 
 # Questo programma calcola l'evoluzione della catena di spin isolata,
 # usando le tecniche dei MPS ed MPO.
 
 let
-  total_time = 10
+  # Lettura dei parametri della simulazione
+  # =======================================
+  input_filename = ARGS[1]
+  input = open(input_filename)
+  s = read(input, String)
+  parameters = JSON.parse(s)
+  close(input)
+
+  # - parametri per ITensors
+  max_err = parameters["MP_compression_error"]
+  max_dim = parameters["MP_maximum_bond_dimension"]
+
+  # - parametri fisici
+  ε = parameters["spin_excitation_energy"]
+  # λ = 1
+
+  # - discretizzazione dell'intervallo temporale
+  total_time = parameters["simulation_end_time"]
   # Al variare di epsilon devo cambiare anche n_steps se no non
   # tornano i risultati... quindi lo definisco in seguito.
 
-  max_err = 1e-10
-
   # Costruzione della catena
   # ========================
-  n_sites = 10 # per ora deve essere un numero pari
+  n_sites = parameters["number_of_spin_sites"] # per ora deve essere un numero pari
   # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
   sites = siteinds("S=1/2", n_sites)
   # Lo stato iniziale ha un'eccitazione nel primo sito
@@ -35,10 +51,10 @@ let
     
   # Costruzione dell'operatore di evoluzione
   # ========================================
-  epsilon = 50
-  n_steps = Int(total_time * epsilon)
-  time_step = total_time / n_steps
-  # lambda = 1
+  n_steps = Int(total_time * ε)
+  time_step_list = collect(LinRange(0, total_time, n_steps))
+  time_step = time_step_list[2] - time_step_list[1]
+  #
   # Ricorda:
   # - gli h_loc agli estremi della catena vanno trattati separatamente
   # - Sz è 1/2*sigma_z, la matrice sigma_z si chiama id, e così per le
@@ -46,24 +62,24 @@ let
   links_odd = ITensor[]
   s1 = sites[1]
   s2 = sites[2]
-  h_loc = epsilon * op("Sz", s1) * op("id*id", s2) +
-          1/2 * epsilon * op("id*id", s1) * op("Sz", s2) +
+  h_loc = ε * op("Sz", s1) * op("id*id", s2) +
+          1/2 * ε * op("id*id", s1) * op("Sz", s2) +
           -1/2 * op("S+", s1) * op("S-", s2) +
           -1/2 * op("S-", s1) * op("S+", s2)
   push!(links_odd, exp(-1.0im * time_step * h_loc))
   for j = 3:2:n_sites-3
     s1 = sites[j]
     s2 = sites[j+1]
-    h_loc = 1/2 * epsilon * op("Sz", s1) * op("id*id", s2) +
-            1/2 * epsilon * op("id*id", s1) * op("Sz", s2) +
+    h_loc = 1/2 * ε * op("Sz", s1) * op("id*id", s2) +
+            1/2 * ε * op("id*id", s1) * op("Sz", s2) +
             -1/2 * op("S+", s1) * op("S-", s2) +
             -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_odd, exp(-1.0im * time_step * h_loc))
   end
   s1 = sites[end-1] # j = n_sites-1
   s2 = sites[end] # j = n_sites
-  h_loc = 1/2 * epsilon * op("Sz", s1) * op("id*id", s2) +
-          epsilon * op("id*id", s1) * op("Sz", s2) +
+  h_loc = 1/2 * ε * op("Sz", s1) * op("id*id", s2) +
+          ε * op("id*id", s1) * op("Sz", s2) +
           -1/2 * op("S+", s1) * op("S-", s2) +
           -1/2 * op("S-", s1) * op("S+", s2)
   push!(links_odd, exp(-1.0im * time_step * h_loc))
@@ -72,8 +88,8 @@ let
   for j = 2:2:n_sites-2
     s1 = sites[j]
     s2 = sites[j+1]
-    h_loc = 1/2 * epsilon * op("Sz", s1) * op("id*id", s2) +
-            1/2 * epsilon * op("id*id", s1) * op("Sz", s2) +
+    h_loc = 1/2 * ε * op("Sz", s1) * op("id*id", s2) +
+            1/2 * ε * op("id*id", s1) * op("Sz", s2) +
             -1/2 * op("S+", s1) * op("S-", s2) +
             -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_even, exp(-1.0im * time_step * h_loc))
@@ -85,7 +101,7 @@ let
   occ_n = [[abs2(inner(s, current_state)) for s in single_ex_states]]
   maxdim_monitor = Int[]
 
-  for step = 1:n_steps
+  for step in time_step_list[2:end]
     current_state = apply(time_evolution_oplist, current_state; cutoff=max_err)
     occ_n = vcat(occ_n, [[abs2(inner(s, current_state)) for s in single_ex_states]])
     push!(maxdim_monitor, maxlinkdim(current_state))

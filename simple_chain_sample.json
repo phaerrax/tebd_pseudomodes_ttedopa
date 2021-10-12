@@ -1,0 +1,7 @@
+{
+  "spin_excitation_energy": 150,
+  "number_of_spin_sites": 10,
+  "simulation_end_time": 40,
+  "MP_maximum_bond_dimension": 100,
+  "MP_compression_error": 1e-8
+}

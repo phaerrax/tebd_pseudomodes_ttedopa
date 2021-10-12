@@ -5,6 +5,7 @@ using Plots
 using LaTeXStrings
 using ProgressMeter
 using LinearAlgebra
+using JSON
 
 include("spin_chain_space.jl")
 include("harmonic_oscillator_space.jl")
@@ -25,22 +26,31 @@ let
   end
   base_path *= '/'
 
-  # Impostazione dei parametri della simulazione
-  # ============================================
+  # Lettura dei parametri della simulazione
+  # =======================================
+  input_filename = ARGS[1]
+  input = open(input_filename)
+  s = read(input, String)
+  parameters = JSON.parse(s)
+  close(input)
 
-  max_err = 1e-10
-  max_dim = 100
+  # - parametri per ITensors
+  max_err = parameters["MP_compression_error"]
+  max_dim = parameters["MP_maximum_bond_dimension"]
 
-  ε = 150
+  # - parametri fisici
+  ε = parameters["spin_excitation_energy"]
   # λ = 1
-  κ = 0
-  γ = 0
-  ω = ε
-  T = 0
+  κ = parameters["oscillator_spin_interaction_coefficient"]
+  γ = parameters["oscillator_damping_coefficient"]
+  ω = parameters["oscillator_frequency"]
+  T = parameters["temperature"]
+
   avg_occ_n(T::Number, ω::Number) = 1 / (ℯ^(ω / T) - 1)
 
-  total_time = 20
-  n_steps = Int(total_time * ε / 2)
+  # - discretizzazione dell'intervallo temporale
+  total_time = parameters["simulation_end_time"]
+  n_steps = Int(total_time * ε)
   time_step_list = collect(LinRange(0, total_time, n_steps))
   time_step = time_step_list[2] - time_step_list[1]
   # Al variare di ε devo cambiare anche n_steps se no non
@@ -48,7 +58,7 @@ let
 
   # Costruzione della catena
   # ========================
-  n_sites = 10 # deve essere un numero pari
+  n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
   sites = vcat(
     [Index(osc_dim^2, "vecOsc,Site,n=L")],
     siteinds("vecS=1/2", n_sites),

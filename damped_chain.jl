@@ -60,19 +60,26 @@ let
     return exp(t * L)
   end
 
-  # Impostazione dei parametri della simulazione
-  # ============================================
-  # Cartella che conterrà i file prodotti
-  base_dir = "damped_chain/"
+  # Lettura dei parametri della simulazione
+  # =======================================
+  input_filename = ARGS[1]
+  input = open(input_filename)
+  s = read(input, String)
+  parameters = JSON.parse(s)
+  close(input)
 
-  max_err = 1e-8
+  # - parametri per ITensors
+  max_err = parameters["MP_compression_error"]
+  max_dim = parameters["MP_maximum_bond_dimension"]
 
-  ε = 150
+  # - parametri fisici
+  ε = parameters["spin_excitation_energy"]
   # λ = 1
-  κ = 0.1
-  T = 10
+  κ = parameters["damping_coefficient"]
+  T = parameters["temperature"]
 
-  total_time = 20
+  # - discretizzazione dell'intervallo temporale
+  total_time = parameters["simulation_end_time"]
   n_steps = Int(total_time * ε)
   time_step_list = collect(LinRange(0, total_time, n_steps))
   time_step = time_step_list[2] - time_step_list[1]
@@ -81,7 +88,7 @@ let
 
   # Costruzione della catena
   # ========================
-  n_sites = 10 # per ora deve essere un numero pari
+  n_sites = parameters["number_of_spin_sites"] # per ora deve essere un numero pari
   # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
   sites = siteinds("vecS=1/2", n_sites)
 
