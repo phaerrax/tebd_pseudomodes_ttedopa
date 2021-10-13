@@ -73,44 +73,20 @@ let
   ) for n = 1:n_sites]
   single_ex_states = [MPS(sites, tags) for tags in single_ex_state_tags]
 
-  # Definizione degli operatori nell'equazione di Lindblad
-  # ======================================================
-  # - termini locali dell'Hamiltoniano
-  function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
-    h = op("σz:id", s) - op("id:σz", s)
-    return 0.5im * h
-  end
-  function ITensors.op(::OpName"H1loc", ::SiteType"vecOsc", s::Index)
-    h = op("num:id", s) - op("id:num", s)
-    return im * h
-  end
-  # - termini bilocali dell'Hamiltoniano
-  function ITensors.op(::OpName"HspinInt", ::SiteType"vecS=1/2", s1::Index, s2::Index)
-    h = op("id:σ-", s1) * op("id:σ+", s2) +
-        op("id:σ+", s1) * op("id:σ-", s2) -
-        op("σ-:id", s1) * op("σ+:id", s2) -
-        op("σ+:id", s1) * op("σ-:id", s2)
-    return 0.5im * h
-  end
-  # - termini di smorzamento
-  function ITensors.op(::OpName"damping", ::SiteType"vecOsc", s::Index; ω::Number, T::Number)
-    if T == 0
-      n = 0
-    else
-      n = (ℯ^(ω / T) - 1)^(-1)
-    end
-    d = (n + 1) * (op("a+T:a-", s) - 0.5 * (op("num:id", s) + op("id:num", s))) +
-        n * (op("a-T:a+", s) - 0.5 * (op("num:id", s) + op("id:num", s)) - op("id:id", s))
-    return d
-  end
-
-  # e rispettivi termini per l'operatore di evoluzione: i siti del sistema
-  # sono numerati come | 1 | 2 | ... | n_sites | n_sites+1 | n_sites+2 |
-  #                      ↑   │                        │          ↑
-  #                      │   └───────────┬────────────┘          │
-  # oscillatore sx ──────┘        catena di spin                 │ 
-  #                                                       oscillatore dx
-  # - quello per la coppia oscillatore-spin di sinistra
+  #= Definizione degli operatori nell'equazione di Lindblad
+     ======================================================
+     I siti del sistema sono numerati come segue:
+     | 1 | 2 | ... | n_sites | n_sites+1 | n_sites+2 |
+       ↑   │                        │          ↑
+       │   └───────────┬────────────┘          │
+       │               │                       │
+       │        catena di spin                 │
+     oscillatore sx                    oscillatore dx
+     (Dato che non so come definire delle funzioni "op" che accettano Index di
+     tipi diversi, vecS=1/2 e vecOsc in questo caso, non posso spostare anche
+     questi due operatori ℓ_sx ed ℓ_dx nei file separati...)
+  =#
+  # - operatore per la coppia oscillatore-spin di sinistra
   sL = sites[1]
   s1 = sites[2]
   ℓ_sx = ω * op("H1loc", sL) * op("id:id", s1) +
@@ -120,15 +96,7 @@ let
          γ * op("damping", sL; ω=ω, T=T) * op("id:id", s1)
   expℓ_sx = exp(0.5time_step * ℓ_sx)
   #
-  # - quello per le coppie di spin, da (1,2) a (n_sites-1,n_sites)
-  function ITensors.op(::OpName"expℓ", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number)
-    ℓ = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-        0.5ε * op("id:id", s1) * op("H1loc", s2) +
-        op("HspinInt", s1, s2)
-    return exp(t * ℓ)
-  end
-  #
-  # - quello per la coppia oscillatore-spin di destra (T = 0 => avg_occ_n = 0)
+  # - e quello per la coppia oscillatore-spin di destra
   sn = sites[end-1]
   sR = sites[end]
   ℓ_dx = 0.5ε * op("H1loc", sn) * op("id:id", sR) +

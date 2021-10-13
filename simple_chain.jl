@@ -51,6 +51,9 @@ let
     
   # Costruzione dell'operatore di evoluzione
   # ========================================
+  # In questo sistema semplice non sto usando la matrice identità e l'equazione
+  # di Lindblad per calcolare la traiettoria del sistema, quindi non mi servono
+  # le funzioni definite nei vari file ausiliari.
   n_steps = Int(total_time * ε)
   time_step_list = collect(LinRange(0, total_time, n_steps))
   time_step = time_step_list[2] - time_step_list[1]

@@ -17,45 +17,20 @@ include("spin_chain_space.jl")
 let
   # Definizione degli operatori nell'equazione di Lindblad
   # ======================================================
-  # - termine locale dell'Hamiltoniano
-  function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
-    h = op("σz:id", s) - op("id:σz", s)
-    return 0.5im * h
-  end
-  # - termine bilocale dell'Hamiltoniano
-  function ITensors.op(::OpName"H2loc", ::SiteType"vecS=1/2", s1::Index, s2::Index)
-    h = op("id:σ-", s1) * op("id:σ+", s2) +
-        op("id:σ+", s1) * op("id:σ-", s2) -
-        op("σ-:id", s1) * op("σ+:id", s2) -
-        op("σ+:id", s1) * op("σ-:id", s2)
-    return 0.5im * h
-  end
-  # - termine di smorzamento
-  function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
-    d = op("σx:σx", s) - op("id:id", s)
-    return d
-  end
-  # e rispettivi termini per l'operatore di evoluzione:
-  # - quello per le coppie di siti non agli estremi
-  function ITensors.op(::OpName"expL", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number)
-    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-        0.5ε * op("id:id", s1) * op("H1loc", s2) +
-        op("H2loc", s1, s2)
-    return exp(t * L)
-  end
-  # - quello per la coppia (1,2)
+  # Molti operatori sono già definiti in spin_chain_space.jl: rimangono quelli
+  # particolari per questo sistema, cioè l'operatore quello per la coppia (1,2)
   function ITensors.op(::OpName"expL_sx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
     L = ε * op("H1loc", s1) * op("id:id", s2) +
         0.5ε * op("id:id", s1) * op("H1loc", s2) +
-        op("H2loc", s1, s2) +
+        op("HspinInt", s1, s2) +
         ξ * op("damping", s1) * op("id:id", s2)
     return exp(t * L)
   end
-  # - quello per la coppia (n-1,n)
+  # e quello per la coppia (n-1,n)
   function ITensors.op(::OpName"expL_dx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
     L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
         ε * op("id:id", s1) * op("H1loc", s2) +
-        op("H2loc", s1, s2) +
+        op("HspinInt", s1, s2) +
         ξ * op("id:id", s1) * op("damping", s2)
     return exp(t * L)
   end
@@ -102,10 +77,10 @@ let
 
   links_odd = vcat(
     [op("expL_sx", sites[1], sites[2]; t=time_step, ε=ε, ξ=ξL)],
-    [op("expL", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 3:2:n_sites-3],
+    [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 3:2:n_sites-3],
     [op("expL_dx", sites[n_sites-1], sites[n_sites]; t=time_step, ε=ε, ξ=ξR)]
   )
-  links_even = [op("expL", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites-2]
+  links_even = [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites-2]
 
   #links_odd = vcat(
   #  [("expL_sx", (1, 2), (t=time_step, ε=ε, ξ=ξL,))],

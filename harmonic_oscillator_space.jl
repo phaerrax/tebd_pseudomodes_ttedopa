@@ -35,3 +35,21 @@ ITensors.op(::OpName"id:num", ::SiteType"vecOsc") = kron(Iₒ, num)
 # - termini di dissipazione
 ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc") = kron(transpose(a⁺), a⁻)
 ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc") = kron(transpose(a⁻), a⁺)
+
+# Composizione dell'Hamiltoniano per i termini degli oscillatori
+# - termini locali dell'Hamiltoniano
+function ITensors.op(::OpName"H1loc", ::SiteType"vecOsc", s::Index)
+  h = op("num:id", s) - op("id:num", s)
+  return im * h
+end
+# - termini di smorzamento
+function ITensors.op(::OpName"damping", ::SiteType"vecOsc", s::Index; ω::Number, T::Number)
+  if T == 0
+    n = 0
+  else
+    n = (ℯ^(ω / T) - 1)^(-1)
+  end
+  d = (n + 1) * (op("a+T:a-", s) - 0.5 * (op("num:id", s) + op("id:num", s))) +
+      n * (op("a-T:a+", s) - 0.5 * (op("num:id", s) + op("id:num", s)) - op("id:id", s))
+  return d
+end

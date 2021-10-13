@@ -44,3 +44,30 @@ ITensors.op(::OpName"σ-:id", ::SiteType"vecS=1/2") = kron(σ⁻, I₂)
 ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = kron(σˣ, σˣ)
 ITensors.op(::OpName"σx:id", ::SiteType"vecS=1/2") = kron(σˣ, I₂)
 ITensors.op(::OpName"id:σx", ::SiteType"vecS=1/2") = kron(I₂, σˣ)
+
+# Composizione dell'Hamiltoniano per i termini di spin
+# - termini locali dell'Hamiltoniano
+function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
+  h = op("σz:id", s) - op("id:σz", s)
+  return 0.5im * h
+end
+# - termini bilocali dell'Hamiltoniano
+function ITensors.op(::OpName"HspinInt", ::SiteType"vecS=1/2", s1::Index, s2::Index)
+  h = op("id:σ-", s1) * op("id:σ+", s2) +
+      op("id:σ+", s1) * op("id:σ-", s2) -
+      op("σ-:id", s1) * op("σ+:id", s2) -
+      op("σ+:id", s1) * op("σ-:id", s2)
+  return 0.5im * h
+end
+# - esponenziale del termine che coinvolge solo spin
+function ITensors.op(::OpName"expHspin", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number)
+  ℓ = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
+      0.5ε * op("id:id", s1) * op("H1loc", s2) +
+      op("HspinInt", s1, s2)
+  return exp(t * ℓ)
+end
+# - termine di smorzamento per uno spin
+function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
+  d = op("σx:σx", s) - op("id:id", s)
+  return d
+end
