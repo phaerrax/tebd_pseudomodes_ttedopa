@@ -5,6 +5,7 @@ using Plots
 using LaTeXStrings
 using ProgressMeter
 using LinearAlgebra
+using JSON
 
 include("spin_chain_space.jl")
 

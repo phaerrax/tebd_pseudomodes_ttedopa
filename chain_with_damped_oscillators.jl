@@ -127,7 +127,7 @@ let
     sR = sites[end]
     ℓ_dx = 0.5ε * op("H1loc", sn) * op("id:id", sR) +
            ω * op("id:id", sn) * op("H1loc", sR) +
-           im*κ * op("σx:id", sn) * op("asumT:id", sR) +
+           im*κ * op("σx:id", sn) * op("asum:id", sR) +
            -im*κ * op("id:σx", sn) * op("id:asum", sR) +
            γ * op("id:id", sn) * op("damping", sR; ω=ω, T=0)
     expℓ_dx = exp(0.5time_step * ℓ_dx)
@@ -136,10 +136,10 @@ let
     # ========================================
     links_odd = vcat(
       [expℓ_sx],
-      [op("expℓ", sites[j], sites[j+1]; t=0.5time_step, ε=ε) for j = 3:2:n_sites],
+      [op("expHspin", sites[j], sites[j+1]; t=0.5time_step, ε=ε) for j = 3:2:n_sites],
       [expℓ_dx]
     )
-    links_even = [op("expℓ", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites+1]
+    links_even = [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites+1]
 
     # Osservabili da misurare
     # =======================
