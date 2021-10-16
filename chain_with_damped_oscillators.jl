@@ -37,27 +37,27 @@ let
     end
   end
 
+  function construct_step_list(total_time, ε)
+    # Siccome i risultati sono migliori se il numero di passi della simulazione
+    # è proporzionale ad ε, ho bisogno di costruire l'array con tutti gli istanti
+    # di tempo toccati dalla simulazione per ciascun file di parametri; tale
+    # array serve anche in seguito per disegnare i grafici, quindi usando questa
+    # funzione mi assicuro che l'array sia creato in modo consistente.
+    n_steps = Int(total_time * ε)
+    step_list = collect(LinRange(0, total_time, n_steps))
+    return step_list
+  end
+
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
   current_super = []
   maxdim_monitor_super = []
 
-  #= Impostazione dell'intervallo temporale delle simulazioni
-     ========================================================
-     Siccome mi servirà in seguito, per disegnare i grafici, devo definire qui
-     la lista degli istanti di tempo, fuori dal ciclo delle simulazioni. Siccome
-     è buona cosa variare il numero di passi a seconda di ε, altrimenti temo
-     che non tornino i risultati, prendo il massimo di tutti gli ε e via.
-     Assumo che il parametro simulation_end_time sia lo stesso per tutti.
-  =#
-  total_time = parameter_lists[begin]["simulation_end_time"]
-  maxε = maximum([p["spin_excitation_energy"] for p in parameter_lists])
-  n_steps = Int(total_time * maxε)
-  time_step_list = collect(LinRange(0, total_time, n_steps))
-  time_step = time_step_list[2] - time_step_list[1]
-
   for parameters in parameter_lists
+    # Impostazione dei parametri
+    # ==========================
+
     # - parametri per ITensors
     max_err = parameters["MP_compression_error"]
     max_dim = parameters["MP_maximum_bond_dimension"]
@@ -69,6 +69,10 @@ let
     γ = parameters["oscillator_damping_coefficient"]
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
+
+    # - intervallo temporale delle simulazioni
+    time_step_list = construct_step_list(parameters["simulation_end_time"], ε)
+    time_step = time_step_list[2] - time_step_list[1]
 
     avg_occ_n(T::Number, ω::Number) = 1 / (ℯ^(ω / T) - 1)
 
@@ -213,7 +217,7 @@ let
     current = [[real(inner(j, current_state)) for j in current_op_list]]
 
     # ...e si parte!
-    progress = Progress(n_steps, 1, "Simulazione in corso ", 20)
+    progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
     for step in time_step_list[2:end]
       # Uso l'espansione di Trotter al 2° ordine
       current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
@@ -253,6 +257,9 @@ let
   # - grafico dei numeri di occupazione
   plot_list = []
   for (occ_n, p) in zip(occ_n_super, parameter_lists)
+    # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
+    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
+    #
     n_sites = p["number_of_spin_sites"]
     row = Vector{Float64}(undef, length(occ_n))
     for j = 1:length(occ_n)
@@ -287,6 +294,9 @@ let
   # - grafico dei ranghi dell'MPS
   plot_list = []
   for (maxdim_monitor, p) in zip(maxdim_monitor_super, parameter_lists)
+    # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
+    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
+    #
     maxdim_monitor_plot = plot(time_step_list, maxdim_monitor)
     xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
     #
@@ -304,6 +314,9 @@ let
   # - grafico della corrente di spin
   plot_list = []
   for (current, p) in zip(current_super, parameter_lists)
+    # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
+    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
+    #
     n_sites = p["number_of_spin_sites"]
     row = Vector{Float64}(undef, length(current))
     for i = 1:length(current)
