@@ -2,6 +2,7 @@
 
 using ITensors
 using Plots
+using Measures
 using LaTeXStrings
 using ProgressMeter
 using LinearAlgebra
@@ -247,12 +248,7 @@ let
      la grandezza del font o con il colore quelli che cambiano da una
      simulazione all'altra.
   =#
-  function subplot_title(values_dict, keys)
-    return join(
-      [short_name[k] * "=" * string(values_dict[k]) for k in keys],
-      ", "
-     )
-  end
+  plotsize = Int(sqrt(length(parameter_lists))) .* (600, 400)
   # Innanzitutto, analizzo l'array dei parametri e individuo quali parametri
   # variano tra un caso e l'altro. La funzione 'allunique' restituisce true se
   # tutti i valori nella lista sono distinti; creo dunque una lista per ciascun
@@ -266,6 +262,36 @@ let
   end
   repeated_parameters = setdiff(keys(parameter_lists[begin]), distinct_parameters)
 
+  function subplot_title(values_dict, keys)
+    # Questa funzione costruisce il titolo personalizzato per ciascun sottografico,
+    # che indica solo i parametri che cambiano da una simulazione all'altra
+    return join(
+      [short_name[k] * "=" * string(values_dict[k]) for k in keys],
+      ", "
+     )
+  end
+  function shared_title_fake_plot(subject::String)
+    # Siccome Plots.jl non ha ancora, che io sappia, un modo per dare un titolo
+    # a un gruppo di grafici, mi arrangio con questa soluzione trovata su
+    # StackOverflow, che consiste nel creare un grafico vuoto che contiene il
+    # titolo voluto come annotazione.
+    # Il titolone contiene i parametri comuni a tutte le simulazioni (perciò
+    # posso prendere senza problemi uno degli elementi di parameter_lists
+    # qualunque) e lo uso come titolo del gruppo di grafici.
+    #
+    # Inserire in questo array i parametri che non si vuole che appaiano nel
+    # titolo:
+    hidden_parameters = ["simulation_end_time"]
+    #
+    shared_title = join(
+      [short_name[k] * "=" * string(parameter_lists[begin][k]) for k in setdiff(repeated_parameters, hidden_parameters)],
+      ", "
+    )
+    y = ones(3) # Dati falsi per far apparire un grafico
+    title_fake_plot = Plots.scatter(y, marker=0, markeralpha=0, ticks=nothing, annotations=(2, y[2], text(subject * "\n" * shared_title)), axis=false, grid=false, leg=false, bottom_margin=2cm, size=(200,100))
+    return title_fake_plot
+  end
+
   # - grafico dei numeri di occupazione
   plot_list = []
   for (occ_n, p) in zip(occ_n_super, parameter_lists)
@@ -277,8 +303,8 @@ let
     for j = 1:length(occ_n)
       row[j] = occ_n[j][1]
     end
-    occ_n_plot = plot(time_step_list, row, label="L", linestyle=:dash)
-    for i = 2:n_sites-1
+    occ_n_plot = plot(time_step_list, row, label="L", linestyle=:dash, legend=:outerright, left_margin=5mm, bottom_margin=5mm)
+    for i = 1:n_sites
       for j = 1:length(occ_n)
         row[j] = occ_n[j][1+i]
       end
@@ -295,7 +321,11 @@ let
     #
     push!(plot_list, occ_n_plot)
   end
-  group_plot = plot(plot_list..., layout=length(plot_list))
+  group_plot = Plots.plot(
+    shared_title_fake_plot("Numero di occupazione dei siti"),
+    Plots.plot(plot_list..., layout=length(plot_list), size=plotsize),
+    layout=grid(2, 1, heights=[0.1, 0.9])
+  )
   savefig(group_plot, base_path * "occ_n.png")
 
   # - grafico dei ranghi dell'MPS
@@ -304,13 +334,17 @@ let
     # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
     time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
     #
-    maxdim_monitor_plot = plot(time_step_list, maxdim_monitor)
+    maxdim_monitor_plot = plot(time_step_list, maxdim_monitor, legend=:outerright, left_margin=5mm, bottom_margin=5mm)
     xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
     title!(maxdim_monitor_plot, subplot_title(p, distinct_parameters))
     #
     push!(plot_list, maxdim_monitor_plot)
   end
-  group_plot = plot(plot_list..., layout=length(plot_list))
+  group_plot = plot(
+    shared_title_fake_plot("Rango massimo del MPS"),
+    plot(plot_list..., layout=length(plot_list), size=plotsize),
+    layout=grid(2, 1, heights=[0.1, 0.9])
+  )
   savefig(group_plot, base_path * "maxdim_monitor.png")
 
   # - grafico della corrente di spin
@@ -324,7 +358,7 @@ let
     for i = 1:length(current)
       row[i] = current[i][1]
     end
-    current_plot = plot(time_step_list, row, label="(1,2)")
+    current_plot = plot(time_step_list, row, label="(1,2)", legend=:outerright, left_margin=5mm, bottom_margin=5mm)
     for i = 2:n_sites-1
       for j = 1:length(current)
         row[j] = current[j][i]
@@ -337,7 +371,11 @@ let
     #
     push!(plot_list, current_plot)
   end
-  group_plot = plot(plot_list..., layout=length(plot_list))
+  group_plot = plot(
+    shared_title_fake_plot("Corrente di spin"),
+    plot(plot_list..., layout=length(plot_list), size=plotsize),
+    layout=grid(2, 1, heights=[0.1, 0.9])
+  )
   savefig(group_plot, base_path * "spin_current.png")
 
   return
