@@ -37,6 +37,12 @@ let
     end
   end
 
+  # Carico il dizionario dei "nomi brevi" per i parametri, che servirà
+  # per i titoli nei grafici dopo
+  f = open("short_names_dictionary.json", "r")
+  short_name = JSON.parse(read(f, String))
+  close(f)
+
   function construct_step_list(total_time, ε)
     # Siccome i risultati sono migliori se il numero di passi della simulazione
     # è proporzionale ad ε, ho bisogno di costruire l'array con tutti gli istanti
@@ -241,6 +247,12 @@ let
      la grandezza del font o con il colore quelli che cambiano da una
      simulazione all'altra.
   =#
+  function subplot_title(values_dict, keys)
+    return join(
+      [short_name[k] * "=" * string(values_dict[k]) for k in keys],
+      ", "
+     )
+  end
   # Innanzitutto, analizzo l'array dei parametri e individuo quali parametri
   # variano tra un caso e l'altro. La funzione 'allunique' restituisce true se
   # tutti i valori nella lista sono distinti; creo dunque una lista per ciascun
@@ -279,12 +291,7 @@ let
     #
     xlabel!(occ_n_plot, L"$\lambda\,t$")
     ylabel!(occ_n_plot, L"$\langle n_i\rangle$")
-    #
-    title = ""
-    for key in distinct_parameters
-      title *= key * "=" * string(p[key]) * " "
-    end
-    title!(occ_n_plot, title)
+    title!(occ_n_plot, subplot_title(p, distinct_parameters))
     #
     push!(plot_list, occ_n_plot)
   end
@@ -299,12 +306,7 @@ let
     #
     maxdim_monitor_plot = plot(time_step_list, maxdim_monitor)
     xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
-    #
-    title = ""
-    for key in distinct_parameters
-      title *= key * "=" * string(p[key]) * " "
-    end
-    title!(maxdim_monitor_plot, title)
+    title!(maxdim_monitor_plot, subplot_title(p, distinct_parameters))
     #
     push!(plot_list, maxdim_monitor_plot)
   end
@@ -331,12 +333,7 @@ let
     end
     xlabel!(current_plot, L"$\lambda\,t$")
     ylabel!(current_plot, L"$j_{k,k+1}$")
-    #
-    title = ""
-    for key in distinct_parameters
-      title *= key * "=" * string(p[key]) * " "
-    end
-    title!(current_plot, title)
+    title!(current_plot, subplot_title(p, distinct_parameters))
     #
     push!(plot_list, current_plot)
   end

@@ -1,0 +1,11 @@
+{
+  "spin_excitation_energy": "ε",
+  "number_of_spin_sites": "N",
+  "simulation_end_time": "end_time",
+  "MP_maximum_bond_dimension": "χ",
+  "MP_compression_error": "compr_err",
+  "oscillator_spin_interaction_coefficient": "κ",
+  "oscillator_damping_coefficient": "γ",
+  "oscillator_frequency": "ω",
+  "temperature": "T"
+}
