@@ -2,7 +2,7 @@
 Il codice sorgente delle simulazioni svolte per la tesi magistrale.
 
 ## Esecuzione
-Gli script richiedono come argomento, da passare alla riga di comando, il nome di un file JSON che contiene i parametri fisici e tecnici per la simulazione, formattato come un dizionario Python, cioè
+Gli script richiedono come argomento, da passare alla riga di comando, uno o più file JSON (uno solo per i programmi più vecchi `simple_chain` e `damped_chain`), ciascuno contenente i parametri fisici e tecnici per la simulazione, formattato come un dizionario Python, cioè
 
 	{
 		"chiave1": valore1,
@@ -11,6 +11,9 @@ Gli script richiedono come argomento, da passare alla riga di comando, il nome d
 		"chiaveN": valoreN
 	}
 In questo modo non è necessario modificare il codice del programma solo per provare nuovi valori dei parametri.
+Il programma eseguirà la simulazione per ciascuno degli insiemi di parametri forniti, e disegnerà dei grafici per confrontare i risultati tra i vari casi.
+
+Esempio: `./chain_with_damped_oscillators.jl parametri1.json parametri2.json`
 
 #### Parametri richiesti
 Tutte le grandezze fisiche sono da intendersi come quantità ridotte (come spiegato nella tesi), vale a dire che il coefficiente λ dell'interazione tra gli spin vale sempre 1. Per tutti gli script sono richiesti i parametri:
