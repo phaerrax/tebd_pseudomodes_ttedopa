@@ -248,7 +248,7 @@ let
      la grandezza del font o con il colore quelli che cambiano da una
      simulazione all'altra.
   =#
-  plotsize = Int(sqrt(length(parameter_lists))) .* (600, 400)
+  plotsize = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
   # Innanzitutto, analizzo l'array dei parametri e individuo quali parametri
   # variano tra un caso e l'altro. La funzione 'allunique' restituisce true se
   # tutti i valori nella lista sono distinti; creo dunque una lista per ciascun
@@ -271,14 +271,14 @@ let
      )
   end
   function shared_title_fake_plot(subject::String)
-    # Siccome Plots.jl non ha ancora, che io sappia, un modo per dare un titolo
-    # a un gruppo di grafici, mi arrangio con questa soluzione trovata su
-    # StackOverflow, che consiste nel creare un grafico vuoto che contiene il
-    # titolo voluto come annotazione.
-    # Il titolone contiene i parametri comuni a tutte le simulazioni (perciò
-    # posso prendere senza problemi uno degli elementi di parameter_lists
-    # qualunque) e lo uso come titolo del gruppo di grafici.
-    #
+    #= Siccome Plots.jl non ha ancora, che io sappia, un modo per dare un titolo
+       a un gruppo di grafici, mi arrangio con questa soluzione trovata su
+       StackOverflow, che consiste nel creare un grafico vuoto che contiene il
+       titolo voluto come annotazione.
+       Il titolone contiene i parametri comuni a tutte le simulazioni (perciò
+       posso prendere senza problemi uno degli elementi di parameter_lists
+       qualunque) e lo uso come titolo del gruppo di grafici.
+    =#
     # Inserire in questo array i parametri che non si vuole che appaiano nel
     # titolo:
     hidden_parameters = ["simulation_end_time"]
@@ -292,91 +292,100 @@ let
     return title_fake_plot
   end
 
-  # - grafico dei numeri di occupazione
-  plot_list = []
-  for (occ_n, p) in zip(occ_n_super, parameter_lists)
-    # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
-    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
-    #
-    n_sites = p["number_of_spin_sites"]
-    row = Vector{Float64}(undef, length(occ_n))
-    for j = 1:length(occ_n)
-      row[j] = occ_n[j][1]
-    end
-    occ_n_plot = plot(time_step_list, row, label="L", linestyle=:dash, legend=:outerright, left_margin=5mm, bottom_margin=5mm)
-    for i = 1:n_sites
-      for j = 1:length(occ_n)
-        row[j] = occ_n[j][1+i]
-      end
-      plot!(occ_n_plot, time_step_list, row, label=string(i))
-    end
-    for j = 1:length(occ_n)
-      row[j] = occ_n[j][end]
-    end
-    plot!(occ_n_plot, time_step_list, row, label="R", linestyle=:dash)
-    #
-    xlabel!(occ_n_plot, L"$\lambda\,t$")
-    ylabel!(occ_n_plot, L"$\langle n_i\rangle$")
-    title!(occ_n_plot, subplot_title(p, distinct_parameters))
-    #
-    push!(plot_list, occ_n_plot)
-  end
-  group_plot = Plots.plot(
-    shared_title_fake_plot("Numero di occupazione dei siti"),
-    Plots.plot(plot_list..., layout=length(plot_list), size=plotsize),
-    layout=grid(2, 1, heights=[0.1, 0.9])
-  )
-  savefig(group_plot, base_path * "occ_n.png")
+  function plot_time_series(data_super; labels, linestyles, x_label, y_label, plot_title)
+    #= Disegna un grafico a partire dagli array "_super" ottenuti dalla
+       simulazione qui sopra.
 
-  # - grafico dei ranghi dell'MPS
-  plot_list = []
-  for (maxdim_monitor, p) in zip(maxdim_monitor_super, parameter_lists)
-    # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
-    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
-    #
-    maxdim_monitor_plot = plot(time_step_list, maxdim_monitor, legend=:outerright, left_margin=5mm, bottom_margin=5mm)
-    xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
-    title!(maxdim_monitor_plot, subplot_title(p, distinct_parameters))
-    #
-    push!(plot_list, maxdim_monitor_plot)
-  end
-  group_plot = plot(
-    shared_title_fake_plot("Rango massimo del MPS"),
-    plot(plot_list..., layout=length(plot_list), size=plotsize),
-    layout=grid(2, 1, heights=[0.1, 0.9])
-  )
-  savefig(group_plot, base_path * "maxdim_monitor.png")
+       Argomenti
+       ---------
+     · `data::Array{Any}`: un array di dimensione uguale a quella di
+       parameter_lists.
+       Ciascun elemento di data è un array X che rappresenta la evoluzione nel
+       tempo (durante la simulazione) di N quantità: ogni riga per la
+       precisione è una N-upla di valori che sono i valori di queste quantità
+       ad ogni istante di tempo.
+       L'array Xᵀ = hcat(X...) ne è la trasposizione: la sua riga j-esima, a
+       cui accedo con Xᵀ[j,:], dà la serie temporale della j-esima quantità.
 
-  # - grafico della corrente di spin
-  plot_list = []
-  for (current, p) in zip(current_super, parameter_lists)
-    # Ricreo l'array con gli istanti di tempo (che varia a seconda di ε)
-    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
-    #
-    n_sites = p["number_of_spin_sites"]
-    row = Vector{Float64}(undef, length(current))
-    for i = 1:length(current)
-      row[i] = current[i][1]
-    end
-    current_plot = plot(time_step_list, row, label="(1,2)", legend=:outerright, left_margin=5mm, bottom_margin=5mm)
-    for i = 2:n_sites-1
-      for j = 1:length(current)
-        row[j] = current[j][i]
+     · `labels::Array{String}`: un array di dimensione N che contiene le
+       etichette da assegnare alla linea di ciascuna quantità da disegnare.
+
+     · `linestyles::Array{Symbol}`: come `labels`, ma per gli stili delle linee.
+
+     · `input_xlabel::String`: etichetta delle ascisse (comune a tutti)
+
+     · `input_ylabel::String`: etichetta delle ordinate (comune a tutti)
+
+     · `plot_title::String`: titolo grande del grafico
+    =#
+    subplots = []
+    for (p, data) in zip(parameter_lists, data_super)
+      time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
+      dataᵀ = hcat(data...)
+      N = size(dataᵀ, 1)
+      this_plot = plot()
+      for j = 1:N
+        plot!(this_plot, time_step_list,
+                         dataᵀ[j,:],
+                         label=labels[j],
+                         linestyle=linestyles[j],
+                         legend=:outerright,
+                         left_margin=5mm,
+                         bottom_margin=5mm
+                        )
       end
-      plot!(current_plot, time_step_list, row, label="("*string(i)*","*string(i+1)*")")
+      xlabel!(this_plot, x_label)
+      ylabel!(this_plot, y_label)
+      title!(this_plot, subplot_title(p, distinct_parameters))
+      push!(subplots, this_plot)
     end
-    xlabel!(current_plot, L"$\lambda\,t$")
-    ylabel!(current_plot, L"$j_{k,k+1}$")
-    title!(current_plot, subplot_title(p, distinct_parameters))
-    #
-    push!(plot_list, current_plot)
+    group_plot = Plots.plot(
+      shared_title_fake_plot(plot_title),
+      Plots.plot(subplots..., layout=length(subplots), size=plotsize),
+      layout=grid(2, 1, heights=[0.1, 0.9])
+    )
+    return group_plot
   end
-  group_plot = plot(
-    shared_title_fake_plot("Corrente di spin"),
-    plot(plot_list..., layout=length(plot_list), size=plotsize),
-    layout=grid(2, 1, heights=[0.1, 0.9])
-  )
-  savefig(group_plot, base_path * "spin_current.png")
+
+  # Grafico dei numeri di occupazione
+  # ---------------------------------
+  len = size(hcat(occ_n_super[begin]...), 1)
+  # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
+  # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
+  # funzione `plot_time_series` anche tutto ciò che varia con tale lunghezza,
+  # come `labels` e `linestyles`.
+  #
+  plt = plot_time_series(occ_n_super;
+                         labels=vcat(["L"], string.(collect(1:len-2)), ["R"]),
+                         linestyles=vcat([:dash], repeat([:solid], len-2), [:dash]),
+                         x_label=L"\lambda\, t",
+                         y_label=L"\langle n_i\rangle",
+                         plot_title="Numeri di occupazione"
+                        )
+  savefig(plt, base_path * "occ_n.png")
+
+  # Grafico dei ranghi del MPS
+  # --------------------------
+  plt = plot_time_series(maxdim_monitor_super;
+                         labels=["MPS"],
+                         linestyles=[:solid],
+                         x_label=L"\lambda\, t",
+                         y_label=L"\max_k\,\chi_{k,k+1}",
+                         plot_title="Rango massimo del MPS"
+                        )
+  savefig(plt, base_path * "maxdim_monitor.png")
+
+  # Grafico della corrente di spin
+  # ------------------------------
+  len = size(hcat(current_super[begin]...), 1)
+  plt = plot_time_series(current_super;
+                         labels=string.(collect(1:len)),
+                         linestyles=repeat([:solid], len),
+                         x_label=L"\lambda\, t",
+                         y_label=L"j_{k,k+1}",
+                         plot_title="Corrente di spin"
+                        )
+  savefig(plt, base_path * "spin_current.png")
 
   return
 end
