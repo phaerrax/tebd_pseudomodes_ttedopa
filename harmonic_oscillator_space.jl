@@ -17,12 +17,15 @@ function ITensors.state(::StateName"Emp:Emp", ::SiteType"vecOsc")
   empty = [i == 1 ? 1 : 0 for i = 1:osc_dim]
   return kron(empty, empty)
 end
-# Lo stato di equilibrio termico deve essere definito nello script principale,
-# perché serve conoscere T ed ω
 ITensors.state(::StateName"veca+", ::SiteType"vecOsc") = vcat(a⁺[:])
 ITensors.state(::StateName"veca-", ::SiteType"vecOsc") = vcat(a⁻[:])
 ITensors.state(::StateName"vecnum", ::SiteType"vecOsc") = vcat(num[:])
 ITensors.state(::StateName"vecid", ::SiteType"vecOsc") = vcat(Iₒ[:])
+function ITensors.state(::StateName"ThermEq", ::SiteType"vecOsc", s::Index; ω, T)
+  mat = exp(-ω / T * num)
+  mat /= tr(mat)
+  return vcat(mat[:])
+end
 
 # Operatori semplici sullo spazio degli oscillatori
 ITensors.op(::OpName"id:id", ::SiteType"vecOsc") = kron(Iₒ, Iₒ)

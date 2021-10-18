@@ -61,6 +61,29 @@ let
   current_super = []
   maxdim_monitor_super = []
 
+  # Definisco qui alcune funzioni che verranno usate nel ciclo principale.
+  # - funzioni per misurare la corrente di spin
+  function current_1(i::Int, obs_index::Int)
+    if i == obs_index
+      str = "vecσy"
+    elseif i == obs_index+1
+      str = "vecσx"
+    else
+      str = "vecid"
+    end
+    return str
+  end
+  function current_2(i::Int, obs_index::Int)
+    if i == obs_index
+      str = "vecσx"
+    elseif i == obs_index+1
+      str = "vecσy"
+    else
+      str = "vecid"
+    end
+    return str
+  end
+
   for parameters in parameter_lists
     # Impostazione dei parametri
     # ==========================
@@ -87,9 +110,9 @@ let
     # ========================
     n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
     sites = vcat(
-      [Index(osc_dim^2, "vecOsc,Site,n=L")],
+      [Index(osc_dim^2, "vecOsc")],
       siteinds("vecS=1/2", n_sites),
-      [Index(osc_dim^2, "vecOsc,Site,n=R")]
+      [Index(osc_dim^2, "vecOsc")]
     )
 
     # Stati di singola eccitazione
@@ -166,27 +189,6 @@ let
     #   viene separato nei suoi due addendi, che sono applicati allo
     #   stato corrente in tempi diversi; in seguito sottraggo il secondo
     #   al primo, e moltiplico tutto per λ/2 (che è 1/2).
-    function current_1(i::Int, obs_index::Int)
-      if i == obs_index
-        str = "vecσy"
-      elseif i == obs_index+1
-        str = "vecσx"
-      else
-        str = "vecid"
-      end
-      return str
-    end
-    function current_2(i::Int, obs_index::Int)
-      if i == obs_index
-        str = "vecσx"
-      elseif i == obs_index+1
-        str = "vecσy"
-      else
-        str = "vecid"
-      end
-      return str
-    end
-    #
     current_op_list_1 = [MPS(sites, vcat(
       ["Emp:Emp"],
       [current_1(i, k) for i = 1:n_sites],
@@ -203,19 +205,17 @@ let
     # Simulazione
     # ===========
     # Stato iniziale: l'oscillatore sx è in equilibrio termico, il resto è vuoto
-    function ITensors.state(::StateName"ThermEq", ::SiteType"vecOsc")
-      mat = exp(-ω / T * num)
-      mat /= tr(mat)
-      return vcat(mat[:]) # (vcat impila le colonne)
-    end
+    # Se T == 0 invece parto con un'eccitazione nella catena (per creare una
+    # situazione simile a quella della catena isolata).
     if T == 0
       current_state = single_ex_states[1]
     else
-      current_state = MPS(sites, vcat(
-        ["ThermEq"],
-        repeat(["Dn:Dn"], n_sites),
-        ["Emp:Emp"]
-      ))
+      current_state = MPS(vcat(
+                               [state(sites[1], "ThermEq"; ω, T)],
+                               [state(sites[1+j], "Dn:Dn") for j=1:n_sites],
+                               [state(sites[end], "Emp:Emp")]
+                              )
+                         )
     end
 
     # Misuro le osservabili sullo stato iniziale
