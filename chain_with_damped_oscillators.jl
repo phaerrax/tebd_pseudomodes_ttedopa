@@ -290,7 +290,7 @@ let
     return title_fake_plot
   end
 
-  function plot_time_series(data_super; labels, linestyles, x_label, y_label, plot_title)
+  function plot_time_series(data_super; displayed_sites, labels, linestyles, x_label, y_label, plot_title)
     #= Disegna un grafico a partire dagli array "_super" ottenuti dalla
        simulazione qui sopra.
 
@@ -305,7 +305,12 @@ let
        L'array Xᵀ = hcat(X...) ne è la trasposizione: la sua riga j-esima, a
        cui accedo con Xᵀ[j,:], dà la serie temporale della j-esima quantità.
 
-     · `labels::Array{String}`: un array di dimensione N che contiene le
+     · `displayed_sites`: un array di M ≤ N indici in 1:N che indica quali
+       serie temporali (cioè, riferite a quali siti) disegnare; il valore
+       `nothing` implica che tutte vanno disegnate. Va bene anche un oggetto
+       del tipo a:b, verrà convertito automaticamente
+
+     · `labels::Array{String}`: un array di dimensione M che contiene le
        etichette da assegnare alla linea di ciascuna quantità da disegnare.
 
      · `linestyles::Array{Symbol}`: come `labels`, ma per gli stili delle linee.
@@ -321,12 +326,16 @@ let
       time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
       dataᵀ = hcat(data...)
       N = size(dataᵀ, 1)
+      if displayed_sites == nothing
+        displayed_sites = 1:N
+      end
+      #
       this_plot = plot()
-      for j = 1:N
+      for (j, lab, lst) in zip(displayed_sites, labels, linestyles)
         plot!(this_plot, time_step_list,
                          dataᵀ[j,:],
-                         label=labels[j],
-                         linestyle=linestyles[j],
+                         label=lab,
+                         linestyle=lst,
                          legend=:outerright,
                          left_margin=5mm,
                          bottom_margin=5mm
@@ -345,8 +354,8 @@ let
     return group_plot
   end
 
-  # Grafico dei numeri di occupazione
-  # ---------------------------------
+  # Grafico dei numeri di occupazione (tutti i siti)
+  # ------------------------------------------------
   len = size(hcat(occ_n_super[begin]...), 1)
   # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
   # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
@@ -354,17 +363,53 @@ let
   # come `labels` e `linestyles`.
   #
   plt = plot_time_series(occ_n_super;
-                         labels=vcat(["L"], string.(collect(1:len-2)), ["R"]),
+                         displayed_sites=nothing,
+                         labels=vcat(["L"], string.(1:len-2), ["R"]),
                          linestyles=vcat([:dash], repeat([:solid], len-2), [:dash]),
                          x_label=L"\lambda\, t",
                          y_label=L"\langle n_i\rangle",
                          plot_title="Numeri di occupazione"
                         )
-  savefig(plt, base_path * "occ_n.png")
+  savefig(plt, base_path * "occ_n_all.png")
+
+  # Grafico dei numeri di occupazione (tutti i siti)
+  # ------------------------------------------------
+  plt = plot_time_series(occ_n_super;
+                         displayed_sites=2:len+1,
+                         labels=string.(1:len-2),
+                         linestyles=repeat([:solid], len-2),
+                         x_label=L"\lambda\, t",
+                         y_label=L"\langle n_i\rangle",
+                         plot_title="Numeri di occupazione (solo spin)"
+                        )
+  savefig(plt, base_path * "occ_n_spins_only.png")
+  
+  # Grafico dei numeri di occupazione (oscillatori + totale catena)
+  # ---------------------------------------------------------------
+  data_super = []
+  for occ_n in occ_n_super
+    data = []
+    for row in occ_n
+      push!(data,
+            [first(row), sum(row[2:end-1]), last(row)])
+    end
+    push!(data_super, data)
+  end
+  #
+  plt = plot_time_series(data_super;
+                         displayed_sites=nothing,
+                         labels=["L", "catena", "R"],
+                         linestyles=[:solid, :dot, :solid],
+                         x_label=L"\lambda\, t",
+                         y_label=L"\langle n_i\rangle",
+                         plot_title="Numeri di occupazione (oscillatori + totale catena)"
+                        )
+  savefig(plt, base_path * "occ_n_sums.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
   plt = plot_time_series(maxdim_monitor_super;
+                         displayed_sites=nothing,
                          labels=["MPS"],
                          linestyles=[:solid],
                          x_label=L"\lambda\, t",
@@ -377,7 +422,8 @@ let
   # ------------------------------
   len = size(hcat(current_super[begin]...), 1)
   plt = plot_time_series(current_super;
-                         labels=string.(collect(1:len)),
+                         displayed_sites=nothing,
+                         labels=string.(1:len),
                          linestyles=repeat([:solid], len),
                          x_label=L"\lambda\, t",
                          y_label=L"j_{k,k+1}",
