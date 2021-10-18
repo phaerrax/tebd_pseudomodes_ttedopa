@@ -256,7 +256,7 @@ let
   distinct_parameters = String[]
   for key in keys(parameter_lists[begin])
     test_list = [p[key] for p in parameter_lists]
-    if allunique(test_list)
+    if !all(x -> x == first(test_list), test_list)
       push!(distinct_parameters, key)
     end
   end
