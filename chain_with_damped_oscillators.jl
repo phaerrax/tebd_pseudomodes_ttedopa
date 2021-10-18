@@ -104,8 +104,6 @@ let
     time_step_list = construct_step_list(parameters["simulation_end_time"], ε)
     time_step = time_step_list[2] - time_step_list[1]
 
-    avg_occ_n(T::Number, ω::Number) = 1 / (ℯ^(ω / T) - 1)
-
     # Costruzione della catena
     # ========================
     n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
