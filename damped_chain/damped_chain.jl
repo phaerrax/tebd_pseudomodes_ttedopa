@@ -6,8 +6,12 @@ using LaTeXStrings
 using ProgressMeter
 using LinearAlgebra
 using JSON
+using Base.Filesystem
 
-include("spin_chain_space.jl")
+root_path = dirname(dirname(Base.source_path()))
+lib_path = root_path * "/lib"
+# Sali di due cartelle. root_path è la cartella principale del progetto.
+include(lib_path * "/spin_chain_space.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -157,7 +161,7 @@ let
 
   # Grafici
   # =================================
-  base_dir = "damped_chain/"
+  base_dir = root_path * "/damped_chain/"
   # - grafico dei numeri di occupazione
   row = Vector{Float64}(undef, length(occ_n))
   for i = 1:length(occ_n)

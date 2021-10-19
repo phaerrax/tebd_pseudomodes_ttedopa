@@ -7,9 +7,13 @@ using LaTeXStrings
 using ProgressMeter
 using LinearAlgebra
 using JSON
+using Base.Filesystem
 
-include("spin_chain_space.jl")
-include("harmonic_oscillator_space.jl")
+root_path = dirname(dirname(Base.source_path()))
+lib_path = root_path * "/lib"
+# Sali di due cartelle. root_path è la cartella principale del progetto.
+include(lib_path * "/spin_chain_space.jl")
+include(lib_path * "/harmonic_oscillator_space.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -18,29 +22,37 @@ include("harmonic_oscillator_space.jl")
 # di Lindblad.
 
 let  
-  # Imposta la cartella di base per l'output
-  # ========================================
-  src_path = Base.source_path()
-  base_path = src_path[findlast(isequal('/'), src_path)+1:end]
-  if base_path[end-2:end] == ".jl"
-    base_path = base_path[begin:end-3]
-  end
-  base_path *= '/'
-
   # Lettura dei parametri della simulazione
   # =======================================
-  input_files = ARGS
+  first_arg = ARGS[1]
+  prev_dir = pwd()
+  if isdir(first_arg)
+    # Se il primo input è una cartella, legge tutti i file .json al suo interno
+    # e li carica come file di parametri; alla fine i file di output saranno
+    # salvati in tale cartella.
+    # I restanti elementi di ARGS vengono ignorati (l'utente viene avvisato).
+    cd(first_arg)
+    files = filter(s -> s[end-4:end] == ".json", readdir())
+    @info "$first_arg è una cartella. I restanti argomenti passati alla linea
+           di comando saranno ignorati."
+  else
+    # Se il primo input non è una cartella, tutti gli argomenti passati in ARGS
+    # vengono trattati come file da leggere contenenti i parametri.
+    # I file di output saranno salvati nella cartella pwd() al momento del lancio
+    # del programma.
+    files = ARGS
+  end
+  # Carico i file di parametri nei dizionari.
   parameter_lists = []
-  for f in input_files
+  for f in files
     open(f) do input
       s = read(input, String)
       push!(parameter_lists, JSON.parse(s))
     end
   end
-
   # Carico il dizionario dei "nomi brevi" per i parametri, che servirà
   # per i titoli nei grafici dopo
-  f = open("short_names_dictionary.json", "r")
+  f = open(lib_path * "/short_names_dictionary.json", "r")
   short_name = JSON.parse(read(f, String))
   close(f)
 
@@ -375,7 +387,7 @@ let
                          y_label=L"\langle n_i\rangle",
                          plot_title="Numeri di occupazione"
                         )
-  savefig(plt, base_path * "occ_n_all.png")
+  savefig(plt, "occ_n_all.png")
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
@@ -387,7 +399,7 @@ let
                          y_label=L"\langle n_i\rangle",
                          plot_title="Numeri di occupazione (solo spin)"
                         )
-  savefig(plt, base_path * "occ_n_spins_only.png")
+  savefig(plt, "occ_n_spins_only.png")
   
   # Grafico dei numeri di occupazione (oscillatori + totale catena)
   # ---------------------------------------------------------------
@@ -409,7 +421,7 @@ let
                          y_label=L"\langle n_i\rangle",
                          plot_title="Numeri di occupazione (oscillatori + totale catena)"
                         )
-  savefig(plt, base_path * "occ_n_sums.png")
+  savefig(plt, "occ_n_sums.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
@@ -421,7 +433,7 @@ let
                          y_label=L"\max_k\,\chi_{k,k+1}",
                          plot_title="Rango massimo del MPS"
                         )
-  savefig(plt, base_path * "maxdim_monitor.png")
+  savefig(plt, "maxdim_monitor.png")
 
   # Grafico della corrente di spin
   # ------------------------------
@@ -434,7 +446,8 @@ let
                          y_label=L"j_{k,k+1}",
                          plot_title="Corrente di spin"
                         )
-  savefig(plt, base_path * "spin_current.png")
+  savefig(plt, "spin_current.png")
 
+  cd(prev_dir) # Ritorna alla cartella iniziale.
   return
 end
