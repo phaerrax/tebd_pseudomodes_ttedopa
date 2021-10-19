@@ -206,14 +206,19 @@ let
     # Se T == 0 invece parto con un'eccitazione nella catena (per creare una
     # situazione simile a quella della catena isolata).
     if T == 0
-      current_state = single_ex_states[1]
+      current_state = MPS(sites,
+                          vcat(
+                               ["Emp:Emp"],
+                               [i == 1 ? "Up:Up" : "Dn:Dn" for i = 1:n_sites],
+                               ["Emp:Emp"]
+                              )
+                         )
     else
       current_state = MPS(vcat(
                                [state(sites[1], "ThermEq"; ω, T)],
                                [state(sites[1+j], "Dn:Dn") for j=1:n_sites],
                                [state(sites[end], "Emp:Emp")]
-                              )
-                         )
+                              ))
     end
 
     # Misuro le osservabili sullo stato iniziale
