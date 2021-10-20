@@ -11,6 +11,7 @@ using Base.Filesystem
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
 # Sali di due cartelle. root_path è la cartella principale del progetto.
+include(lib_path * "/utils.jl")
 include(lib_path * "/spin_chain_space.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
@@ -20,11 +21,21 @@ include(lib_path * "/spin_chain_space.jl")
 # di Lindblad.
 
 let
+  parameter_lists = load_parameters(ARGS)
+
+  # Le seguenti liste conterranno i risultati della simulazione per ciascuna
+  # lista di parametri fornita.
+  occ_n_super = []
+  current_super = []
+  maxdim_monitor_super = []
+
   # Definizione degli operatori nell'equazione di Lindblad
   # ======================================================
   # Molti operatori sono già definiti in spin_chain_space.jl: rimangono quelli
-  # particolari per questo sistema, cioè l'operatore quello per la coppia (1,2)
-  function ITensors.op(::OpName"expL_sx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
+  # particolari per questo sistema, che sono specifici di questo sistema e
+  # perciò non ha senso definire nel file comune. Essi sono l'operatore per
+  # la coppia (1,2)
+  function ITensors.op(::OpName"expℓ_sx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
     L = ε * op("H1loc", s1) * op("id:id", s2) +
         0.5ε * op("id:id", s1) * op("H1loc", s2) +
         op("HspinInt", s1, s2) +
@@ -32,7 +43,7 @@ let
     return exp(t * L)
   end
   # e quello per la coppia (n-1,n)
-  function ITensors.op(::OpName"expL_dx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
+  function ITensors.op(::OpName"expℓ_dx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
     L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
         ε * op("id:id", s1) * op("H1loc", s2) +
         op("HspinInt", s1, s2) +
@@ -40,73 +51,8 @@ let
     return exp(t * L)
   end
 
-  # Lettura dei parametri della simulazione
-  # =======================================
-  input_filename = ARGS[1]
-  input = open(input_filename)
-  s = read(input, String)
-  parameters = JSON.parse(s)
-  close(input)
-
-  # - parametri per ITensors
-  max_err = parameters["MP_compression_error"]
-  max_dim = parameters["MP_maximum_bond_dimension"]
-
-  # - parametri fisici
-  ε = parameters["spin_excitation_energy"]
-  # λ = 1
-  κ = parameters["damping_coefficient"]
-  T = parameters["temperature"]
-
-  # - discretizzazione dell'intervallo temporale
-  total_time = parameters["simulation_end_time"]
-  n_steps = Int(total_time * ε)
-  time_step_list = collect(LinRange(0, total_time, n_steps))
-  time_step = time_step_list[2] - time_step_list[1]
-  # Al variare di ε devo cambiare anche n_steps se no non
-  # tornano i risultati...
-
-  # Costruzione della catena
-  # ========================
-  n_sites = parameters["number_of_spin_sites"] # per ora deve essere un numero pari
-  # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
-  sites = siteinds("vecS=1/2", n_sites)
-
-  # Stati di singola eccitazione
-  single_ex_states = MPS[productMPS(sites, n -> n == i ? "Up:Up" : "Dn:Dn") for i = 1:n_sites]
-
-  # Costruzione dell'operatore di evoluzione
-  # ========================================
-  ξL = κ * (1 + 2 / (ℯ^(ε/T) - 1))
-  ξR = κ
-
-  links_odd = vcat(
-    [op("expL_sx", sites[1], sites[2]; t=time_step, ε=ε, ξ=ξL)],
-    [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 3:2:n_sites-3],
-    [op("expL_dx", sites[n_sites-1], sites[n_sites]; t=time_step, ε=ε, ξ=ξR)]
-  )
-  links_even = [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites-2]
-
-  #links_odd = vcat(
-  #  [("expL_sx", (1, 2), (t=time_step, ε=ε, ξ=ξL,))],
-  #  [("expL", (j, j+1), (t=time_step, ε=ε,)) for j = 3:2:n_sites-3],
-  #  [("expL_dx", (n_sites-1, n_sites), (t=time_step, ε=ε, ξ=ξR,))]
-  #)
-
-  #links_even = [("expL", (j, j+1), (t=time_step, ε=ε,)) for j = 2:2:n_sites-2]
-
-  #evol_op_odd_links = MPO(ops(links_odd, sites))
-  #evol_op_even_links = MPO(ops(links_even, sites))
-
-  # Osservabili da misurare
-  # =======================
-  # - la corrente di spin
-  #   Il metodo per calcolarla è questo, finché non mi viene in mente
-  #   qualcosa di più comodo: l'operatore della corrente,
-  #   J_k = λ/2 (σ ˣ⊗ σ ʸ-σ ʸ⊗ σ ˣ),
-  #   viene separato nei suoi due addendi, che sono applicati allo
-  #   stato corrente in tempi diversi; in seguito sottraggo il secondo
-  #   al primo, e moltiplico tutto per λ/2 (che è 1/2).
+  # Definisco ora anche le funzioni che mi serviranno per calcolare la corrente
+  # di spin all'interno del ciclo successivo.
   function current_1(i::Int, obs_index::Int)
     if i == obs_index
       str = "vecσy"
@@ -127,77 +73,151 @@ let
     end
     return str
   end
+
+  for parameters in parameter_lists
+    # - parametri per ITensors
+    max_err = parameters["MP_compression_error"]
+    max_dim = parameters["MP_maximum_bond_dimension"]
+
+    # - parametri fisici
+    ε = parameters["spin_excitation_energy"]
+    # λ = 1
+    κ = parameters["spin_damping_coefficient"]
+    T = parameters["temperature"]
+
+    # - intervallo temporale delle simulazioni
+    time_step_list = construct_step_list(parameters["simulation_end_time"], ε)
+    time_step = time_step_list[2] - time_step_list[1]
+
+    # Costruzione della catena
+    # ========================
+    n_sites = parameters["number_of_spin_sites"] # per ora deve essere un numero pari
+    # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
+    sites = siteinds("vecS=1/2", n_sites)
+
+    # Stati di singola eccitazione
+    single_ex_states = MPS[productMPS(sites, n -> n == i ? "Up:Up" : "Dn:Dn") for i = 1:n_sites]
+
+    # Costruzione dell'operatore di evoluzione
+    # ========================================
+    ξL = T==0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
+    ξR = κ
+
+    links_odd = vcat(
+      [op("expℓ_sx", sites[1], sites[2]; t=0.5time_step, ε=ε, ξ=ξL)],
+      [op("expHspin", sites[j], sites[j+1]; t=0.5time_step, ε=ε) for j = 3:2:n_sites-3],
+      [op("expℓ_dx", sites[n_sites-1], sites[n_sites]; t=0.5time_step, ε=ε, ξ=ξR)]
+    )
+    links_even = [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites-2]
+
+    # Osservabili da misurare
+    # =======================
+    # - la corrente di spin
+    #   Il metodo per calcolarla è questo, finché non mi viene in mente
+    #   qualcosa di più comodo: l'operatore della corrente,
+    #   J_k = λ/2 (σ ˣ⊗ σ ʸ-σ ʸ⊗ σ ˣ),
+    #   viene separato nei suoi due addendi, che sono applicati allo
+    #   stato corrente in tempi diversi; in seguito sottraggo il secondo
+    #   al primo, e moltiplico tutto per λ/2 (che è 1/2).
+    current_op_list_1 = MPS[productMPS(sites, n -> current_1(n, i)) for i = 1:n_sites-1]
+    current_op_list_2 = MPS[productMPS(sites, n -> current_2(n, i)) for i = 1:n_sites-1]
+    current_op_list = [0.5 * (J₊ - J₋) for (J₊, J₋) in zip(current_op_list_1, current_op_list_2)]
+
+    # Simulazione
+    # ===========
+    # Stato iniziale: c'è un'eccitazione nel primo sito
+    current_state = single_ex_states[1]
+
+    # Misuro le osservabili sullo stato iniziale
+    occ_n = [[inner(s, current_state) for s in single_ex_states]]
+    maxdim_monitor = Int[maxlinkdim(current_state)]
+    current = [[real(inner(j, current_state)) for j in current_op_list]]
+
+    # ...e si parte!
+    progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
+    for step in time_step_list[2:end]
+      current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
+      #
+      occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in single_ex_states]])
+      current = vcat(current, [[real(inner(j, current_state)) for j in current_op_list]])
+      push!(maxdim_monitor, maxlinkdim(current_state))
+      next!(progress)
+    end
+
+    # Salvo i risultati nei grandi contenitori
+    push!(occ_n_super, occ_n)
+    push!(current_super, current)
+    push!(maxdim_monitor_super, maxdim_monitor)
+  end
+
+  #= Grafici
+     =======
+     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
+     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
+     la grandezza del font o con il colore quelli che cambiano da una
+     simulazione all'altra.
+  =#
+  # Se il primo argomento da riga di comando è una cartella (che contiene
+  # anche i file di parametri, così anche i grafici verranno salvati in tale
+  # cartella.
+  prev_dir = pwd()
+  if isdir(ARGS[1])
+    cd(ARGS[1])
+  end
+
+  plot_size = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
+
+  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+
+  # Grafico dei numeri di occupazione (tutti i siti)
+  # ------------------------------------------------
+  len = size(hcat(occ_n_super[begin]...), 1)
+  # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
+  # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
+  # funzione `plot_time_series` anche tutto ciò che varia con tale lunghezza,
+  # come `labels` e `linestyles`.
   #
-  current_op_list_1 = MPS[productMPS(sites, n -> current_1(n, i)) for i = 1:n_sites-1]
-  current_op_list_2 = MPS[productMPS(sites, n -> current_2(n, i)) for i = 1:n_sites-1]
-  # Definisco la funzione che misura la corrente di uno stato MPS in modo
-  # da poterla riusare dopo in maniera consistente
-  # Restituisce una lista di n_sites-1 numeri che sono la corrente tra un
-  # sito e il successivo.
-  function measure_current(s::MPS)
-    return [0.5 * real(inner(J1, s) - inner(J2, s)) for (J1, J2) in zip(current_op_list_1, current_op_list_2)]
-  end
+  plt = plot_time_series(occ_n_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=string.(1:len),
+                         linestyles=repeat([:solid], len),
+                         x_label=L"\lambda\, t",
+                         y_label=L"\langle n_i\rangle",
+                         plot_title="Numeri di occupazione",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "occ_n_all.png")
 
-  # Simulazione
-  # ===========
-  # Stato iniziale: c'è un'eccitazione nel primo sito
-  current_state = single_ex_states[1]
+  # Grafico dei ranghi del MPS
+  # --------------------------
+  plt = plot_time_series(maxdim_monitor_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=["MPS"],
+                         linestyles=[:solid],
+                         x_label=L"\lambda\, t",
+                         y_label=L"\max_k\,\chi_{k,k+1}",
+                         plot_title="Rango massimo del MPS",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "maxdim_monitor.png")
 
-  # Misuro le osservabili sullo stato iniziale
-  occ_n = [[inner(s, current_state) for s in single_ex_states]]
-  maxdim_monitor = Int[maxlinkdim(current_state)]
-  current = [measure_current(current_state)]
+  # Grafico della corrente di spin
+  # ------------------------------
+  len = size(hcat(current_super[begin]...), 1)
+  plt = plot_time_series(current_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=string.(1:len),
+                         linestyles=repeat([:solid], len),
+                         x_label=L"\lambda\, t",
+                         y_label=L"j_{k,k+1}",
+                         plot_title="Corrente di spin",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "spin_current.png")
 
-  # ...e si parte!
-  progress = Progress(n_steps, 1, "Simulazione in corso ", 20)
-  for step in time_step_list[2:end]
-    current_state = apply(vcat(links_even, links_odd), current_state, cutoff=max_err, maxdim=32)
-    #
-    occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in single_ex_states]])
-    current = vcat(current, [measure_current(current_state)])
-    push!(maxdim_monitor, maxlinkdim(current_state))
-    next!(progress)
-  end
-
-  # Grafici
-  # =================================
-  base_dir = root_path * "/damped_chain/"
-  # - grafico dei numeri di occupazione
-  row = Vector{Float64}(undef, length(occ_n))
-  for i = 1:length(occ_n)
-    row[i] = occ_n[i][1]
-  end
-  occ_n_plot = plot(time_step_list, row, title="Numero di occupazione dei siti", label="1")
-  for i = 2:n_sites
-    for j = 1:length(occ_n)
-      row[j] = occ_n[j][i]
-    end
-    plot!(occ_n_plot, time_step_list, row, label=string(i))
-  end
-  xlabel!(occ_n_plot, L"$\lambda\,t$")
-  ylabel!(occ_n_plot, L"$\langle n_i\rangle$")
-  savefig(occ_n_plot, base_dir * "occ_n.png")
-
-  # - grafico dei ranghi dell'MPS
-  maxdim_monitor_plot = plot(time_step_list, maxdim_monitor)
-  xlabel!(maxdim_monitor_plot, L"$\lambda\,t$")
-  savefig(maxdim_monitor_plot, base_dir * "maxdim_monitor.png")
-
-  # - grafico della corrente di spin
-  row = Vector{Float64}(undef, length(current))
-  for i = 1:length(current)
-    row[i] = current[i][1]
-  end
-  current_plot = plot(time_step_list, row, title="Corrente di spin", label="(1,2)")
-  for i = 2:n_sites-1
-    for j = 1:length(current)
-      row[j] = current[j][i]
-    end
-    plot!(current_plot, time_step_list, row, label="("*string(i)*","*string(i+1)*")")
-  end
-  xlabel!(current_plot, L"$\lambda\,t$")
-  ylabel!(current_plot, L"$j_{k,k+1}$")
-  savefig(current_plot, base_dir * "spin_current.png")
-
+  cd(prev_dir) # Ritorna alla cartella iniziale.
   return
 end

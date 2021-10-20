@@ -4,6 +4,7 @@
   "simulation_end_time": "end_time",
   "MP_maximum_bond_dimension": "χ",
   "MP_compression_error": "compr_err",
+  "spin_damping_coefficient": "κ",
   "oscillator_spin_interaction_coefficient": "κ",
   "oscillator_damping_coefficient": "γ",
   "oscillator_frequency": "ω",

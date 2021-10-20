@@ -2,7 +2,7 @@
 Il codice sorgente delle simulazioni svolte per la tesi magistrale.
 
 ## Esecuzione
-Gli script richiedono come argomento, da passare alla riga di comando, uno o più file JSON (uno solo per i programmi più vecchi `simple_chain` e `damped_chain`), ciascuno contenente i parametri fisici e tecnici per la simulazione, formattato come un dizionario Python, cioè
+Gli script richiedono dei file JSON, contenenti i parametri fisici e tecnici per la simulazione, formattato come un dizionario Python, cioè
 
 	{
 		"chiave1": valore1,
@@ -11,9 +11,11 @@ Gli script richiedono come argomento, da passare alla riga di comando, uno o pi�
 		"chiaveN": valoreN
 	}
 In questo modo non è necessario modificare il codice del programma solo per provare nuovi valori dei parametri.
-Il programma eseguirà la simulazione per ciascuno degli insiemi di parametri forniti, e disegnerà dei grafici per confrontare i risultati tra i vari casi.
+Questi file possono essere forniti a ciascun programma tramite la riga di comando in due modi:
+1) semplicemente scrivendoli uno dopo l'altro, ad esempio: `./chain_with_damped_oscillators.jl parametri1.json parametri2.json parametri3.json`;
+2) fornendo una cartella, all'interno della quale verranno letti *tutti* i file .json.
 
-Esempio: `./chain_with_damped_oscillators.jl parametri1.json parametri2.json`
+Il programma eseguirà la simulazione per ciascuno dei file forniti, e disegnerà dei grafici per confrontare i risultati tra i vari casi.
 
 #### Parametri richiesti
 Tutte le grandezze fisiche sono da intendersi come quantità ridotte (come spiegato nella tesi), vale a dire che il coefficiente λ dell'interazione tra gli spin vale sempre 1. Per tutti gli script sono richiesti i parametri:
@@ -24,7 +26,7 @@ Tutte le grandezze fisiche sono da intendersi come quantità ridotte (come spieg
 - `MP_compression_error`
 
 In aggiunta, `damped_chain.jl` richiede anche
-- `damping_coefficient`
+- `spin_damping_coefficient`
 - `temperature`
 
 mentre `chain_with_damper_oscillators.jl` richiede
