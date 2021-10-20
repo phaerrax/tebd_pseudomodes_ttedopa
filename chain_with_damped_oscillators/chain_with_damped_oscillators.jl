@@ -158,14 +158,14 @@ let
     #   stato corrente in tempi diversi; in seguito sottraggo il secondo
     #   al primo, e moltiplico tutto per λ/2 (che è 1/2).
     current_op_list_1 = [MPS(sites, vcat(
-      ["Emp:Emp"],
+      ["vecid"],
       [current_1(i, k) for i = 1:n_sites],
-      ["Emp:Emp"]
+      ["vecid"]
     )) for k = 1:n_sites-1]
     current_op_list_2 = [MPS(sites, vcat(
-      ["Emp:Emp"],
+      ["vecid"],
       [current_2(i, k) for i = 1:n_sites],
-      ["Emp:Emp"]
+      ["vecid"]
     )) for k = 1:n_sites-1]
     current_op_list = [0.5 * (J₊ - J₋) for (J₊,J₋) in zip(current_op_list_1, current_op_list_2)]
     # Ora per misurare la corrente basta prendere il prodotto interno con questi.
