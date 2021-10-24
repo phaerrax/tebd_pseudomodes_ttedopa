@@ -178,3 +178,41 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
   )
   return group_plot
 end
+
+function chain(left::MPS, right::MPS)
+  # Questa funzione dovrebbe essere l'analogo di `chain` di mpnum: prende
+  # due MPS e ne crea uno che ne è la concatenazione.
+  # Per scriverla mi sono "ispirato" al codice della funzione `MPS` nel
+  # file mps.jl, riga 308.
+
+  midN = length(left) # È l'indice a cui si troverà il "buco"
+  # Innanzitutto, riscalo i tag dei Link negli MPS di argomento, in
+  # modo che la numerazione alla fine risulti corretta.
+  # Facendo un po' di prove ho visto che la numerazione degli Index di
+  # tipo Link nei MPS segue uno schema proprio, cioè non è legata a come
+  # vengono chiamati i siti: va semplicemente da 1 alla lunghezza-1.
+  for j in eachindex(left)
+    replacetags!(left[j], "l=$j", "l=$j"; tags="Link")
+    replacetags!(left[j], "l=$(j-1)", "l=$(j-1)"; tags="Link")
+  end
+  for j in eachindex(right)
+    replacetags!(right[j], "l=$j", "l=$(midN+j)"; tags="Link")
+    replacetags!(right[j], "l=$(j-1)", "l=$(midN+j-1)"; tags="Link")
+  end
+  # Spacchetto i tensori in `left` e `right` e creo un MPS con le
+  # liste concatenate.
+  M = MPS([left..., right...])
+  # I siti "di confine", l'ultimo a dx di `left` e il primo a sx di
+  # `right`, non sono ancora collegati. Creo un indice banale, di
+  # dimensione 1, di tipo Link e lo aggiungo a quei due siti.
+  # L'indice è _sempre_ banale perché per costruzione il MPS risultato
+  # è il prodotto tensore dei due argomenti: non c'è interazione tra loro.
+  missing_link = Index(1; tags="Link,l=$midN")
+  M[midN] = M[midN] * state(missing_link, 1)
+  M[midN+1] = state(dag(missing_link), 1) * M[midN+1]
+
+  return M
+end
+
+# Variante a numero di argomenti libero
+chain(a::MPS, b...) = chain(a, chain(b...))
