@@ -28,6 +28,7 @@ let
   occ_n_super = []
   spin_current_super = []
   maxdim_monitor_super = []
+  chain_levels_super = []
 
   # Definizione degli operatori nell'equazione di Lindblad
   # ======================================================
@@ -92,6 +93,13 @@ let
     # - la corrente di spin
     spin_current_ops = spin_current_op_list(sites)
 
+    # - l'occupazione degli autospazi dell'operatore numero
+    # Ad ogni istante proietto lo stato corrente sugli autostati
+    # dell'operatore numero della catena di spin, vale a dire calcolo
+    # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
+    # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
+    num_eigenspace_projs = [level_subspace_proj(sites, n) for n=0:n_sites]
+
     # Simulazione
     # ===========
     # Stato iniziale: c'è un'eccitazione nel primo sito
@@ -101,6 +109,10 @@ let
     occ_n = [[inner(s, current_state) for s in single_ex_states]]
     maxdim_monitor = Int[maxlinkdim(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
+    # Per gli autostati dell'operatore numero, calcolo anche la somma
+    # di tutti i coefficienti (così da verificare che sia pari a 1).
+    lev = [real(inner(p, current_state)) for p in num_eigenspace_projs]
+    chain_levels = [[lev; sum(lev)]]
 
     # ...e si parte!
     progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
@@ -111,6 +123,9 @@ let
             [real(inner(s, current_state)) for s in single_ex_states])
       push!(spin_current,
             [real(inner(j, current_state)) for j in spin_current_ops])
+      lev = [real(inner(p, current_state)) for p in num_eigenspace_projs]
+      push!(chain_levels,
+            [lev; sum(lev)])
       push!(maxdim_monitor,
             maxlinkdim(current_state))
       next!(progress)
@@ -119,6 +134,7 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
     push!(spin_current_super, spin_current)
+    push!(chain_levels_super, chain_levels)
     push!(maxdim_monitor_super, maxdim_monitor)
   end
 
@@ -189,6 +205,24 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "spin_current.png")
+
+  # Grafico dell'occupazione degli autospazi di N della catena di spin
+  # ------------------------------------------------------------------
+  # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
+  # restanti valori.
+  len = size(hcat(chain_levels_super[begin]...), 1) - 1
+  plt = plot_time_series(chain_levels_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=[string.(0:len-1); "total"],
+                         linestyles=[repeat([:solid], len); :dash],
+                         x_label=L"\lambda\, t",
+                         y_label=L"n",
+                         plot_title="Occupazione degli autospazi "
+                         * "dell'operatore numero",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "chain_levels.png")
 
   cd(prev_dir) # Ritorna alla cartella iniziale.
   return
