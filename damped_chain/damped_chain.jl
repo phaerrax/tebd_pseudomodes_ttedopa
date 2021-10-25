@@ -22,6 +22,7 @@ include(lib_path * "/spin_chain_space.jl")
 
 let
   parameter_lists = load_parameters(ARGS)
+  tot_sim_n = length(parameter_lists)
 
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
@@ -52,7 +53,7 @@ let
     return exp(t * L)
   end
 
-  for parameters in parameter_lists
+  for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
     max_err = parameters["MP_compression_error"]
     max_dim = parameters["MP_maximum_bond_dimension"]
@@ -115,7 +116,8 @@ let
     chain_levels = [[lev; sum(lev)]]
 
     # ...e si parte!
-    progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
+    message = "Simulazione $current_sim_n di $tot_sim_n:"
+    progress = Progress(length(time_step_list), 1, message, 30)
     for _ in time_step_list[2:end]
       current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
       #
