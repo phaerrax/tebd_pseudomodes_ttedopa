@@ -163,7 +163,7 @@ let
 
     # ...e si parte!
     progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
-    for step in time_step_list[2:end]
+    for _ in time_step_list[2:end]
       # Uso l'espansione di Trotter al 2° ordine
       current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
       #
