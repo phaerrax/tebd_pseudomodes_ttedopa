@@ -107,9 +107,12 @@ let
     for step in time_step_list[2:end]
       current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
       #
-      occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in single_ex_states]])
-      spin_current = vcat(spin_current, [[real(inner(j, current_state)) for j in spin_current_ops]])
-      push!(maxdim_monitor, maxlinkdim(current_state))
+      push!(occ_n,
+            [real(inner(s, current_state)) for s in single_ex_states])
+      push!(spin_current,
+            [real(inner(j, current_state)) for j in spin_current_ops])
+      push!(maxdim_monitor,
+            maxlinkdim(current_state))
       next!(progress)
     end
 

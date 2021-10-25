@@ -109,7 +109,8 @@ let
     progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
     for step in time_step_list[2:end]
       current_state = apply(time_evolution_oplist, current_state; cutoff=max_err, maxdim=max_dim)
-      occ_n = vcat(occ_n, [[abs2(inner(s, current_state)) for s in single_ex_states]])
+      push!(occ_n,
+            [abs2(inner(s, current_state)) for s in single_ex_states])
       #push!(maxdim_monitor, maxlinkdim(current_state))
       next!(progress)
     end
