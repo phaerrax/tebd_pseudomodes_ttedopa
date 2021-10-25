@@ -28,31 +28,8 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
-  current_super = []
+  spin_current_super = []
   maxdim_monitor_super = []
-
-  # Definisco qui alcune funzioni che verranno usate nel ciclo principale.
-  # - funzioni per misurare la corrente di spin
-  function current_1(i::Int, obs_index::Int)
-    if i == obs_index
-      str = "vecσy"
-    elseif i == obs_index+1
-      str = "vecσx"
-    else
-      str = "vecid"
-    end
-    return str
-  end
-  function current_2(i::Int, obs_index::Int)
-    if i == obs_index
-      str = "vecσx"
-    elseif i == obs_index+1
-      str = "vecσy"
-    else
-      str = "vecid"
-    end
-    return str
-  end
 
   for parameters in parameter_lists
     # Impostazione dei parametri
@@ -151,24 +128,12 @@ let
     occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
 
     # - la corrente di spin
-    #   Il metodo per calcolarla è questo, finché non mi viene in mente
-    #   qualcosa di più comodo: l'operatore della corrente,
-    #   J_k = λ/2 (σ ˣ⊗ σ ʸ-σ ʸ⊗ σ ˣ),
-    #   viene separato nei suoi due addendi, che sono applicati allo
-    #   stato corrente in tempi diversi; in seguito sottraggo il secondo
-    #   al primo, e moltiplico tutto per λ/2 (che è 1/2).
-    current_op_list_1 = [MPS(sites, vcat(
-      ["vecid"],
-      [current_1(i, k) for i = 1:n_sites],
-      ["vecid"]
-    )) for k = 1:n_sites-1]
-    current_op_list_2 = [MPS(sites, vcat(
-      ["vecid"],
-      [current_2(i, k) for i = 1:n_sites],
-      ["vecid"]
-    )) for k = 1:n_sites-1]
-    current_op_list = [0.5 * (J₊ - J₋) for (J₊,J₋) in zip(current_op_list_1, current_op_list_2)]
-    # Ora per misurare la corrente basta prendere il prodotto interno con questi.
+    # Prima costruisco gli operatori sulla catena di spin, poi li
+    # estendo con l'identità sui restanti siti. 
+    spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
+                              j,
+                              MPS(sites[end:end], "vecid"))
+                        for j in spin_current_op_list(sites[2:end-1])]
 
     # Simulazione
     # ===========
@@ -194,7 +159,7 @@ let
     # Misuro le osservabili sullo stato iniziale
     occ_n = [[inner(s, current_state) for s in occ_n_list]]
     maxdim_monitor = Int[maxlinkdim(current_state)]
-    current = [[real(inner(j, current_state)) for j in current_op_list]]
+    spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
 
     # ...e si parte!
     progress = Progress(length(time_step_list), 1, "Simulazione in corso ", 20)
@@ -203,14 +168,14 @@ let
       current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
       #
       occ_n = vcat(occ_n, [[real(inner(s, current_state)) for s in occ_n_list]])
-      current = vcat(current, [[real(inner(j, current_state)) for j in current_op_list]])
+      spin_current = vcat(spin_current, [[real(inner(j, current_state)) for j in spin_current_ops]])
       push!(maxdim_monitor, maxlinkdim(current_state))
       next!(progress)
     end
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
-    push!(current_super, current)
+    push!(spin_current_super, spin_current)
     push!(maxdim_monitor_super, maxdim_monitor)
   end
 
@@ -307,11 +272,11 @@ let
 
   # Grafico della corrente di spin
   # ------------------------------
-  len = size(hcat(current_super[begin]...), 1)
-  plt = plot_time_series(current_super,
+  len = size(hcat(spin_current_super[begin]...), 1)
+  plt = plot_time_series(spin_current_super,
                          parameter_lists;
                          displayed_sites=nothing,
-                         labels=string.(1:len),
+                         labels=["($j,$(j+1))" for j=1:len],
                          linestyles=repeat([:solid], len),
                          x_label=L"\lambda\, t",
                          y_label=L"j_{k,k+1}",

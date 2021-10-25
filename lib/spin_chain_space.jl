@@ -77,6 +77,40 @@ function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
   return d
 end
 
+# Operatori della corrente di spin
+# --------------------------------
+# Jₖ = -λ/2 (σ ˣ⊗ σ ʸ-σ ʸ⊗ σ ˣ)
+function J⁺tag(left_site::Int, i::Int)
+  # Questa funzione restituisce i nomi degli operatori da assegnare al
+  # sito i-esimo per la parte σ ˣ⊗ σ ʸ di Jₖ, k == left_side
+  if i == left_site
+    str = "vecσx"
+  elseif i == left_site + 1
+    str = "vecσy"
+  else
+    str = "vecid"
+  end
+  return str
+end
+function J⁻tag(left_site::Int, i::Int)
+  # Come `J⁺tag`, ma per σ ʸ⊗ σ ˣ
+  if i == left_site
+    str = "vecσy"
+  elseif i == left_site + 1
+    str = "vecσx"
+  else
+    str = "vecid"
+  end
+  return str
+end
+function spin_current_op_list(sites::Vector{Index{Int64}})
+  N = length(sites)
+  J⁺ = [MPS(sites, [J⁺tag(k, i) for i = 1:N]) for k = 1:N-1]
+  J⁻ = [MPS(sites, [J⁻tag(k, i) for i = 1:N]) for k = 1:N-1]
+  spin_current_op_list = [-0.5 * (j⁺ - j⁻) for (j⁺, j⁻) in zip(J⁺, J⁻)]
+  return spin_current_op_list
+end
+
 # Base di autostati per la catena
 # -------------------------------
 #= Come misurare il "contributo" di ogni autospazio dell'operatore numero
