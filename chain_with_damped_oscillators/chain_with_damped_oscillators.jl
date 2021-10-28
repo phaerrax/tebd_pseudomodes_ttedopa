@@ -297,7 +297,7 @@ let
   plt = plot_time_series(maxdim_monitor_super,
                          parameter_lists;
                          displayed_sites=nothing,
-                         labels=["MPS"],
+                         labels=[nothing],
                          linestyles=[:solid],
                          x_label=L"\lambda\, t",
                          y_label=L"\max_k\,\chi_{k,k+1}",
