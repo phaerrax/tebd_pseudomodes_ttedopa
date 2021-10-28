@@ -3,6 +3,7 @@ using Measures
 using LinearAlgebra
 using JSON
 using Base.Filesystem
+using ITensors
 
 #= Questo file contiene un insieme variegato di funzioni che servono bene o
    male per tutti gli script. Le raduno tutte qui in modo da non dover copiare
@@ -48,6 +49,15 @@ function construct_step_list(parameters)
   τ = parameters["simulation_time_step"]
   end_time = parameters["simulation_end_time"]
   return collect(range(0, end_time; step=τ))
+end
+
+# Calcolo di osservabili durante la simulazione
+# =============================================
+# Per calcolare gli autostati dell'operatore numero: calcolo anche la somma
+# di tutti i coefficienti (così da verificare che sia pari a 1).
+function levels(projs::Vector{MPS}, state::MPS)
+  lev = [real(inner(p, state)) for p in projs]
+  return [lev; sum(lev)]
 end
 
 # Grafici

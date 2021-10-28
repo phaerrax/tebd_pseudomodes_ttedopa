@@ -110,10 +110,7 @@ let
     occ_n = [[inner(s, current_state) for s in single_ex_states]]
     maxdim_monitor = Int[maxlinkdim(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
-    # Per gli autostati dell'operatore numero, calcolo anche la somma
-    # di tutti i coefficienti (così da verificare che sia pari a 1).
-    lev = [real(inner(p, current_state)) for p in num_eigenspace_projs]
-    chain_levels = [[lev; sum(lev)]]
+    chain_levels = [levels(num_eigenspace_projs, current_state)]
 
     # ...e si parte!
     message = "Simulazione $current_sim_n di $tot_sim_n:"
@@ -125,9 +122,8 @@ let
             [real(inner(s, current_state)) for s in single_ex_states])
       push!(spin_current,
             [real(inner(j, current_state)) for j in spin_current_ops])
-      lev = [real(inner(p, current_state)) for p in num_eigenspace_projs]
       push!(chain_levels,
-            [lev; sum(lev)])
+            levels(num_eigenspace_projs, current_state))
       push!(maxdim_monitor,
             maxlinkdim(current_state))
       next!(progress)

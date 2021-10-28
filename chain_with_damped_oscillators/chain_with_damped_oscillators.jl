@@ -32,6 +32,8 @@ let
   spin_current_super = []
   maxdim_monitor_super = []
   chain_levels_super = []
+  osc_levels_left_super = []
+  osc_levels_right_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -145,6 +147,14 @@ let
                                   MPS(sites[end:end], "vecid"))
                             for n=0:n_sites]
 
+    # - l'occupazione dei livelli degli oscillatori
+    osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
+                                   MPS(sites[2:end], "vecid"))
+                             for n=1:osc_dim]
+    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
+                                    osc_levels_proj(sites[end], n))
+                             for n=1:osc_dim]
+
     # Simulazione
     # ===========
     # Stato iniziale: l'oscillatore sx è in equilibrio termico, il resto è vuoto
@@ -170,10 +180,9 @@ let
     occ_n = [[inner(s, current_state) for s in occ_n_list]]
     maxdim_monitor = Int[maxlinkdim(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
-    # Per gli autostati dell'operatore numero, calcolo anche la somma
-    # di tutti i coefficienti (così da verificare che sia pari a 1).
-    lev = [real(inner(p, current_state)) for p in num_eigenspace_projs]
-    chain_levels = [[lev; sum(lev)]]
+    chain_levels = [levels(num_eigenspace_projs, current_state)]
+    osc_levels_left = [levels(osc_levels_projs_left, current_state)]
+    osc_levels_right = [levels(osc_levels_projs_right, current_state)]
 
     # ...e si parte!
     message = "Simulazione $current_sim_n di $tot_sim_n:"
@@ -186,9 +195,12 @@ let
             [real(inner(s, current_state)) for s in occ_n_list])
       push!(spin_current,
             [real(inner(j, current_state)) for j in spin_current_ops])
-      lev = [real(inner(p, current_state)) for p in num_eigenspace_projs]
       push!(chain_levels,
-            [lev; sum(lev)])
+            levels(num_eigenspace_projs, current_state))
+      push!(osc_levels_left,
+            levels(osc_levels_projs_left, current_state))
+      push!(osc_levels_right,
+            levels(osc_levels_projs_right, current_state))
       push!(maxdim_monitor,
             maxlinkdim(current_state))
       next!(progress)
@@ -198,6 +210,8 @@ let
     push!(occ_n_super, occ_n)
     push!(spin_current_super, spin_current)
     push!(chain_levels_super, chain_levels)
+    push!(osc_levels_left_super, osc_levels_left)
+    push!(osc_levels_right_super, osc_levels_right)
     push!(maxdim_monitor_super, maxdim_monitor)
   end
 
@@ -320,10 +334,29 @@ let
                          x_label=L"\lambda\, t",
                          y_label=L"n",
                          plot_title="Occupazione degli autospazi "
-                         * "dell'operatore numero",
+                         * "della catena di spin",
                          plot_size=plot_size
                         )
   savefig(plt, "chain_levels.png")
+
+  # Grafico dell'occupazione dei livelli degli oscillatori
+  # ------------------------------------------------------
+  for (list, pos) in zip([osc_levels_left_super, osc_levels_right_super],
+                         ["sx", "dx"])
+    len = size(hcat(list[begin]...), 1) - 1
+    plt = plot_time_series(list,
+                           parameter_lists;
+                           displayed_sites=nothing,
+                           labels=[string.(0:len-1); "total"],
+                           linestyles=[repeat([:solid], len); :dash],
+                           x_label=L"\lambda\, t",
+                           y_label=L"n",
+                           plot_title="Occupazione degli autospazi "
+                           * "dell'oscillatore $pos",
+                           plot_size=plot_size
+                          )
+    savefig(plt, "osc_levels_$pos.png")
+  end
 
   cd(prev_dir) # Ritorna alla cartella iniziale.
   return

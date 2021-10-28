@@ -13,10 +13,12 @@ a⁺[end,end] = 1
 num = diagm(0 => 0:osc_dim-1)
 Iₒ = Matrix{Int}(I, osc_dim, osc_dim)
 
-function ITensors.state(::StateName"Emp:Emp", ::SiteType"vecOsc")
-  empty = [i == 1 ? 1 : 0 for i = 1:osc_dim]
-  return kron(empty, empty)
+function ITensors.state(::StateName"canon", ::SiteType"vecOsc"; n::Int)
+  v = [i == n ? 1 : 0 for i=1:osc_dim]
+  return kron(v, v)
 end
+
+ITensors.state(::StateName"Emp:Emp", st::SiteType"vecOsc") = state(StateName("canon"), st; n=1)
 ITensors.state(::StateName"veca+", ::SiteType"vecOsc") = vcat(a⁺[:])
 ITensors.state(::StateName"veca-", ::SiteType"vecOsc") = vcat(a⁻[:])
 ITensors.state(::StateName"vecnum", ::SiteType"vecOsc") = vcat(num[:])
@@ -55,4 +57,13 @@ function ITensors.op(::OpName"damping", ::SiteType"vecOsc", s::Index; ω::Number
   d = (n + 1) * (op("a+T:a-", s) - 0.5 * (op("num:id", s) + op("id:num", s))) +
       n * (op("a-T:a+", s) - 0.5 * (op("num:id", s) + op("id:num", s)) - op("id:id", s))
   return d
+end
+
+# - proiezione sugli autostati dell'operatore numero
+# Il sito è uno solo quindi basta usare i vettori della base canonica
+function osc_levels_proj(site::Index{Int64}, level::Int)
+  return MPS([ITensor(state(StateName("canon"),
+                            SiteType("vecOsc");
+                            n=level),
+                      site)])
 end
