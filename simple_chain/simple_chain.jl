@@ -41,7 +41,7 @@ let
     sites = siteinds("S=1/2", n_sites)
 
     # Stati di singola eccitazione
-    single_ex_states = MPS[productMPS(sites, n -> n == i ? "Up" : "Dn") for i = 1:n_sites]
+    single_ex_states = [single_ex_state(sites, j) for j = 1:n_sites]
 
     # Nuovi operatori di ITensors
     # ===========================

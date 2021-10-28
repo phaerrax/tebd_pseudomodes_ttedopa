@@ -63,12 +63,10 @@ let
     )
 
     # Stati di singola eccitazione
-    single_ex_state_tags = [vcat(
-      ["vecid"],
-      [i == n ? "Up:Up" : "Dn:Dn" for i = 1:n_sites],
-      ["vecid"]
-    ) for n = 1:n_sites]
-    single_ex_states = [MPS(sites, tags) for tags in single_ex_state_tags]
+    single_ex_states = [chain(MPS(sites[1:1], "vecid"),
+                              single_ex_state(sites[2:end-1], k),
+                              MPS(sites[end:end], "vecid"))
+                        for k = 1:n_sites]
 
     #= Definizione degli operatori nell'equazione di Lindblad
        ======================================================

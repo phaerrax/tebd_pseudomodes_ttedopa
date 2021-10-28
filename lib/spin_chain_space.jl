@@ -144,3 +144,43 @@ function level_subspace_proj(sites::Vector{Index{Int64}}, level::Int)
   end
   return proj
 end
+
+# Autostati del primo livello
+# ---------------------------
+# Potrebbe essere utile anche avere a disposizione la forma degli autostati della
+# catena di spin (isolata).
+# Gli stati sₖ che hanno il sito k nello stato eccitato e gli altri nello stato
+# fondamentale infatti non sono autostati; nella base {sₖ}ₖ (k=1:N) posso
+# scrivere l'Hamiltoniano della catena isolata, ristretto all'autospazio di
+# singola eccitazione, come
+# ε λ 0 0 … 0
+# λ ε λ 0 … 0
+# 0 λ ε λ … 0
+# 0 0 λ ε … 0
+# … … … … … …
+# 0 0 0 0 … ε
+# che ha come autostati vⱼ= ∑ₖ sin(kjπ /(N+1)) sₖ, con j=1:N.
+# Attenzione poi a normalizzarli: ‖vⱼ‖² = (N+1)/2.
+function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
+  # Ricorda che questa è la vettorizzazione della matrice densità costruita
+  # a partire dallo stato a singola eccitazione: vec(sₖ⊗ sₖᵀ).
+  states = [i == k ? "Up:Up" : "Dn:Dn" for i = 1:length(sites)]
+  return MPS(sites, states)
+end
+function chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
+  # Occhio ai coefficienti: questo, come sopra, non è il vettore vⱼ ma è
+  # vec(vⱼ⊗ vⱼᵀ): di conseguenza i coefficienti della combinazione lineare
+  # qui sopra devono essere usati al quadrato.
+  # Il prodotto interno tra matrici vettorizzate è tale che
+  # ⟨vec(a⊗ aᵀ),vec(b⊗ bᵀ)⟩ = tr((a⊗ aᵀ)ᵀ b⊗ bᵀ) = (aᵀb)².
+  # Non mi aspetto che la norma di questo MPS sia 1, pur avendo
+  # usato i coefficienti normalizzati. Quello che deve fare 1 è invece la
+  # somma dei prodotti interni di vec(sₖ⊗ sₖᵀ), per k=1:N, con questo vettore.
+  # Ottengo poi che ⟨Pₙ,vⱼ⟩ = 1 solo se n=j, 0 altrimenti.
+  N = length(sites)
+  state = MPS(sites, "zero")
+  for k=1:N
+    state += 2/(N+1) * sin(j*k*π / (N+1))^2 * single_ex_state(sites, k)
+  end
+  return state
+end
