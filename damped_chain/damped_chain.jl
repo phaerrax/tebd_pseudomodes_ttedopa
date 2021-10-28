@@ -65,8 +65,8 @@ let
     T = parameters["temperature"]
 
     # - intervallo temporale delle simulazioni
-    time_step_list = construct_step_list(parameters["simulation_end_time"], ε)
-    time_step = time_step_list[2] - time_step_list[1]
+    time_step = parameters["simulation_time_step"]
+    time_step_list = construct_step_list(parameters)
 
     # Costruzione della catena
     # ========================

@@ -44,15 +44,10 @@ end
 
 # Costruzione della lista di istanti di tempo per la simulazione
 # ==============================================================
-function construct_step_list(total_time, ε)
-  # Siccome i risultati sono migliori se il numero di passi della simulazione
-  # è proporzionale ad ε, ho bisogno di costruire l'array con tutti gli istanti
-  # di tempo toccati dalla simulazione per ciascun file di parametri; tale
-  # array serve anche in seguito per disegnare i grafici, quindi usando questa
-  # funzione mi assicuro che l'array sia creato in modo consistente.
-  n_steps = Int(total_time * ε)
-  step_list = collect(LinRange(0, total_time, n_steps))
-  return step_list
+function construct_step_list(parameters)
+  τ = parameters["simulation_time_step"]
+  end_time = parameters["simulation_end_time"]
+  return collect(range(0, end_time; step=τ))
 end
 
 # Grafici
@@ -148,7 +143,7 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
   subplots = []
   distinct_parameters, _ = categorise_parameters(parameter_super)
   for (p, data) in zip(parameter_super, data_super)
-    time_step_list = construct_step_list(p["simulation_end_time"], p["spin_excitation_energy"])
+    time_step_list = construct_step_list(p)
     dataᵀ = hcat(data...)
     N = size(dataᵀ, 1)
     if displayed_sites == nothing
