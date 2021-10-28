@@ -34,6 +34,7 @@ let
   chain_levels_super = []
   osc_levels_left_super = []
   osc_levels_right_super = []
+  normalisation_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -155,6 +156,9 @@ let
                                     osc_levels_proj(sites[end], n))
                              for n=1:osc_dim]
 
+    # - la normalizzazione (cioè la traccia) della matrice densità
+    full_trace = MPS(sites, "vecid")
+
     # Simulazione
     # ===========
     # Stato iniziale: l'oscillatore sx è in equilibrio termico, il resto è vuoto
@@ -183,6 +187,7 @@ let
     chain_levels = [levels(num_eigenspace_projs, current_state)]
     osc_levels_left = [levels(osc_levels_projs_left, current_state)]
     osc_levels_right = [levels(osc_levels_projs_right, current_state)]
+    normalisation = [real(inner(full_trace, current_state))]
 
     # ...e si parte!
     message = "Simulazione $current_sim_n di $tot_sim_n:"
@@ -203,6 +208,8 @@ let
             levels(osc_levels_projs_right, current_state))
       push!(maxdim_monitor,
             maxlinkdim(current_state))
+      push!(normalisation,
+            real(inner(full_trace, current_state)))
       next!(progress)
     end
 
@@ -213,6 +220,7 @@ let
     push!(osc_levels_left_super, osc_levels_left)
     push!(osc_levels_right_super, osc_levels_right)
     push!(maxdim_monitor_super, maxdim_monitor)
+    push!(normalisation_super, normalisation)
   end
 
   #= Grafici
@@ -305,6 +313,21 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "maxdim_monitor.png")
+
+  # Grafico della traccia della matrice densità
+  # -------------------------------------------
+  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
+  plt = plot_time_series(normalisation_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=[nothing],
+                         linestyles=[:solid],
+                         x_label=L"\lambda\, t",
+                         y_label=L"\operatorname{tr}\,\rho(t)",
+                         plot_title="Normalizzazione della matrice densità",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "dm_normalisation.png")
 
   # Grafico della corrente di spin
   # ------------------------------
