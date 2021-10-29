@@ -23,9 +23,14 @@ ITensors.state(::StateName"veca+", ::SiteType"vecOsc") = vcat(a⁺[:])
 ITensors.state(::StateName"veca-", ::SiteType"vecOsc") = vcat(a⁻[:])
 ITensors.state(::StateName"vecnum", ::SiteType"vecOsc") = vcat(num[:])
 ITensors.state(::StateName"vecid", ::SiteType"vecOsc") = vcat(Iₒ[:])
-function ITensors.state(::StateName"ThermEq", ::SiteType"vecOsc", s::Index; ω, T)
-  mat = exp(-ω / T * num)
-  mat /= tr(mat)
+function ITensors.state(::StateName"ThermEq", ::SiteType"vecOsc"; ω, T)
+  if T == 0
+    mat = kron([1; repeat([0], osc_dim-1)],
+               [1; repeat([0], osc_dim-1)])
+  else
+    mat = exp(-ω / T * num)
+    mat /= tr(mat)
+  end
   return vcat(mat[:])
 end
 
