@@ -36,6 +36,66 @@ let
   osc_levels_right_super = []
   normalisation_super = []
 
+  # Precaricamento
+  # ==============
+  # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
+  # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
+  n_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
+  if all(x -> x == first(n_sites_list), n_sites_list)
+    preload = true
+    n_sites = first(n_sites_list)
+    sites = vcat(
+                 [Index(osc_dim^2, "vecOsc")],
+                 siteinds("vecS=1/2", n_sites),
+                 [Index(osc_dim^2, "vecOsc")]
+                )
+    single_ex_states = [chain(MPS(sites[1:1], "vecid"),
+                              single_ex_state(sites[2:end-1], k),
+                              MPS(sites[end:end], "vecid"))
+                        for k = 1:n_sites]
+    # - i numeri di occupazione: per gli spin della catena si prende il prodotto
+    #   interno con gli elementi di single_ex_states già definiti; per gli
+    #   oscillatori, invece, uso
+    osc_num_sx = MPS(sites, vcat(["vecnum"],
+                                 repeat(["vecid"], n_sites),
+                                 ["vecid"]))
+    osc_num_dx = MPS(sites, vcat(["vecid"],
+                                 repeat(["vecid"], n_sites),
+                                 ["vecnum"]))
+    occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
+
+    # - la corrente di spin
+    # Prima costruisco gli operatori sulla catena di spin, poi li
+    # estendo con l'identità sui restanti siti.
+    spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
+                              j,
+                              MPS(sites[end:end], "vecid"))
+                        for j in spin_current_op_list(sites[2:end-1])]
+
+    # - l'occupazione degli autospazi dell'operatore numero
+    # Ad ogni istante proietto lo stato corrente sugli autostati
+    # dell'operatore numero della catena di spin, vale a dire calcolo
+    # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
+    # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
+    num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
+                                  level_subspace_proj(sites[2:end-1], n),
+                                  MPS(sites[end:end], "vecid"))
+                            for n=0:n_sites]
+
+    # - l'occupazione dei livelli degli oscillatori
+    osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
+                                   MPS(sites[2:end], "vecid"))
+                             for n=1:osc_dim]
+    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
+                                    osc_levels_proj(sites[end], n))
+                              for n=1:osc_dim]
+
+    # - la normalizzazione (cioè la traccia) della matrice densità
+    full_trace = MPS(sites, "vecid")
+  else
+    preload = false
+  end
+
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
     # ==========================
@@ -58,18 +118,18 @@ let
 
     # Costruzione della catena
     # ========================
-    n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
-    sites = vcat(
-      [Index(osc_dim^2, "vecOsc")],
-      siteinds("vecS=1/2", n_sites),
-      [Index(osc_dim^2, "vecOsc")]
-    )
-
-    # Stati di singola eccitazione
-    single_ex_states = [chain(MPS(sites[1:1], "vecid"),
-                              single_ex_state(sites[2:end-1], k),
-                              MPS(sites[end:end], "vecid"))
-                        for k = 1:n_sites]
+    if !preload
+      n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
+      sites = vcat(
+                   [Index(osc_dim^2, "vecOsc")],
+                   siteinds("vecS=1/2", n_sites),
+                   [Index(osc_dim^2, "vecOsc")]
+                  )
+      single_ex_states = [chain(MPS(sites[1:1], "vecid"),
+                                single_ex_state(sites[2:end-1], k),
+                                MPS(sites[end:end], "vecid"))
+                          for k = 1:n_sites]
+    end
 
     #= Definizione degli operatori nell'equazione di Lindblad
        ======================================================
@@ -115,49 +175,39 @@ let
 
     # Osservabili da misurare
     # =======================
-    # - i numeri di occupazione: per gli spin della catena si prende il prodotto
-    #   interno con gli elementi di single_ex_states già definiti; per gli
-    #   oscillatori, invece, uso
-    osc_num_sx = MPS(sites, vcat(
-      ["vecnum"],
-      repeat(["vecid"], n_sites),
-      ["vecid"]
-    ))
-    osc_num_dx = MPS(sites, vcat(
-      ["vecid"],
-      repeat(["vecid"], n_sites),
-      ["vecnum"]
-    ))
-    occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
+    if !preload
+      # - i numeri di occupazione
+      osc_num_sx = MPS(sites, vcat(["vecnum"],
+                                   repeat(["vecid"], n_sites),
+                                   ["vecid"]))
+      osc_num_dx = MPS(sites, vcat(["vecid"],
+                                   repeat(["vecid"], n_sites),
+                                   ["vecnum"]))
+      occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
 
-    # - la corrente di spin
-    # Prima costruisco gli operatori sulla catena di spin, poi li
-    # estendo con l'identità sui restanti siti. 
-    spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
-                              j,
-                              MPS(sites[end:end], "vecid"))
-                        for j in spin_current_op_list(sites[2:end-1])]
+      # - la corrente di spin
+      spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
+                                j,
+                                MPS(sites[end:end], "vecid"))
+                          for j in spin_current_op_list(sites[2:end-1])]
 
-    # - l'occupazione degli autospazi dell'operatore numero
-    # Ad ogni istante proietto lo stato corrente sugli autostati
-    # dell'operatore numero della catena di spin, vale a dire calcolo
-    # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
-    # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
-                                  level_subspace_proj(sites[2:end-1], n),
-                                  MPS(sites[end:end], "vecid"))
-                            for n=0:n_sites]
+      # - l'occupazione degli autospazi dell'operatore numero
+      num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
+                                    level_subspace_proj(sites[2:end-1], n),
+                                    MPS(sites[end:end], "vecid"))
+                              for n=0:n_sites]
 
-    # - l'occupazione dei livelli degli oscillatori
-    osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                   MPS(sites[2:end], "vecid"))
-                             for n=1:osc_dim]
-    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
-                                    osc_levels_proj(sites[end], n))
-                             for n=1:osc_dim]
+      # - l'occupazione dei livelli degli oscillatori
+      osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
+                                     MPS(sites[2:end], "vecid"))
+                               for n=1:osc_dim]
+      osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
+                                      osc_levels_proj(sites[end], n))
+                                for n=1:osc_dim]
 
-    # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecid")
+      # - la normalizzazione (cioè la traccia) della matrice densità
+      full_trace = MPS(sites, "vecid")
+    end
 
     # Simulazione
     # ===========
@@ -173,9 +223,9 @@ let
       chain_init_state = single_ex_state(sites[2:end-1], 1)
     else
       # stato di vuoto
-      #chain_init_state = MPS(sites[2:end-1], "Dn:Dn")
+      chain_init_state = MPS(sites[2:end-1], "Dn:Dn")
       # oppure un autostato del primo livello
-      chain_init_state = chain_L1_state(sites[2:end-1], 1)
+      #chain_init_state = chain_L1_state(sites[2:end-1], 1)
     end
     current_state = chain(osc_sx_init_state,
                           chain_init_state,
