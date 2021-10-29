@@ -12,6 +12,11 @@ using ITensors
 
 # Lettura dei parametri della simulazione
 # =======================================
+function isjson(filename::String)
+  return length(filename) > 5 && filename[end-4:end] == ".json"
+  # Volutamente, un file che di nome fa solo ".json" viene ignorato.
+end
+
 function load_parameters(file_list)
   first_arg = file_list[1]
   prev_dir = pwd()
@@ -21,7 +26,7 @@ function load_parameters(file_list)
     # salvati in tale cartella.
     # I restanti elementi di ARGS vengono ignorati (l'utente viene avvisato).
     cd(first_arg)
-    files = filter(s -> s[end-4:end] == ".json", readdir())
+    files = filter(isjson, readdir())
     @info "$first_arg è una cartella. I restanti argomenti passati alla linea
     di comando saranno ignorati."
   else
