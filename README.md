@@ -23,6 +23,7 @@ Tutte le grandezze fisiche sono da intendersi come quantità ridotte (come spieg
 - `number_of_spin_sites`
 - `simulation_end_time`
 - `simulation_time_step`
+- `chain_initial_state`
 - `MP_maximum_bond_dimension`
 - `MP_compression_error`
 

@@ -3,6 +3,7 @@
   "number_of_spin_sites": 10,
   "simulation_end_time": 40,
   "simulation_time_step": 0.01,
+  "chain_initial_state": "empty",
   "MP_maximum_bond_dimension": 100,
   "MP_compression_error": 1e-8,
   "oscillator_spin_interaction_coefficient": 1,

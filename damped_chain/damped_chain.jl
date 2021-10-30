@@ -103,8 +103,8 @@ let
 
     # Simulazione
     # ===========
-    # Stato iniziale: c'è un'eccitazione nel primo sito
-    current_state = single_ex_states[1]
+    # Lo stato iniziale della catena è dato da "chain_initial_state".
+    current_state = parse_init_state(sites, parameters["chain_initial_state"])
 
     # Misuro le osservabili sullo stato iniziale
     occ_n = [[inner(s, current_state) for s in single_ex_states]]

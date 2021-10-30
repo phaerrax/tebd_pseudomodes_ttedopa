@@ -162,10 +162,23 @@ end
 # che ha come autostati vⱼ= ∑ₖ sin(kjπ /(N+1)) sₖ, con j=1:N.
 # Attenzione poi a normalizzarli: ‖vⱼ‖² = (N+1)/2.
 function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
-  # Ricorda che questa è la vettorizzazione della matrice densità costruita
-  # a partire dallo stato a singola eccitazione: vec(sₖ⊗ sₖᵀ).
-  states = [i == k ? "Up:Up" : "Dn:Dn" for i = 1:length(sites)]
-  return MPS(sites, states)
+  N = length(sites)
+  if k ∈ 1:N
+    # Ricorda che questa è la vettorizzazione della matrice densità costruita
+    # a partire dallo stato a singola eccitazione: vec(sₖ⊗ sₖᵀ).
+    states = [i == k ? "Up:Up" : "Dn:Dn" for i = 1:N]
+    return MPS(sites, states)
+  elseif k > N
+    throw(DomainError(k,
+                      "Si è tentato di costruire uno stato con eccitazione "*
+                      "localizzata nel sito $k, ma la catena è composta da "*
+                      "$N siti."))
+  elseif k < 1
+    throw(DomainError(k,
+                      "Si è tentato di costruire uno stato con eccitazione "*
+                      "localizzata nel sito $k, che non appartiene alla "*
+                      "catena: inserire un valore tra 1 e $N."))
+  end
 end
 function chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
   # Occhio ai coefficienti: questo, come sopra, non è il vettore vⱼ ma è
@@ -178,9 +191,39 @@ function chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
   # somma dei prodotti interni di vec(sₖ⊗ sₖᵀ), per k=1:N, con questo vettore.
   # Ottengo poi che ⟨Pₙ,vⱼ⟩ = 1 solo se n=j, 0 altrimenti.
   N = length(sites)
-  state = MPS(sites, "zero")
-  for k=1:N
-    state += 2/(N+1) * sin(j*k*π / (N+1))^2 * single_ex_state(sites, k)
+  if j ∈ 1:N
+    state = MPS(sites, "zero")
+    for k=1:N
+      state += 2/(N+1) * sin(j*k*π / (N+1))^2 * single_ex_state(sites, k)
+    end
+    return state
+  else
+    throw(DomainError(j,
+                      "Si è tentato di costruire un autostato della catena "*
+                      "con indice $j, che non è valido: bisogna fornire un "*
+                      "indice tra 1 e $N."))
   end
-  return state
+end
+
+# Scelta dello stato iniziale della catena
+# ----------------------------------------
+# Con un'apposita stringa nei parametri è possibile scegliere lo stato da cui
+# far partire la catena di spin. La seguente funzione traduce la stringa
+# nell'MPS desiderato, in modo case-insensitive. Le opzioni sono:
+# · "empty": stato vuoto
+# · "1locM": stato con una (sola) eccitazione localizzata nel sito M (M=1:N)
+# · "1eigM": autostato del primo livello con M nodi (M=0:N-1)
+function parse_init_state(sites::Vector{Index{Int64}}, state::String)
+  state = lowercase(state)
+  if state == "empty"
+    v = MPS(sites, "Dn:Dn")
+  elseif occursin(r"^1loc", state)
+    j = parse(Int, replace(state, "1loc" => ""))
+    v = single_ex_state(sites, j)
+  elseif occursin(r"^1eig", state)
+    j = parse(Int, replace(state, "1eig" => ""))
+    # Il j-esimo autostato ha j-1 nodi 
+    v = chain_L1_state(sites, j + 1)
+  end
+  return v
 end

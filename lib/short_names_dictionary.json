@@ -2,6 +2,7 @@
   "spin_excitation_energy": "ε",
   "number_of_spin_sites": "N",
   "simulation_end_time": "end_time",
+  "chain_initial_state": "vₜ₌₀",
   "simulation_time_step": "τ",
   "MP_maximum_bond_dimension": "χ",
   "MP_compression_error": "compr_err",
