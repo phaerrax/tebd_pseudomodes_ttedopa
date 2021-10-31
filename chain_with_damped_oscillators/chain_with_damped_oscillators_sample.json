@@ -6,6 +6,7 @@
   "chain_initial_state": "empty",
   "MP_maximum_bond_dimension": 100,
   "MP_compression_error": 1e-8,
+  "TS_expansion_order": 3,
   "oscillator_spin_interaction_coefficient": 1,
   "oscillator_damping_coefficient": 1,
   "oscillator_frequency": 150,

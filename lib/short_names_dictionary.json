@@ -6,6 +6,7 @@
   "simulation_time_step": "τ",
   "MP_maximum_bond_dimension": "χ",
   "MP_compression_error": "compr_err",
+  "TS_expansion_order": "T-S order",
   "spin_damping_coefficient": "κ",
   "oscillator_spin_interaction_coefficient": "κ",
   "oscillator_damping_coefficient": "γ",

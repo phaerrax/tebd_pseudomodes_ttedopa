@@ -152,8 +152,6 @@ let
            im*κ * op("asum:id", sL) * op("σx:id", s1) +
            -im*κ* op("id:asum", sL)  * op("id:σx", s1) +
            γ * op("damping", sL; ω=ω, T=T) * op("id:id", s1)
-    expℓ_sx = exp(0.5time_step * ℓ_sx)
-    #
     # - e quello per la coppia oscillatore-spin di destra
     sn = sites[end-1]
     sR = sites[end]
@@ -162,16 +160,20 @@ let
            im*κ * op("σx:id", sn) * op("asum:id", sR) +
            -im*κ * op("id:σx", sn) * op("id:asum", sR) +
            γ * op("id:id", sn) * op("damping", sR; ω=ω, T=0)
-    expℓ_dx = exp(0.5time_step * ℓ_dx)
-
-    # Costruzione dell'operatore di evoluzione
-    # ========================================
-    links_odd = vcat(
-      [expℓ_sx],
-      [op("expHspin", sites[j], sites[j+1]; t=0.5time_step, ε=ε) for j = 3:2:n_sites],
-      [expℓ_dx]
-    )
-    links_even = [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites+1]
+    #
+    function links_odd(τ)
+      return [exp(τ * ℓ_sx);
+              [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε) for j = 3:2:n_sites];
+              exp(τ * ℓ_dx)]
+    end
+    function links_even(τ)
+      return [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε) for j = 2:2:n_sites+1]
+    end
+    #
+    evo = evolution_operator(links_odd,
+                             links_even,
+                             time_step,
+                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
@@ -237,8 +239,10 @@ let
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
     for _ in time_step_list[2:end]
-      # Uso l'espansione di Trotter al 2° ordine
-      current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
+      current_state = apply(evo,
+                            current_state,
+                            cutoff=max_err,
+                            maxdim=max_dim)
       #
       push!(occ_n,
             [real(inner(s, current_state)) for s in occ_n_list])

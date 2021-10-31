@@ -26,6 +26,7 @@ Tutte le grandezze fisiche sono da intendersi come quantità ridotte (come spieg
 - `chain_initial_state`
 - `MP_maximum_bond_dimension`
 - `MP_compression_error`
+- `TS_expansion_order`
 
 In aggiunta, `damped_chain.jl` richiede anche
 - `spin_damping_coefficient`

@@ -82,12 +82,20 @@ let
     ξL = T==0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
     ξR = κ
 
-    links_odd = vcat(
-      [op("expℓ_sx", sites[1], sites[2]; t=0.5time_step, ε=ε, ξ=ξL)],
-      [op("expHspin", sites[j], sites[j+1]; t=0.5time_step, ε=ε) for j = 3:2:n_sites-3],
-      [op("expℓ_dx", sites[n_sites-1], sites[n_sites]; t=0.5time_step, ε=ε, ξ=ξR)]
-    )
-    links_even = [op("expHspin", sites[j], sites[j+1]; t=time_step, ε=ε) for j = 2:2:n_sites-2]
+    function links_odd(τ)
+      return [op("expℓ_sx", sites[1], sites[2]; t=τ, ε=ε, ξ=ξL);
+              [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε) for j = 3:2:n_sites-3];
+              op("expℓ_dx", sites[n_sites-1], sites[n_sites]; t=τ, ε=ε, ξ=ξR)]
+    end
+    function links_even(τ)
+      return [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε)
+              for j = 2:2:n_sites-2]
+    end
+    #
+    evo = evolution_operator(links_odd,
+                             links_even,
+                             time_step,
+                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
@@ -116,7 +124,10 @@ let
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
     for _ in time_step_list[2:end]
-      current_state = apply(vcat(links_odd, links_even, links_odd), current_state, cutoff=max_err, maxdim=max_dim)
+      current_state = apply(evo,
+                            current_state,
+                            cutoff=max_err,
+                            maxdim=max_dim)
       #
       push!(occ_n,
             [real(inner(s, current_state)) for s in single_ex_states])
