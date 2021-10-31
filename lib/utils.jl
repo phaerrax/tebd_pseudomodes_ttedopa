@@ -18,22 +18,25 @@ function isjson(filename::String)
 end
 
 function load_parameters(file_list)
+  if isempty(file_list)
+    throw(ErrorException("Non è stato fornito alcun file di parametri."))
+  end
   first_arg = file_list[1]
   prev_dir = pwd()
   if isdir(first_arg)
-    # Se il primo input è una cartella, legge tutti i file .json al suo interno
-    # e li carica come file di parametri; alla fine i file di output saranno
-    # salvati in tale cartella.
+    # Se il primo input è una cartella, legge tutti i file .json al suo
+    # interno e li carica come file di parametri; alla fine i file di
+    # output saranno salvati in tale cartella.
     # I restanti elementi di ARGS vengono ignorati (l'utente viene avvisato).
     cd(first_arg)
     files = filter(isjson, readdir())
-    @info "$first_arg è una cartella. I restanti argomenti passati alla linea
-    di comando saranno ignorati."
+    @info "$first_arg è una cartella. I restanti argomenti passati alla "*
+          "linea di comando saranno ignorati."
   else
-    # Se il primo input non è una cartella, tutti gli argomenti passati in ARGS
-    # vengono trattati come file da leggere contenenti i parametri.
-    # I file di output saranno salvati nella cartella pwd() al momento del lancio
-    # del programma.
+    # Se il primo input non è una cartella, tutti gli argomenti passati in
+    # ARGS vengono trattati come file da leggere contenenti i parametri.
+    # I file di output saranno salvati nella cartella pwd() al momento
+    # del lancio del programma.
     files = file_list
   end
   # Carico i file di parametri nei dizionari.
