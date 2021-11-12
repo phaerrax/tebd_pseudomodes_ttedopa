@@ -243,21 +243,29 @@ let
                             current_state,
                             cutoff=max_err,
                             maxdim=max_dim)
-      #
+      #=
+      Calcolo dapprima la traccia della matrice densità. Se non devia
+      eccessivamente da 1, in ogni caso influisce sul valore delle
+      osservabili che calcolo successivamente, che si modificano dello
+      stesso fattore, e devono essere quindi corrette di un fattore pari
+      al reciproco della traccia.
+      =#
+      trace = real(inner(full_trace, current_state))
+
+      push!(normalisation,
+            trace)
       push!(occ_n,
-            [real(inner(s, current_state)) for s in occ_n_list])
+            [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
       push!(spin_current,
-            [real(inner(j, current_state)) for j in spin_current_ops])
+            [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
       push!(chain_levels,
-            levels(num_eigenspace_projs, current_state))
+            levels(num_eigenspace_projs, current_state) ./ trace)
       push!(osc_levels_left,
-            levels(osc_levels_projs_left, current_state))
+            levels(osc_levels_projs_left, current_state) ./ trace)
       push!(osc_levels_right,
-            levels(osc_levels_projs_right, current_state))
+            levels(osc_levels_projs_right, current_state) ./ trace)
       push!(maxdim_monitor,
             maxlinkdim(current_state))
-      push!(normalisation,
-            real(inner(full_trace, current_state)))
       next!(progress)
     end
 
