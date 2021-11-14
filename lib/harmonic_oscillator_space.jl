@@ -72,3 +72,8 @@ function osc_levels_proj(site::Index{Int64}, level::Int)
                             n=level),
                       site)])
 end
+
+function ITensors.state(::StateName"mat_comp", ::SiteType"vecOsc", s::Index; j::Int, k::Int)
+  return kron([i == j ? 1 : 0 for i=1:osc_dim],
+              [i == k ? 1 : 0 for i=1:osc_dim])
+end

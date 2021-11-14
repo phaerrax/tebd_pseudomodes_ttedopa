@@ -35,6 +35,7 @@ let
   osc_levels_left_super = []
   osc_levels_right_super = []
   normalisation_super = []
+  hermiticity_monitor_super = []
 
   # Precaricamento
   # ==============
@@ -233,6 +234,7 @@ let
     osc_levels_left = [levels(osc_levels_projs_left, current_state)]
     osc_levels_right = [levels(osc_levels_projs_right, current_state)]
     normalisation = [real(inner(full_trace, current_state))]
+    hermiticity_monitor = Real[0]
 
     # Evoluzione temporale
     # --------------------
@@ -266,6 +268,31 @@ let
             levels(osc_levels_projs_right, current_state) ./ trace)
       push!(maxdim_monitor,
             maxlinkdim(current_state))
+
+      #=
+      Controllo che la matrice densità ridotta dell'oscillatore a sinistra
+      sia una valida matrice densità: hermitiana e semidefinita negativa.
+      Calcolo la traccia parziale su tutti i siti tranne il primo, ricreo
+      la matrice a partire dal vettore, e faccio i dovuti controlli.
+      Non so come creare un MPO misto di matrici e vettori, quindi creo osc_dim²
+      operatori che estraggono tutte le coordinate del vettore.
+      =#
+      mat = Array{Complex}(undef, osc_dim, osc_dim)
+      for j = 1:osc_dim, k = 1:osc_dim
+        proj = chain(MPS([state(sites[1], "mat_comp"; j, k)]),
+                     MPS(sites[2:end], "vecid"))
+        mat[j, k] = inner(proj, current_state)
+      end
+      # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
+      # la positività degli autovalori devo tagliare via la loro parte reale,
+      # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
+      if any(x -> x < 0, real.(eigvals(mat)))
+        @warn "La matrice densità del primo sito non è semidefinita positiva."
+      end
+      diff = sqrt(norm(mat - mat'))
+      push!(hermiticity_monitor,
+            diff)
+
       next!(progress)
     end
 
@@ -277,6 +304,7 @@ let
     push!(osc_levels_right_super, osc_levels_right)
     push!(maxdim_monitor_super, maxdim_monitor)
     push!(normalisation_super, normalisation)
+    push!(hermiticity_monitor_super, hermiticity_monitor)
   end
 
   #= Grafici
@@ -384,6 +412,21 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "dm_normalisation.png")
+
+  # Grafico della traccia della matrice densità
+  # -------------------------------------------
+  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
+  plt = plot_time_series(hermiticity_monitor_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=[nothing],
+                         linestyles=[:solid],
+                         x_label=L"\lambda\, t",
+                         y_label=L"\lVert\rho_L(t)-\rho_L(t)^\dagger\rVert",
+                         plot_title="Controllo hermitianità della matrice densità",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "hermiticity_monitor.png")
 
   # Grafico della corrente di spin
   # ------------------------------
