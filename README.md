@@ -34,7 +34,8 @@ In aggiunta, `damped_chain.jl` richiede anche
 
 mentre `chain_with_damper_oscillators.jl` richiede
 - `oscillator_spin_interaction_coefficient`
-- `oscillator_damping_coefficient`
+- `oscillator_damping_coefficient_left`
+- `oscillator_damping_coefficient_right`
 - `oscillator_frequency`
 - `temperature`
 

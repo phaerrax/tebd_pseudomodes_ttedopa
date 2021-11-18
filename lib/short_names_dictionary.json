@@ -9,7 +9,8 @@
   "TS_expansion_order": "T-S order",
   "spin_damping_coefficient": "κ",
   "oscillator_spin_interaction_coefficient": "κ",
-  "oscillator_damping_coefficient": "γ",
+  "oscillator_damping_coefficient_left": "γₗ",
+  "oscillator_damping_coefficient_right": "γᵣ",
   "oscillator_frequency": "ω",
   "temperature": "T"
 }

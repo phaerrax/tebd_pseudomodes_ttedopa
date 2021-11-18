@@ -109,7 +109,8 @@ let
     ε = parameters["spin_excitation_energy"]
     # λ = 1
     κ = parameters["oscillator_spin_interaction_coefficient"]
-    γ = parameters["oscillator_damping_coefficient"]
+    γₗ = parameters["oscillator_damping_coefficient_left"]
+    γᵣ = parameters["oscillator_damping_coefficient_right"]
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
 
@@ -152,7 +153,7 @@ let
            0.5ε * op("id:id", sL) * op("H1loc", s1) +
            im*κ * op("asum:id", sL) * op("σx:id", s1) +
            -im*κ* op("id:asum", sL)  * op("id:σx", s1) +
-           γ * op("damping", sL; ω=ω, T=T) * op("id:id", s1)
+           γₗ * op("damping", sL; ω=ω, T=T) * op("id:id", s1)
     # - e quello per la coppia oscillatore-spin di destra
     sn = sites[end-1]
     sR = sites[end]
@@ -160,7 +161,7 @@ let
            ω * op("id:id", sn) * op("H1loc", sR) +
            im*κ * op("σx:id", sn) * op("asum:id", sR) +
            -im*κ * op("id:σx", sn) * op("id:asum", sR) +
-           γ * op("id:id", sn) * op("damping", sR; ω=ω, T=0)
+           γᵣ * op("id:id", sn) * op("damping", sR; ω=ω, T=0)
     #
     function links_odd(τ)
       return [exp(τ * ℓ_sx);
@@ -422,7 +423,7 @@ let
                          labels=[nothing],
                          linestyles=[:solid],
                          x_label=L"\lambda\, t",
-                         y_label=L"\lVert\rho_L(t)-\rho_L(t)^\dagger\rVert",
+                         y_label=L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
                          plot_title="Controllo hermitianità della matrice densità",
                          plot_size=plot_size
                         )
