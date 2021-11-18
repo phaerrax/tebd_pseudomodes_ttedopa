@@ -322,7 +322,7 @@ let
     cd(ARGS[1])
   end
 
-  plot_size = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
+  plot_size = (2, 0.5 + ceil(length(parameter_lists)/2)) .* (600, 400)
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
 

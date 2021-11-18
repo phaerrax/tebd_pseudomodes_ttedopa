@@ -186,7 +186,9 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
   end
   group_plot = Plots.plot(
     shared_title_fake_plot(plot_title, parameter_super),
-    Plots.plot(subplots..., layout=length(subplots), size=plot_size),
+    Plots.plot(subplots...,
+               layout=(Int(ceil(length(subplots)/2)), 2),
+               size=plot_size),
     layout=grid(2, 1, heights=[0.1, 0.9])
   )
   return group_plot
