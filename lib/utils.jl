@@ -44,7 +44,8 @@ function load_parameters(file_list)
   for f in files
     open(f) do input
       s = read(input, String)
-      push!(parameter_lists, JSON.parse(s))
+      # Aggiungo anche il nome del file alla lista di parametri.
+      push!(parameter_lists, merge(Dict("filename" => f), JSON.parse(s)))
     end
   end
   cd(prev_dir)
@@ -110,7 +111,7 @@ function shared_title_fake_plot(subject::String, parameters)
   =#
   # Inserire in questo array i parametri che non si vuole che appaiano nel
   # titolo:
-  hidden_parameters = ["simulation_end_time"]
+  hidden_parameters = ["simulation_end_time", "filename"]
   _, repeated_parameters = categorise_parameters(parameters)
   #
   f = open(lib_path * "/short_names_dictionary.json", "r")

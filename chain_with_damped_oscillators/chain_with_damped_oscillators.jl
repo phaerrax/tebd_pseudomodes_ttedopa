@@ -8,6 +8,8 @@ using ProgressMeter
 using LinearAlgebra
 using JSON
 using Base.Filesystem
+using DataFrames
+using CSV
 
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
@@ -296,6 +298,38 @@ let
 
       next!(progress)
     end
+    # Creo una tabella con i dati rilevanti da scrivere nel file di output
+    dict = Dict(:time => construct_step_list(parameters))
+    tmp_list = hcat(occ_n...)
+    for (j, name) in enumerate([:occ_n_left;
+                              [Symbol("occ_n_spin$n") for n = 1:n_sites];
+                              :occ_n_right])
+      push!(dict, name => tmp_list[j,:])
+    end
+    tmp_list = hcat(spin_current...)
+    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_sites-1])
+      push!(dict, name => tmp_list[j,:])
+    end
+    tmp_list = hcat(osc_levels_left...)
+    for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
+      push!(dict, name => tmp_list[j,:])
+    end
+    tmp_list = hcat(chain_levels...)
+    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_sites])
+      push!(dict, name => tmp_list[j,:])
+    end
+    tmp_list = hcat(osc_levels_right...)
+    for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
+      push!(dict, name => tmp_list[j,:])
+    end
+    push!(dict, :maxdim => maxdim_monitor)
+    push!(dict, :full_trace => normalisation)
+    push!(dict, :hermiticity => hermiticity_monitor)
+    table = DataFrame(dict)
+    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    # Scrive la tabella su un file che ha la stessa estensione del file dei
+    # parametri, con estensione modificata.
+    CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
