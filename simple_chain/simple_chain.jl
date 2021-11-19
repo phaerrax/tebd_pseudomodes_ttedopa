@@ -17,6 +17,15 @@ let
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
 
+  # Se il primo argomento da riga di comando è una cartella (che dovrebbe
+  # contenere i file dei parametri), mi sposto subito in tale posizione in modo
+  # che i file di output, come grafici e tabelle, siano salvati insieme ai file
+  # di parametri.
+  prev_dir = pwd()
+  if isdir(ARGS[1])
+    cd(ARGS[1])
+  end
+
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
@@ -128,14 +137,6 @@ let
      la grandezza del font o con il colore quelli che cambiano da una
      simulazione all'altra.
   =#
-  # Se il primo argomento da riga di comando è una cartella (che contiene
-  # anche i file di parametri, così anche i grafici verranno salvati in tale
-  # cartella.
-  prev_dir = pwd()
-  if isdir(ARGS[1])
-    cd(ARGS[1])
-  end
-
   plot_size = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
@@ -160,6 +161,6 @@ let
                         )
   savefig(plt, "occupation_numbers.png")
 
-  cd(prev_dir) # Ritorna alla cartella iniziale.
+  cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
 end
