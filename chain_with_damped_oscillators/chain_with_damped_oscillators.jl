@@ -307,6 +307,7 @@ let
 
       next!(progress)
     end
+
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => construct_step_list(parameters))
     tmp_list = hcat(occ_n...)
