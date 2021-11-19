@@ -94,10 +94,10 @@ function subplot_title(values_dict, keys)
   # Carico il dizionario dei "nomi brevi" per i parametri.
   short_name = JSON.parse(read(f, String))
   close(f)
-  return join(
-    [short_name[k] * "=" * string(values_dict[k]) for k in keys],
-    ", "
-   )
+  hidden_parameters = ["simulation_end_time", "filename"]
+  return join([short_name[k] * "=" * string(values_dict[k])
+               for k in setdiff(keys, hidden_parameters)],
+              ", ")
 end
 #
 function shared_title_fake_plot(subject::String, parameters)
@@ -119,10 +119,9 @@ function shared_title_fake_plot(subject::String, parameters)
   short_name = JSON.parse(read(f, String))
   close(f)
   #
-  shared_title = join(
-    [short_name[k] * "=" * string(parameters[begin][k]) for k in setdiff(repeated_parameters, hidden_parameters)],
-    ", "
-  )
+  shared_title = join([short_name[k] * "=" * string(parameters[begin][k])
+                       for k in setdiff(repeated_parameters, hidden_parameters)],
+                      ", ")
   y = ones(3) # Dati falsi per far apparire un grafico
   title_fake_plot = Plots.scatter(y, marker=0, markeralpha=0, ticks=nothing, annotations=(2, y[2], text(subject * "\n" * shared_title)), axis=false, grid=false, leg=false, bottom_margin=2cm, size=(200,100))
   return title_fake_plot
@@ -134,7 +133,7 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
 
      Argomenti
      ---------
-   · `data::Array{Any}`: un array di dimensione uguale a quella di
+   · `data_super::Array{Any}`: un array di dimensione uguale a quella di
      parameter_lists.
      Ciascun elemento di data è un array X che rappresenta la evoluzione nel
      tempo (durante la simulazione) di N quantità: ogni riga per la
@@ -158,9 +157,32 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
    · `input_ylabel::String`: etichetta delle ordinate (comune a tutti)
 
    · `plot_title::String`: titolo grande del grafico
+
+   · `plot_size`: una Pair che indica la dimensione complessiva del grafico
   =#
   subplots = []
   distinct_parameters, _ = categorise_parameters(parameter_super)
+  #
+  # Calcola il minimo e il massimo valore delle ordinate tra tutti i dati,
+  # per poter impostare una scala universale che mostri tutti i grafici
+  # nello stesso modo (e non tagli fuori nulla).
+  # In pratica: `extrema` calcola gli estremi di un Array multidimensionale, ma
+  # i miei data_super sono invece Vector di Vector (di Vector, talvolta) quindi non
+  # si può fare semplicemente: calcolo prima la lista degli estremi di ciascun
+  # `data`, poi prendo gli estremi di tutto.
+  if data_super[1][1] isa Vector
+    # Alcuni data_super sono Vector³, altri Vector², e nel primo caso c'è
+    # un ulteriore livello da sbrogliare.
+    y_minima = [minimum([minimum(data₂) for data₂ in data₁])
+                for data₁ in data_super]
+    y_maxima = [maximum([maximum(data₂) for data₂ in data₁])
+                for data₁ in data_super]
+  else
+    y_minima = [minimum(data) for data in data_super]
+    y_maxima = [maximum(data) for data in data_super]
+  end
+  ylimits = (minimum(y_minima), maximum(y_maxima))
+  #
   for (p, data) in zip(parameter_super, data_super)
     time_step_list = construct_step_list(p)
     dataᵀ = hcat(data...)
@@ -173,6 +195,7 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
     for (j, lab, lst) in zip(displayed_sites, labels, linestyles)
       plot!(this_plot, time_step_list,
                        dataᵀ[j,:],
+                       ylim=ylimits,
                        label=lab,
                        linestyle=lst,
                        legend=:outerright,
