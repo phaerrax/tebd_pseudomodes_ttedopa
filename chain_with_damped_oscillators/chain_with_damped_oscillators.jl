@@ -128,6 +128,7 @@ let
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
     time_step_list = construct_step_list(parameters)
+    skip_steps = parameters["skip_steps"]
 
     # Costruzione della catena
     # ========================
@@ -247,69 +248,73 @@ let
     osc_levels_right = [levels(osc_levels_projs_right, current_state)]
     normalisation = [real(inner(full_trace, current_state))]
     hermiticity_monitor = Real[0]
+    time_instants = Real[0]
 
     # Evoluzione temporale
     # --------------------
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
+    skip_count = 1
     for _ in time_step_list[2:end]
       current_state = apply(evo,
                             current_state,
                             cutoff=max_err,
                             maxdim=max_dim)
-      #=
-      Calcolo dapprima la traccia della matrice densità. Se non devia
-      eccessivamente da 1, in ogni caso influisce sul valore delle
-      osservabili che calcolo successivamente, che si modificano dello
-      stesso fattore, e devono essere quindi corrette di un fattore pari
-      al reciproco della traccia.
-      =#
-      trace = real(inner(full_trace, current_state))
+      if skip_count % skip_steps == 0
+        #=
+        Calcolo dapprima la traccia della matrice densità. Se non devia
+        eccessivamente da 1, in ogni caso influisce sul valore delle
+        osservabili che calcolo successivamente, che si modificano dello
+        stesso fattore, e devono essere quindi corrette di un fattore pari
+        al reciproco della traccia.
+        =#
+        trace = real(inner(full_trace, current_state))
 
-      push!(normalisation,
-            trace)
-      push!(occ_n,
-            [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
-      push!(spin_current,
-            [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
-      push!(chain_levels,
-            levels(num_eigenspace_projs, current_state) ./ trace)
-      push!(osc_levels_left,
-            levels(osc_levels_projs_left, current_state) ./ trace)
-      push!(osc_levels_right,
-            levels(osc_levels_projs_right, current_state) ./ trace)
-      push!(maxdim_monitor,
-            maxlinkdim(current_state))
+        push!(normalisation,
+              trace)
+        push!(occ_n,
+              [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
+        push!(spin_current,
+              [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
+        push!(chain_levels,
+              levels(num_eigenspace_projs, current_state) ./ trace)
+        push!(osc_levels_left,
+              levels(osc_levels_projs_left, current_state) ./ trace)
+        push!(osc_levels_right,
+              levels(osc_levels_projs_right, current_state) ./ trace)
+        push!(maxdim_monitor,
+              maxlinkdim(current_state))
 
-      #=
-      Controllo che la matrice densità ridotta dell'oscillatore a sinistra
-      sia una valida matrice densità: hermitiana e semidefinita negativa.
-      Calcolo la traccia parziale su tutti i siti tranne il primo, ricreo
-      la matrice a partire dal vettore, e faccio i dovuti controlli.
-      Non so come creare un MPO misto di matrici e vettori, quindi creo osc_dim²
-      operatori che estraggono tutte le coordinate del vettore.
-      =#
-      mat = Array{Complex}(undef, osc_dim, osc_dim)
-      for j = 1:osc_dim, k = 1:osc_dim
-        proj = chain(MPS([state(sites[1], "mat_comp"; j, k)]),
-                     MPS(sites[2:end], "vecid"))
-        mat[j, k] = inner(proj, current_state)
+        #=
+        Controllo che la matrice densità ridotta dell'oscillatore a sinistra
+        sia una valida matrice densità: hermitiana e semidefinita negativa.
+        Calcolo la traccia parziale su tutti i siti tranne il primo, ricreo
+        la matrice a partire dal vettore, e faccio i dovuti controlli.
+        Non so come creare un MPO misto di matrici e vettori, quindi creo osc_dim²
+        operatori che estraggono tutte le coordinate del vettore.
+        =#
+        mat = Array{Complex}(undef, osc_dim, osc_dim)
+        for j = 1:osc_dim, k = 1:osc_dim
+          proj = chain(MPS([state(sites[1], "mat_comp"; j, k)]),
+                       MPS(sites[2:end], "vecid"))
+          mat[j, k] = inner(proj, current_state)
+        end
+        # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
+        # la positività degli autovalori devo tagliare via la loro parte reale,
+        # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
+        if any(x -> x < 0, real.(eigvals(mat)))
+          @warn "La matrice densità del primo sito non è semidefinita positiva."
+        end
+        diff = sqrt(norm(mat - mat'))
+        push!(hermiticity_monitor,
+              diff)
       end
-      # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
-      # la positività degli autovalori devo tagliare via la loro parte reale,
-      # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
-      if any(x -> x < 0, real.(eigvals(mat)))
-        @warn "La matrice densità del primo sito non è semidefinita positiva."
-      end
-      diff = sqrt(norm(mat - mat'))
-      push!(hermiticity_monitor,
-            diff)
-
       next!(progress)
+      skip_count += 1
     end
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => construct_step_list(parameters))
+    dict = Dict(:time => time_step_list[1:skip_steps:end])
     tmp_list = hcat(occ_n...)
     for (j, name) in enumerate([:occ_n_left;
                               [Symbol("occ_n_spin$n") for n = 1:n_sites];

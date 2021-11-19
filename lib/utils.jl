@@ -94,7 +94,7 @@ function subplot_title(values_dict, keys)
   # Carico il dizionario dei "nomi brevi" per i parametri.
   short_name = JSON.parse(read(f, String))
   close(f)
-  hidden_parameters = ["simulation_end_time", "filename"]
+  hidden_parameters = ["simulation_end_time", "skip_steps", "filename"]
   return join([short_name[k] * "=" * string(values_dict[k])
                for k in setdiff(keys, hidden_parameters)],
               ", ")
@@ -111,7 +111,7 @@ function shared_title_fake_plot(subject::String, parameters)
   =#
   # Inserire in questo array i parametri che non si vuole che appaiano nel
   # titolo:
-  hidden_parameters = ["simulation_end_time", "filename"]
+  hidden_parameters = ["simulation_end_time", "skip_steps", "filename"]
   _, repeated_parameters = categorise_parameters(parameters)
   #
   f = open(lib_path * "/short_names_dictionary.json", "r")
@@ -185,6 +185,8 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
   #
   for (p, data) in zip(parameter_super, data_super)
     time_step_list = construct_step_list(p)
+    skip_steps = p["skip_steps"]
+    time_step_list_filtered = time_step_list[1:skip_steps:end]
     dataᵀ = hcat(data...)
     N = size(dataᵀ, 1)
     if displayed_sites == nothing
@@ -193,7 +195,7 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
     #
     this_plot = plot()
     for (j, lab, lst) in zip(displayed_sites, labels, linestyles)
-      plot!(this_plot, time_step_list,
+      plot!(this_plot, time_step_list_filtered,
                        dataᵀ[j,:],
                        ylim=ylimits,
                        label=lab,
