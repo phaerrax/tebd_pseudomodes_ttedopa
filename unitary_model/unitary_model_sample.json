@@ -1,0 +1,18 @@
+{
+  "spin_excitation_energy": 150,
+  "number_of_spin_sites": 10,
+  "number_of_oscillators_left": 20,
+  "number_of_oscillators_right": 10,
+  "frequency_cutoff": 250,
+  "simulation_end_time": 10,
+  "simulation_time_step": 0.01,
+  "skip_steps": 10,
+  "chain_initial_state": "empty",
+  "MP_maximum_bond_dimension": 100,
+  "MP_compression_error": 1e-8,
+  "TS_expansion_order": 2,
+  "PolyChaos_nquad": 1e5,
+  "spectral_density_peak": 150,
+  "temperature": 150,
+  "spectral_density_half_width": 1
+}

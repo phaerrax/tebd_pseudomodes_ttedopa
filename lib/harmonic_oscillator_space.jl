@@ -1,10 +1,7 @@
 using ITensors
 using LinearAlgebra
 
-# Spazio degli oscillatori
-# ------------------------
 osc_dim = 8
-ITensors.space(::SiteType"vecOsc") = osc_dim^2
 
 # Operatori di scala e affini
 a⁻ = diagm(1 => [sqrt(j) for j = 1:osc_dim-1])
@@ -12,6 +9,35 @@ a⁺ = diagm(-1 => [sqrt(j) for j = 1:osc_dim-1])
 a⁺[end,end] = 1
 num = diagm(0 => 0:osc_dim-1)
 Iₒ = Matrix{Int}(I, osc_dim, osc_dim)
+
+# Spazio degli oscillatori
+# ------------------------
+ITensors.space(::SiteType"Osc") = osc_dim
+function ITensors.state(::StateName"canon", ::SiteType"Osc"; n::Int)
+  v = [i == n ? 1 : 0 for i=1:osc_dim]
+  return v
+end
+
+ITensors.state(::StateName"Emp", st::SiteType"Osc") = state(StateName("canon"), st; n=1)
+
+ITensors.op(::OpName"id", ::SiteType"Osc") = Iₒ
+ITensors.op(::OpName"num", ::SiteType"Osc") = num
+ITensors.op(::OpName"a+", ::SiteType"Osc") = a⁺
+ITensors.op(::OpName"a-", ::SiteType"Osc") = a⁻
+
+# Proiezione sugli autostati dell'operatore numero
+# Il sito è uno solo quindi basta usare i vettori della base canonica
+function osc_levels_proj(site::Index{Int64}, level::Int)
+  return MPS([ITensor(state(StateName("canon"),
+                            SiteType("Osc");
+                            n=level),
+                      site)])
+end
+
+# Spazio degli oscillatori vettorizzato
+# -------------------------------------
+osc_dim = 8
+ITensors.space(::SiteType"vecOsc") = osc_dim^2
 
 function ITensors.state(::StateName"canon", ::SiteType"vecOsc"; n::Int)
   v = [i == n ? 1 : 0 for i=1:osc_dim]
