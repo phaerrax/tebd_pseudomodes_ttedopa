@@ -2,8 +2,9 @@
   "spin_excitation_energy": 150,
   "number_of_spin_sites": 10,
   "simulation_end_time": 40,
-  "simulation_end_step": 0.1,
+  "simulation_time_step": 0.1,
   "MP_maximum_bond_dimension": 100,
   "MP_compression_error": 1e-8,
-  "TS_expansion_order": 2
+  "TS_expansion_order": 2,
+  "skip_steps": 2
 }

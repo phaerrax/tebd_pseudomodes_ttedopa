@@ -4,6 +4,7 @@ using ITensors
 using Plots
 using LaTeXStrings
 using JSON
+using ProgressMeter
 
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
@@ -42,6 +43,7 @@ let
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
     time_step_list = construct_step_list(parameters)
+    skip_steps = parameters["skip_steps"]
 
     # Costruzione della catena
     # ========================
@@ -50,7 +52,9 @@ let
     sites = siteinds("S=1/2", n_sites)
 
     # Stati di singola eccitazione
-    single_ex_states = [single_ex_state(sites, j) for j = 1:n_sites]
+    single_ex_states = [MPS(sites,
+                            [j == n ? "Up" : "Dn" for j = 1:n_sites])
+                        for n = 1:n_sites]
 
     # Nuovi operatori di ITensors
     # ===========================
@@ -118,12 +122,16 @@ let
 
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
+    skip_count = 1
     for _ in time_step_list[2:end]
       current_state = apply(time_evolution_oplist, current_state; cutoff=max_err, maxdim=max_dim)
-      push!(occ_n,
-            [abs2(inner(s, current_state)) for s in single_ex_states])
-      #push!(maxdim_monitor, maxlinkdim(current_state))
+      if skip_count % skip_steps == 0
+        push!(occ_n,
+              [abs2(inner(s, current_state)) for s in single_ex_states])
+        #push!(maxdim_monitor, maxlinkdim(current_state))
+      end
       next!(progress)
+      skip_count += 1
     end
 
     # Salvo i risultati nei grandi contenitori
