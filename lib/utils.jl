@@ -64,6 +64,10 @@ end
 # =============================================
 # Per calcolare gli autostati dell'operatore numero: calcolo anche la somma
 # di tutti i coefficienti (così da verificare che sia pari a 1).
+function levels(projs::Vector{MPO}, state::MPS, ::SiteType"S=1/2")
+  lev = [real(inner(state, p * state)) for p in projs]
+  return [lev; sum(lev)]
+end
 function levels(projs::Vector{MPS}, state::MPS)
   lev = [real(inner(p, state)) for p in projs]
   return [lev; sum(lev)]

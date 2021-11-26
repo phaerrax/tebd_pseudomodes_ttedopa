@@ -17,11 +17,16 @@ using Combinatorics
 I₂ = [1 0
       0 1]
 
+# Il vettore nullo:
+ITensors.state(::StateName"zero", ::SiteType"S=1/2") = [ 0 0 ]
 # Definisco l'operatore numero per un singolo spin, che altro non è che
 # la proiezione sullo stato |↑⟩.
 ITensors.op(::OpName"num", s::SiteType"S=1/2") = op(OpName("ProjUp"), s)
 # La matrice identità
 ITensors.op(::OpName"id", ::SiteType"S=1/2") = I₂
+# La matrice nulla
+ITensors.op(::OpName"zero", ::SiteType"S=1/2") = [0 0
+                                                  0 0]
 
 # Operatori della corrente di spin
 # --------------------------------
@@ -55,6 +60,34 @@ function spin_current_op_list(::SiteType"S=1/2", sites::Vector{Index{Int64}})
   J⁻ = [MPO(sites, [J⁻tag(SiteType("S=1/2"), k, i) for i = 1:N]) for k = 1:N-1]
   spin_current_op_list = -0.5 .* (J⁺ .- J⁻)
   return spin_current_op_list
+end
+
+# Proiettori sugli autostati dell'operatore numero
+# ------------------------------------------------
+# La seguente funzione restituisce i nomi per costruire i MPS degli
+# stati della base dell'intero spazio della catena (suddivisi per
+# numero di occupazione complessivo).
+function chain_basis_states(n_sites::Int, level::Int, ::SiteType"S=1/2")
+  return unique(permutations([repeat(["Up"], level);
+                              repeat(["Dn"], n_sites - level)]))
+end
+
+# La seguente funzione crea un proiettore su ciascun sottospazio con
+# livello di occupazione definito.
+function level_subspace_proj(sites::Vector{Index{Int64}},
+                             level::Int,
+                             ::SiteType"S=1/2")
+  # Metodo "crudo": prendo tutti i vettori della base ortonormale di
+  # ciascun autospazio, ne creo i proiettori ortogonali e li sommo tutti.
+  # Forse poco efficiente, ma funziona.
+  N = length(sites)
+  projs = [projector(MPS(sites, names); normalize=false)
+           for names in chain_basis_states(N, level, SiteType("S=1/2"))]
+  result = projs[1]
+  for p in projs[2:end]
+    result = add(result, p)
+  end
+  return result
 end
 
 # Spazio degli spin vettorizzato

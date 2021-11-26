@@ -43,11 +43,7 @@ let
   occ_n_super = []
   spin_current_super = []
   maxdim_monitor_super = []
-  #spin_chain_levels_super = []
-  #osc_levels_left_super = []
-  #osc_levels_right_super = []
-  #normalisation_super = []
-  #hermiticity_monitor_super = []
+  spin_chain_levels_super = []
 
   # Precaricamento
   # ==============
@@ -74,28 +70,16 @@ let
                                     n_osc_left+1 : n_osc_left+n_spin_sites,
                                     j)
                         for j in list]
-    #=
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
     # dell'operatore numero della catena di spin, vale a dire calcolo
-    # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
-    # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
-                                  level_subspace_proj(sites[2:end-1], n),
-                                  MPS(sites[end:end], "vecid"))
-                            for n=0:n_sites]
-
-    # - l'occupazione dei livelli degli oscillatori
-    osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                   MPS(sites[2:end], "vecid"))
-                             for n=1:osc_dim]
-    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
-                                    osc_levels_proj(sites[end], n))
-                              for n=1:osc_dim]
-
-    # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecid")
-  =#
+    # (ψ,Pₙψ) dove ψ è lo stato corrente e Pₙ è il proiettore ortogonale
+    # sull'n-esimo autospazio di N.
+    spin_range = n_osc_left+1:n_osc_left+n_spin_sites
+    projectors = [level_subspace_proj(sites[spin_range], n, SiteType("S=1/2"))
+                  for n=0:n_spin_sites]
+    num_eigenspace_projs = [embed_slice(sites, spin_range, p)
+                            for p in projectors]
   else
     preload = false
   end
@@ -269,25 +253,12 @@ let
                                       n_osc_left+1 : n_osc_left+n_spin_sites,
                                       j)
                           for j in list]
-
-      #=
       # - l'occupazione degli autospazi dell'operatore numero
-      num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
-      level_subspace_proj(sites[2:end-1], n),
-      MPS(sites[end:end], "vecid"))
-      for n=0:n_sites]
-
-      # - l'occupazione dei livelli degli oscillatori
-      osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-      MPS(sites[2:end], "vecid"))
-      for n=1:osc_dim]
-      osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
-      osc_levels_proj(sites[end], n))
-      for n=1:osc_dim]
-
-      # - la normalizzazione (cioè la traccia) della matrice densità
-      full_trace = MPS(sites, "vecid")
-      =#
+      spin_range = n_osc_left+1:n_osc_left+n_spin_sites
+      projectors = [level_subspace_proj(sites[spin_range], n, SiteType("S=1/2"))
+                    for n=0:n_spin_sites]
+      num_eigenspace_projs = [embed_slice(sites, spin_range, p)
+                              for p in projectors]
     end
 
     # Simulazione
@@ -310,12 +281,9 @@ let
     spin_current = [[real(inner(current_state,
                                 j * current_state))
                      for j in spin_current_ops]]
-    #chain_levels = [levels(num_eigenspace_projs, current_state)]
-    #osc_levels_left = [levels(osc_levels_projs_left, current_state)]
-    #osc_levels_right = [levels(osc_levels_projs_right, current_state)]
-    #normalisation = [real(inner(full_trace, current_state))]
-    #hermiticity_monitor = Real[0]
-    #time_instants = Real[0]
+    spin_chain_levels = [levels(num_eigenspace_projs,
+                                current_state,
+                                SiteType("S=1/2"))]
 
     # Evoluzione temporale
     # --------------------
@@ -328,28 +296,13 @@ let
                             cutoff=max_err,
                             maxdim=max_dim)
       if skip_count % skip_steps == 0
-        #=
-        Calcolo dapprima la traccia della matrice densità. Se non devia
-        eccessivamente da 1, in ogni caso influisce sul valore delle
-        osservabili che calcolo successivamente, che si modificano dello
-        stesso fattore, e devono essere quindi corrette di un fattore pari
-        al reciproco della traccia.
-        =#
-        #trace = real(inner(full_trace, current_state))
-
-        #push!(normalisation,
-        #      trace)
         push!(occ_n,
               expect(current_state, "num"))
         push!(spin_current,
               [real(inner(current_state, j * current_state))
                for j in spin_current_ops])
-        #push!(chain_levels,
-        #      levels(num_eigenspace_projs, current_state) ./ trace)
-        #push!(osc_levels_left,
-        #      levels(osc_levels_projs_left, current_state) ./ trace)
-        #push!(osc_levels_right,
-        #      levels(osc_levels_projs_right, current_state) ./ trace)
+        push!(spin_chain_levels,
+              levels(num_eigenspace_projs, current_state, SiteType("S=1/2")))
         push!(maxdim_monitor,
               maxlinkdim(current_state))
       end
@@ -370,22 +323,10 @@ let
                                 for n = 1:n_spin_sites-1])
       push!(dict, name => tmp_list[j,:])
     end
-    #=
-    tmp_list = hcat(osc_levels_left...)
-    for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
+    tmp_list = hcat(spin_chain_levels...)
+    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
       push!(dict, name => tmp_list[j,:])
     end
-    tmp_list = hcat(chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_sites])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(osc_levels_right...)
-    for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
-      push!(dict, name => tmp_list[j,:])
-    end
-    push!(dict, :full_trace => normalisation)
-    push!(dict, :hermiticity => hermiticity_monitor)
-    =#
     push!(dict, :maxdim => maxdim_monitor)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
@@ -396,12 +337,8 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
     push!(spin_current_super, spin_current)
-    #push!(chain_levels_super, chain_levels)
-    #push!(osc_levels_left_super, osc_levels_left)
-    #push!(osc_levels_right_super, osc_levels_right)
+    push!(spin_chain_levels_super, spin_chain_levels)
     push!(maxdim_monitor_super, maxdim_monitor)
-    #push!(normalisation_super, normalisation)
-    #push!(hermiticity_monitor_super, hermiticity_monitor)
   end
 
   #= Grafici
@@ -504,37 +441,6 @@ let
                         )
   savefig(plt, "maxdim_monitor.png")
 
-  #=
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = plot_time_series(normalisation_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[nothing],
-                         linestyles=[:solid],
-                         x_label=L"\lambda\, t",
-                         y_label=L"\operatorname{tr}\,\rho(t)",
-                         plot_title="Normalizzazione della matrice densità",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "dm_normalisation.png")
-
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = plot_time_series(hermiticity_monitor_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[nothing],
-                         linestyles=[:solid],
-                         x_label=L"\lambda\, t",
-                         y_label=L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
-                         plot_title="Controllo hermitianità della matrice densità",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "hermiticity_monitor.png")
-  =#
   # Grafico della corrente di spin
   # ------------------------------
   len = size(hcat(spin_current_super[begin]...), 1)
@@ -549,13 +455,13 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "spin_current.png")
-  #=
+ 
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------
   # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
   # restanti valori.
-  len = size(hcat(chain_levels_super[begin]...), 1) - 1
-  plt = plot_time_series(chain_levels_super,
+  len = size(hcat(spin_chain_levels_super[begin]...), 1) - 1
+  plt = plot_time_series(spin_chain_levels_super,
                          parameter_lists;
                          displayed_sites=nothing,
                          labels=[string.(0:len-1); "total"],
@@ -567,26 +473,6 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "chain_levels.png")
-
-  # Grafico dell'occupazione dei livelli degli oscillatori
-  # ------------------------------------------------------
-  for (list, pos) in zip([osc_levels_left_super, osc_levels_right_super],
-                         ["sx", "dx"])
-    len = size(hcat(list[begin]...), 1) - 1
-    plt = plot_time_series(list,
-                           parameter_lists;
-                           displayed_sites=nothing,
-                           labels=[string.(0:len-1); "total"],
-                           linestyles=[repeat([:solid], len); :dash],
-                           x_label=L"\lambda\, t",
-                           y_label=L"n",
-                           plot_title="Occupazione degli autospazi "
-                           * "dell'oscillatore $pos",
-                           plot_size=plot_size
-                          )
-    savefig(plt, "osc_levels_$pos.png")
-  end
-  =#
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
