@@ -41,7 +41,7 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
-  #spin_current_super = []
+  spin_current_super = []
   maxdim_monitor_super = []
   #spin_chain_levels_super = []
   #osc_levels_left_super = []
@@ -67,15 +67,14 @@ let
              siteinds("S=1/2", n_spin_sites);
              siteinds("Osc", n_osc_right)]
 
-    #=
     # - la corrente di spin
-    # Prima costruisco gli operatori sulla catena di spin, poi li
-    # estendo con l'identità sui restanti siti.
-    spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
-                              j,
-                              MPS(sites[end:end], "vecid"))
-                        for j in spin_current_op_list(sites[2:end-1])]
-
+    list = spin_current_op_list(SiteType("S=1/2"),
+                                sites[n_osc_left+1:n_osc_left+n_spin_sites])
+    spin_current_ops = [embed_slice(sites,
+                                    n_osc_left+1 : n_osc_left+n_spin_sites,
+                                    j)
+                        for j in list]
+    #=
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
     # dell'operatore numero della catena di spin, vale a dire calcolo
@@ -263,13 +262,15 @@ let
     # Osservabili da misurare
     # =======================
     if !preload
-      #=
       # - la corrente di spin
-      spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
-      j,
-      MPS(sites[end:end], "vecid"))
-      for j in spin_current_op_list(sites[2:end-1])]
+      list = spin_current_op_list("S=1/2",
+                                  sites[n_osc_left+1:n_osc_left+n_spin_sites])
+      spin_current_ops = [embed_slice(sites,
+                                      n_osc_left+1 : n_osc_left+n_spin_sites,
+                                      j)
+                          for j in list]
 
+      #=
       # - l'occupazione degli autospazi dell'operatore numero
       num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
       level_subspace_proj(sites[2:end-1], n),
@@ -306,7 +307,9 @@ let
     # --------------------------------
     occ_n = [expect(current_state, "num")]
     maxdim_monitor = Int[maxlinkdim(current_state)]
-    #spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
+    spin_current = [[real(inner(current_state,
+                                j * current_state))
+                     for j in spin_current_ops]]
     #chain_levels = [levels(num_eigenspace_projs, current_state)]
     #osc_levels_left = [levels(osc_levels_projs_left, current_state)]
     #osc_levels_right = [levels(osc_levels_projs_right, current_state)]
@@ -338,8 +341,9 @@ let
         #      trace)
         push!(occ_n,
               expect(current_state, "num"))
-        #push!(spin_current,
-        #      [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
+        push!(spin_current,
+              [real(inner(current_state, j * current_state))
+               for j in spin_current_ops])
         #push!(chain_levels,
         #      levels(num_eigenspace_projs, current_state) ./ trace)
         #push!(osc_levels_left,
@@ -361,11 +365,12 @@ let
                                 [Symbol("occ_n_right$n") for n∈1:n_osc_right]])
       push!(dict, name => tmp_list[j,:])
     end
-    #=
     tmp_list = hcat(spin_current...)
-    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_sites-1])
+    for (j, name) in enumerate([Symbol("spin_current$n")
+                                for n = 1:n_spin_sites-1])
       push!(dict, name => tmp_list[j,:])
     end
+    #=
     tmp_list = hcat(osc_levels_left...)
     for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
       push!(dict, name => tmp_list[j,:])
@@ -390,7 +395,7 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
-    #push!(spin_current_super, spin_current)
+    push!(spin_current_super, spin_current)
     #push!(chain_levels_super, chain_levels)
     #push!(osc_levels_left_super, osc_levels_left)
     #push!(osc_levels_right_super, osc_levels_right)
@@ -529,7 +534,7 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "hermiticity_monitor.png")
-
+  =#
   # Grafico della corrente di spin
   # ------------------------------
   len = size(hcat(spin_current_super[begin]...), 1)
@@ -544,7 +549,7 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "spin_current.png")
-
+  #=
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------
   # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i

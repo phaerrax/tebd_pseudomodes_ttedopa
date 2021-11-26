@@ -23,6 +23,40 @@ ITensors.op(::OpName"num", s::SiteType"S=1/2") = op(OpName("ProjUp"), s)
 # La matrice identità
 ITensors.op(::OpName"id", ::SiteType"S=1/2") = I₂
 
+# Operatori della corrente di spin
+# --------------------------------
+# Jₖ = -λ/2 (σˣ⊗σʸ - σʸ⊗σˣ)
+function J⁺tag(::SiteType"S=1/2", left_site::Int, i::Int)
+  # Questa funzione restituisce i nomi degli operatori da assegnare al
+  # sito i-esimo per la parte σˣ⊗σʸ di Jₖ, k == left_site
+  if i == left_site
+    str = "σx"
+  elseif i == left_site + 1
+    str = "σy"
+  else
+    str = "id"
+  end
+  return str
+end
+function J⁻tag(::SiteType"S=1/2", left_site::Int, i::Int)
+  # Come `J⁺tag`, ma per σʸ⊗σˣ
+  if i == left_site
+    str = "σy"
+  elseif i == left_site + 1
+    str = "σx"
+  else
+    str = "id"
+  end
+  return str
+end
+function spin_current_op_list(::SiteType"S=1/2", sites::Vector{Index{Int64}})
+  N = length(sites)
+  J⁺ = [MPO(sites, [J⁺tag(SiteType("S=1/2"), k, i) for i = 1:N]) for k = 1:N-1]
+  J⁻ = [MPO(sites, [J⁻tag(SiteType("S=1/2"), k, i) for i = 1:N]) for k = 1:N-1]
+  spin_current_op_list = -0.5 .* (J⁺ .- J⁻)
+  return spin_current_op_list
+end
+
 # Spazio degli spin vettorizzato
 # ==============================
 ITensors.space(::SiteType"vecS=1/2") = 4
@@ -109,7 +143,7 @@ function J⁻tag(left_site::Int, i::Int)
   end
   return str
 end
-function spin_current_op_list(sites::Vector{Index{Int64}})
+function spin_current_op_list(sites::Vector{Index{Int64}}, ::SiteType"vecS=1/2")
   N = length(sites)
   J⁺ = [MPS(sites, [J⁺tag(k, i) for i = 1:N]) for k = 1:N-1]
   J⁻ = [MPS(sites, [J⁻tag(k, i) for i = 1:N]) for k = 1:N-1]
