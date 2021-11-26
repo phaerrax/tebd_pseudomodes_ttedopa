@@ -153,12 +153,28 @@ function embed_slice(sites::Array{Index{Int64}},
 
   · `slice::Array{ITensors}`: il MPO da estendere.
   =#
-  @assert length(slice) == length(range)
-  #return chain(chain(MPO(sites[1 : range[begin]-1], "id"), slice),
-  #             MPO(sites[range[end]+1 : end], "id"))
-  return chain(MPO(sites[1 : range[begin]-1], "id"),
-               slice,
-               MPO(sites[range[end]+1 : end], "id"))
+  # Controllo dei parametri
+  if length(slice) != length(range)
+    throw(DimensionMismatch("Le dimensioni di slice e range non combaciano."))
+  end
+  if !issubset(range, eachindex(sites))
+    throw(BoundsError(range, sites))
+  end
+
+  if range[begin] == 1 && range[end] == length(sites)
+    mpo = slice
+  elseif range[begin] == 1
+    mpo = chain(slice,
+                MPO(sites[range[end]+1 : end], "id"))
+  elseif range[end] == length(sites)
+    mpo = chain(MPO(sites[1 : range[begin]-1], "id"),
+                slice)
+  else
+    mpo = chain(MPO(sites[1 : range[begin]-1], "id"),
+                slice,
+                MPO(sites[range[end]+1 : end], "id"))
+  end
+  return mpo
 end
 
 # Grafici
