@@ -2,10 +2,6 @@ using LinearAlgebra
 using ITensors
 using Combinatorics
 
-# Spazio degli spin
-# =================
-ITensors.space(::SiteType"vecS=1/2") = 4
-
 # Matrici di Pauli e affini
 # -------------------------
 σˣ = [0 1
@@ -20,6 +16,16 @@ ITensors.space(::SiteType"vecS=1/2") = 4
       1 0]
 I₂ = [1 0
       0 1]
+
+# Definisco l'operatore numero per un singolo spin, che altro non è che
+# la proiezione sullo stato |↑⟩.
+ITensors.op(::OpName"num", s::SiteType"S=1/2") = op(OpName("ProjUp"), s)
+# La matrice identità
+ITensors.op(::OpName"id", ::SiteType"S=1/2") = I₂
+
+# Spazio degli spin vettorizzato
+# ==============================
+ITensors.space(::SiteType"vecS=1/2") = 4
 
 # Questi "stati" contengono sia degli stati veri e propri, come Up:Up e Dn:Dn,
 # sia la vettorizzazione di alcuni operatori che mi servono per calcolare le
