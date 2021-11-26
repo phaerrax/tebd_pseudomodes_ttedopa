@@ -40,9 +40,9 @@ let
 
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
-  #occ_n_super = []
+  occ_n_super = []
   #spin_current_super = []
-  #maxdim_monitor_super = []
+  maxdim_monitor_super = []
   #spin_chain_levels_super = []
   #osc_levels_left_super = []
   #osc_levels_right_super = []
@@ -66,10 +66,6 @@ let
     sites = [siteinds("Osc", n_osc_left);
              siteinds("S=1/2", n_spin_sites);
              siteinds("Osc", n_osc_right)]
-    #single_ex_states = ...
-    #osc_num_sx = ...
-    #osc_num_dx = ...
-    #occ_n_list = ...
 
     #=
     # - la corrente di spin
@@ -130,16 +126,12 @@ let
     # Costruzione della catena
     # ========================
     if !preload
-    n_spin_sites = parameters["number_of_spin_sites"]
-    n_osc_left = parameters["number_of_oscillators_left"]
-    n_osc_right = parameters["number_of_oscillators_right"]
-    sites = [siteinds("Osc", n_osc_left);
-             siteinds("S=1/2", n_spin_sites);
-             siteinds("Osc", n_osc_right)]
-    #single_ex_states = [chain(MPS(sites[1:1], "vecid"),
-    #                            single_ex_state(sites[2:end-1], k),
-    #                            MPS(sites[end:end], "vecid"))
-    #                      for k = 1:n_sites]
+      n_spin_sites = parameters["number_of_spin_sites"]
+      n_osc_left = parameters["number_of_oscillators_left"]
+      n_osc_right = parameters["number_of_oscillators_right"]
+      sites = [siteinds("Osc", n_osc_left);
+               siteinds("S=1/2", n_spin_sites);
+               siteinds("Osc", n_osc_right)]
     end
 
 
@@ -270,41 +262,32 @@ let
 
     # Osservabili da misurare
     # =======================
-    #=
     if !preload
-      # - i numeri di occupazione
-      osc_num_sx = MPS(sites, vcat(["vecnum"],
-                                   repeat(["vecid"], n_sites),
-                                   ["vecid"]))
-      osc_num_dx = MPS(sites, vcat(["vecid"],
-                                   repeat(["vecid"], n_sites),
-                                   ["vecnum"]))
-      occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
-
+      #=
       # - la corrente di spin
       spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
-                                j,
-                                MPS(sites[end:end], "vecid"))
-                          for j in spin_current_op_list(sites[2:end-1])]
+      j,
+      MPS(sites[end:end], "vecid"))
+      for j in spin_current_op_list(sites[2:end-1])]
 
       # - l'occupazione degli autospazi dell'operatore numero
       num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
-                                    level_subspace_proj(sites[2:end-1], n),
-                                    MPS(sites[end:end], "vecid"))
-                              for n=0:n_sites]
+      level_subspace_proj(sites[2:end-1], n),
+      MPS(sites[end:end], "vecid"))
+      for n=0:n_sites]
 
       # - l'occupazione dei livelli degli oscillatori
       osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                     MPS(sites[2:end], "vecid"))
-                               for n=1:osc_dim]
+      MPS(sites[2:end], "vecid"))
+      for n=1:osc_dim]
       osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
-                                      osc_levels_proj(sites[end], n))
-                                for n=1:osc_dim]
+      osc_levels_proj(sites[end], n))
+      for n=1:osc_dim]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
       full_trace = MPS(sites, "vecid")
+      =#
     end
-    =#
 
     # Simulazione
     # ===========
@@ -321,8 +304,8 @@ let
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    #occ_n = [[inner(s, current_state) for s in occ_n_list]]
-    #maxdim_monitor = Int[maxlinkdim(current_state)]
+    occ_n = [expect(current_state, "num")]
+    maxdim_monitor = Int[maxlinkdim(current_state)]
     #spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
     #chain_levels = [levels(num_eigenspace_projs, current_state)]
     #osc_levels_left = [levels(osc_levels_projs_left, current_state)]
@@ -353,8 +336,8 @@ let
 
         #push!(normalisation,
         #      trace)
-        #push!(occ_n,
-        #      [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
+        push!(occ_n,
+              expect(current_state, "num"))
         #push!(spin_current,
         #      [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
         #push!(chain_levels,
@@ -363,22 +346,22 @@ let
         #      levels(osc_levels_projs_left, current_state) ./ trace)
         #push!(osc_levels_right,
         #      levels(osc_levels_projs_right, current_state) ./ trace)
-        #push!(maxdim_monitor,
-        #      maxlinkdim(current_state))
+        push!(maxdim_monitor,
+              maxlinkdim(current_state))
       end
       next!(progress)
       skip_count += 1
     end
 
-    #=
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => time_step_list[1:skip_steps:end])
     tmp_list = hcat(occ_n...)
-    for (j, name) in enumerate([:occ_n_left;
-                              [Symbol("occ_n_spin$n") for n = 1:n_sites];
-                              :occ_n_right])
+    for (j, name) in enumerate([[Symbol("occ_n_left$n") for n∈n_osc_left:-1:1];
+                                [Symbol("occ_n_spin$n") for n∈1:n_spin_sites];
+                                [Symbol("occ_n_right$n") for n∈1:n_osc_right]])
       push!(dict, name => tmp_list[j,:])
     end
+    #=
     tmp_list = hcat(spin_current...)
     for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_sites-1])
       push!(dict, name => tmp_list[j,:])
@@ -395,9 +378,10 @@ let
     for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
       push!(dict, name => tmp_list[j,:])
     end
-    push!(dict, :maxdim => maxdim_monitor)
     push!(dict, :full_trace => normalisation)
     push!(dict, :hermiticity => hermiticity_monitor)
+    =#
+    push!(dict, :maxdim => maxdim_monitor)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -406,16 +390,14 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
-    push!(spin_current_super, spin_current)
-    push!(chain_levels_super, chain_levels)
-    push!(osc_levels_left_super, osc_levels_left)
-    push!(osc_levels_right_super, osc_levels_right)
+    #push!(spin_current_super, spin_current)
+    #push!(chain_levels_super, chain_levels)
+    #push!(osc_levels_left_super, osc_levels_left)
+    #push!(osc_levels_right_super, osc_levels_right)
     push!(maxdim_monitor_super, maxdim_monitor)
-    push!(normalisation_super, normalisation)
-    push!(hermiticity_monitor_super, hermiticity_monitor)
-  =#
+    #push!(normalisation_super, normalisation)
+    #push!(hermiticity_monitor_super, hermiticity_monitor)
   end
-  #=
 
   #= Grafici
      =======
@@ -428,8 +410,8 @@ let
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
+  # Grafico dei numeri di occupazione (oscillatori sx)
+  # --------------------------------------------------
   len = size(hcat(occ_n_super[begin]...), 1)
   # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
   # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
@@ -438,30 +420,46 @@ let
   #
   plt = plot_time_series(occ_n_super,
                          parameter_lists;
-                         displayed_sites=nothing,
-                         labels=vcat(["L"], string.(1:len-2), ["R"]),
-                         linestyles=vcat([:dash], repeat([:solid], len-2), [:dash]),
+                         displayed_sites=1:n_osc_left,
+                         labels=string.(n_osc_left:-1:1),
+                         linestyles=repeat([:solid], n_osc_left),
                          x_label=L"\lambda\, t",
                          y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "occ_n_all.png")
+                         plot_title="Numeri di occupazione "*
+                                    "(oscillatori a sx)",
+                         plot_size=plot_size)
+  savefig(plt, "occ_n_osc_left.png")
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
+  # Grafico dei numeri di occupazione (solo spin)
+  # ---------------------------------------------
+  start = n_osc_left
   plt = plot_time_series(occ_n_super,
                          parameter_lists;
-                         displayed_sites=2:len+1,
-                         labels=string.(1:len-2),
-                         linestyles=repeat([:solid], len-2),
+                         displayed_sites=start+1:start+n_spin_sites,
+                         labels=string.(1:n_spin_sites),
+                         linestyles=repeat([:solid], n_spin_sites),
                          x_label=L"\lambda\, t",
                          y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione (solo spin)",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "occ_n_spins_only.png")
+                         plot_title="Numeri di occupazione (spin)",
+                         plot_size=plot_size)
+  savefig(plt, "occ_n_spins.png")
   
+  # Grafico dei numeri di occupazione (oscillatori dx)
+  # --------------------------------------------------
+  start = n_osc_left + n_spin_sites
+  plt = plot_time_series(occ_n_super,
+                         parameter_lists;
+                         displayed_sites=start+1:start+n_osc_right,
+                         labels=string.(1:n_osc_right),
+                         linestyles=repeat([:solid], n_osc_right),
+                         x_label=L"\lambda\, t",
+                         y_label=L"\langle n_i\rangle",
+                         plot_title="Numeri di occupazione "*
+                                    "(oscillatori dx)",
+                         plot_size=plot_size)
+  savefig(plt, "occ_n_osc_right.png")
+
+  #=
   # Grafico dei numeri di occupazione (oscillatori + totale catena)
   # ---------------------------------------------------------------
   data_super = []
@@ -485,6 +483,7 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "occ_n_sums.png")
+  =#
 
   # Grafico dei ranghi del MPS
   # --------------------------
@@ -500,6 +499,7 @@ let
                         )
   savefig(plt, "maxdim_monitor.png")
 
+  #=
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.

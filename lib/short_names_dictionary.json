@@ -1,6 +1,6 @@
 {
   "spin_excitation_energy": "ε",
-  "number_of_spin_sites": "N",
+  "number_of_spin_sites": "Nₛ",
   "simulation_end_time": "end_time",
   "chain_initial_state": "vₜ₌₀",
   "simulation_time_step": "τ",
@@ -12,5 +12,11 @@
   "oscillator_damping_coefficient_left": "γₗ",
   "oscillator_damping_coefficient_right": "γᵣ",
   "oscillator_frequency": "ω",
-  "temperature": "T"
+  "temperature": "T",
+  "spectral_density_peak": "Ω",
+  "spectral_density_half_width": "γ",
+  "frequency_cutoff": "ωc",
+  "PolyChaos_nquad": "Nquad",
+  "number_of_oscillators_left": "Nₗ",
+  "number_of_oscillators_right": "Nᵣ"
 }
