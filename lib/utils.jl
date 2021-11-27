@@ -73,6 +73,14 @@ function levels(projs::Vector{MPS}, state::MPS)
   return [lev; sum(lev)]
 end
 
+# Rilevazione della dimensione dei legami tra i siti degli MPS o MPO
+function linkdims(m::MPS)
+  return [ITensors.dim(linkind(m, j)) for j ∈ 1:length(m)-1]
+end
+function linkdims(m::MPO)
+  return [ITensors.dim(linkind(m, j)) for j ∈ 1:length(m)-1]
+end
+
 # Composizione di MPS e MPO
 # =========================
 function chain(left::MPS, right::MPS)

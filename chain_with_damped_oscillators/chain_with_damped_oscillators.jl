@@ -41,7 +41,7 @@ let
   # lista di parametri fornita.
   occ_n_super = []
   spin_current_super = []
-  maxdim_monitor_super = []
+  bond_dimensions_super = []
   chain_levels_super = []
   osc_levels_left_super = []
   osc_levels_right_super = []
@@ -241,7 +241,7 @@ let
     # Osservabili sullo stato iniziale
     # --------------------------------
     occ_n = [[inner(s, current_state) for s in occ_n_list]]
-    maxdim_monitor = Int[maxlinkdim(current_state)]
+    bond_dimensions = [linkdims(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
     chain_levels = [levels(num_eigenspace_projs, current_state)]
     osc_levels_left = [levels(osc_levels_projs_left, current_state)]
@@ -282,8 +282,8 @@ let
               levels(osc_levels_projs_left, current_state) ./ trace)
         push!(osc_levels_right,
               levels(osc_levels_projs_right, current_state) ./ trace)
-        push!(maxdim_monitor,
-              maxlinkdim(current_state))
+        push!(bond_dimensions,
+              linkdims(current_state))
 
         #=
         Controllo che la matrice densità ridotta dell'oscillatore a sinistra
@@ -337,7 +337,11 @@ let
     for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
       push!(dict, name => tmp_list[j,:])
     end
-    push!(dict, :maxdim => maxdim_monitor)
+    tmp_list = hcat(bond_dimensions...)
+    for (j, name) in enumerate([Symbol("bond_dim$n")
+                                for n ∈ eachindex(bond_dimensions)])
+      push!(dict, name => tmp_list[j,:])
+    end
     push!(dict, :full_trace => normalisation)
     push!(dict, :hermiticity => hermiticity_monitor)
     table = DataFrame(dict)
@@ -352,7 +356,7 @@ let
     push!(chain_levels_super, chain_levels)
     push!(osc_levels_left_super, osc_levels_left)
     push!(osc_levels_right_super, osc_levels_right)
-    push!(maxdim_monitor_super, maxdim_monitor)
+    push!(bond_dimensions_super, bond_dimensions)
     push!(normalisation_super, normalisation)
     push!(hermiticity_monitor_super, hermiticity_monitor)
   end
@@ -428,17 +432,18 @@ let
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  plt = plot_time_series(maxdim_monitor_super,
+  len = size(hcat(bond_dimensions_super[begin]...), 1)
+  plt = plot_time_series(bond_dimensions_super,
                          parameter_lists;
                          displayed_sites=nothing,
-                         labels=[nothing],
-                         linestyles=[:solid],
+                         labels=["($j,$(j+1))" for j=1:len],
+                         linestyles=repeat([:solid], len),
                          x_label=L"\lambda\, t",
-                         y_label=L"\max_k\,\chi_{k,k+1}",
-                         plot_title="Rango massimo del MPS",
+                         y_label=L"\chi_{k,k+1}",
+                         plot_title="Ranghi del MPS",
                          plot_size=plot_size
                         )
-  savefig(plt, "maxdim_monitor.png")
+  savefig(plt, "bond_dimensions.png")
 
   # Grafico della traccia della matrice densità
   # -------------------------------------------

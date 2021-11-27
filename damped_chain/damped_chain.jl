@@ -37,7 +37,7 @@ let
   # lista di parametri fornita.
   occ_n_super = []
   spin_current_super = []
-  maxdim_monitor_super = []
+  bond_dimensions_super = []
   chain_levels_super = []
 
   # Definizione degli operatori nell'equazione di Lindblad
@@ -125,7 +125,7 @@ let
 
     # Misuro le osservabili sullo stato iniziale
     occ_n = [[inner(s, current_state) for s in single_ex_states]]
-    maxdim_monitor = Int[maxlinkdim(current_state)]
+    bond_dimensions = [linkdims(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
     chain_levels = [levels(num_eigenspace_projs, current_state)]
 
@@ -144,8 +144,8 @@ let
             [real(inner(j, current_state)) for j in spin_current_ops])
       push!(chain_levels,
             levels(num_eigenspace_projs, current_state))
-      push!(maxdim_monitor,
-            maxlinkdim(current_state))
+        push!(bond_dimensions,
+              linkdims(current_state))
       next!(progress)
     end
 
@@ -163,7 +163,11 @@ let
     for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_sites])
       push!(dict, name => tmp_list[j,:])
     end
-    push!(dict, :maxdim => maxdim_monitor)
+    tmp_list = hcat(bond_dimensions...)
+    for (j, name) in enumerate([Symbol("bond_dim$n")
+                                for n ∈ eachindex(bond_dimensions)])
+      push!(dict, name => tmp_list[j,:])
+    end
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -174,7 +178,7 @@ let
     push!(occ_n_super, occ_n)
     push!(spin_current_super, spin_current)
     push!(chain_levels_super, chain_levels)
-    push!(maxdim_monitor_super, maxdim_monitor)
+    push!(bond_dimensions_super, bond_dimensions)
   end
 
   #= Grafici
@@ -210,17 +214,18 @@ let
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  plt = plot_time_series(maxdim_monitor_super,
+  len = size(hcat(bond_dimensions_super[begin]...), 1)
+  plt = plot_time_series(bond_dimensions_super,
                          parameter_lists;
                          displayed_sites=nothing,
-                         labels=["MPS"],
-                         linestyles=[:solid],
+                         labels=["($j,$(j+1))" for j=1:len],
+                         linestyles=repeat([:solid], len),
                          x_label=L"\lambda\, t",
-                         y_label=L"\max_k\,\chi_{k,k+1}",
-                         plot_title="Rango massimo del MPS",
+                         y_label=L"\chi_{k,k+1}",
+                         plot_title="Ranghi del MPS",
                          plot_size=plot_size
                         )
-  savefig(plt, "maxdim_monitor.png")
+  savefig(plt, "bond_dimensions.png")
 
   # Grafico della corrente di spin
   # ------------------------------
