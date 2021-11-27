@@ -63,12 +63,13 @@ let
              siteinds("S=1/2", n_spin_sites);
              siteinds("Osc", n_osc_right)]
 
+    range_osc_left = 1:n_osc_left
+    range_spins = n_osc_left .+ (1:n_spin_sites)
+    range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
+
     # - la corrente di spin
-    list = spin_current_op_list(SiteType("S=1/2"),
-                                sites[n_osc_left+1:n_osc_left+n_spin_sites])
-    spin_current_ops = [embed_slice(sites,
-                                    n_osc_left+1 : n_osc_left+n_spin_sites,
-                                    j)
+    list = spin_current_op_list(SiteType("S=1/2"), sites[range_spins])
+    spin_current_ops = [embed_slice(sites, range_spins, j)
                         for j in list]
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
@@ -117,6 +118,9 @@ let
                siteinds("Osc", n_osc_right)]
     end
 
+    range_osc_left = 1:n_osc_left
+    range_spins = n_osc_left .+ (1:n_spin_sites)
+    range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
     #= Definizione degli operatori nell'Hamiltoniana
        =============================================
@@ -247,17 +251,13 @@ let
     # =======================
     if !preload
       # - la corrente di spin
-      list = spin_current_op_list("S=1/2",
-                                  sites[n_osc_left+1:n_osc_left+n_spin_sites])
-      spin_current_ops = [embed_slice(sites,
-                                      n_osc_left+1 : n_osc_left+n_spin_sites,
-                                      j)
+      list = spin_current_op_list("S=1/2", sites[range_spins])
+      spin_current_ops = [embed_slice(sites, range_spins, j)
                           for j in list]
       # - l'occupazione degli autospazi dell'operatore numero
-      spin_range = n_osc_left+1:n_osc_left+n_spin_sites
-      projectors = [level_subspace_proj(sites[spin_range], n, SiteType("S=1/2"))
+      projectors = [level_subspace_proj(sites[range_spins], n, SiteType("S=1/2"))
                     for n=0:n_spin_sites]
-      num_eigenspace_projs = [embed_slice(sites, spin_range, p)
+      num_eigenspace_projs = [embed_slice(sites, range_spins, p)
                               for p in projectors]
     end
 
@@ -266,10 +266,10 @@ let
     # Stato iniziale
     # --------------
     # Gli oscillatori partono tutti dallo stato vuoto
-    osc_sx_init_state = MPS(sites[1:n_osc_left], "Emp")
-    spin_init_state = MPS(sites[n_osc_left+1:n_osc_left+n_spin_sites],
+    osc_sx_init_state = MPS(sites[range_osc_left], "Emp")
+    spin_init_state = MPS(sites[range_spins],
                           ["Up"; repeat(["Dn"], n_spin_sites-1)])
-    osc_dx_init_state = MPS(sites[end-n_osc_right+1:end], "Emp")
+    osc_dx_init_state = MPS(sites[range_osc_right], "Emp")
     current_state = chain(osc_sx_init_state,
                           spin_init_state,
                           osc_dx_init_state)
@@ -278,8 +278,7 @@ let
     # --------------------------------
     occ_n = [expect(current_state, "num")]
     maxdim_monitor = Int[maxlinkdim(current_state)]
-    spin_current = [[real(inner(current_state,
-                                j * current_state))
+    spin_current = [[real(inner(current_state, j * current_state))
                      for j in spin_current_ops]]
     spin_chain_levels = [levels(num_eigenspace_projs,
                                 current_state,
@@ -362,8 +361,8 @@ let
   #
   plt = plot_time_series(occ_n_super,
                          parameter_lists;
-                         displayed_sites=1:n_osc_left,
-                         labels=string.(n_osc_left:-1:1),
+                         displayed_sites=range_osc_left,
+                         labels=string.(reverse(range_osc_left)),
                          linestyles=repeat([:solid], n_osc_left),
                          x_label=L"\lambda\, t",
                          y_label=L"\langle n_i\rangle",
@@ -374,10 +373,9 @@ let
 
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
-  start = n_osc_left
   plt = plot_time_series(occ_n_super,
                          parameter_lists;
-                         displayed_sites=start+1:start+n_spin_sites,
+                         displayed_sites=range_spins,
                          labels=string.(1:n_spin_sites),
                          linestyles=repeat([:solid], n_spin_sites),
                          x_label=L"\lambda\, t",
@@ -388,10 +386,9 @@ let
   
   # Grafico dei numeri di occupazione (oscillatori dx)
   # --------------------------------------------------
-  start = n_osc_left + n_spin_sites
   plt = plot_time_series(occ_n_super,
                          parameter_lists;
-                         displayed_sites=start+1:start+n_osc_right,
+                         displayed_sites=range_osc_right,
                          labels=string.(1:n_osc_right),
                          linestyles=repeat([:solid], n_osc_right),
                          x_label=L"\lambda\, t",
