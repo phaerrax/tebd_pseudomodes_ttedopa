@@ -10,6 +10,18 @@ using ITensors
    il loro codice ad ogni nuovo file.
 =#
 
+# Manipolazione dei dati di oggetti di ITensors
+# =============================================
+function sitetypes(s::Index)
+  # Questa funzione estrae i tag dell'oggetto Index fornito, e costruisce per
+  # ciascuno un oggetto SiteType. Questi SiteType possono poi essere interpretati
+  # da una funzione che riceve l'Index come argomento per capire come comportarsi.
+  # [La funzione è già presente nella libreria ITensors, ma è solo interna, quindi
+  # devo ricopiarla qui per poterla utilizzare.]
+  ts = tags(s)
+  return SiteType[SiteType(ts.data[n]) for n in 1:length(ts)]
+end
+
 # Lettura dei parametri della simulazione
 # =======================================
 function isjson(filename::String)
