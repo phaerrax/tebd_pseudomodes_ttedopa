@@ -7,6 +7,8 @@ using ProgressMeter
 using LinearAlgebra
 using JSON
 using Base.Filesystem
+using DataFrames
+using CSV
 
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
@@ -76,6 +78,7 @@ let
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
     time_step_list = construct_step_list(parameters)
+    skip_steps = parameters["skip_steps"]
 
     # Costruzione della catena
     # ========================
@@ -132,25 +135,29 @@ let
     # ...e si parte!
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
+    skip_count = 1
     for _ in time_step_list[2:end]
       current_state = apply(evo,
                             current_state,
                             cutoff=max_err,
                             maxdim=max_dim)
       #
-      push!(occ_n,
-            [real(inner(s, current_state)) for s in single_ex_states])
-      push!(spin_current,
-            [real(inner(j, current_state)) for j in spin_current_ops])
-      push!(chain_levels,
-            levels(num_eigenspace_projs, current_state))
+      if skip_count % skip_steps == 0
+        push!(occ_n,
+              [real(inner(s, current_state)) for s in single_ex_states])
+        push!(spin_current,
+              [real(inner(j, current_state)) for j in spin_current_ops])
+        push!(chain_levels,
+              levels(num_eigenspace_projs, current_state))
         push!(bond_dimensions,
               linkdims(current_state))
+      end
       next!(progress)
+      skip_count += 1
     end
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => construct_step_list(parameters))
+    dict = Dict(:time => time_step_list[1:skip_steps:end])
     tmp_list = hcat(occ_n...)
     for (j, name) in enumerate([Symbol("occ_n_spin$n") for n = 1:n_sites])
       push!(dict, name => tmp_list[j,:])
@@ -164,8 +171,7 @@ let
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(bond_dimensions...)
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ eachindex(bond_dimensions)])
+    for (j, name) in enumerate([Symbol("bond_dim$n") for n = 1:n_sites-1])
       push!(dict, name => tmp_list[j,:])
     end
     table = DataFrame(dict)
