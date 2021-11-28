@@ -338,8 +338,9 @@ let
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(bond_dimensions...)
+    len = n_sites + 2
     for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ eachindex(bond_dimensions)])
+                                for n ∈ 1:len-1])
       push!(dict, name => tmp_list[j,:])
     end
     push!(dict, :full_trace => normalisation)

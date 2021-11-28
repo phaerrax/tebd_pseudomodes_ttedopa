@@ -327,8 +327,9 @@ let
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(bond_dimensions...)
+    len = n_osc_left + n_spin_sites + n_osc_right
     for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ eachindex(bond_dimensions)])
+                                for n ∈ 1:len-1])
       push!(dict, name => tmp_list[j,:])
     end
     table = DataFrame(dict)
