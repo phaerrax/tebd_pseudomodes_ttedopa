@@ -77,8 +77,8 @@ let
     # (ψ,Pₙψ) dove ψ è lo stato corrente e Pₙ è il proiettore ortogonale
     # sull'n-esimo autospazio di N.
     spin_range = n_osc_left+1:n_osc_left+n_spin_sites
-    projectors = [level_subspace_proj(sites[spin_range], n, SiteType("S=1/2"))
-                  for n=0:n_spin_sites]
+    projectors = [level_subspace_proj(sites[spin_range], n)
+                  for n = 0:n_spin_sites]
     num_eigenspace_projs = [embed_slice(sites, spin_range, p)
                             for p in projectors]
   else
@@ -255,8 +255,8 @@ let
       spin_current_ops = [embed_slice(sites, range_spins, j)
                           for j in list]
       # - l'occupazione degli autospazi dell'operatore numero
-      projectors = [level_subspace_proj(sites[range_spins], n, SiteType("S=1/2"))
-                    for n=0:n_spin_sites]
+      projectors = [level_subspace_proj(sites[range_spins], n)
+                    for n = 0:n_spin_sites]
       num_eigenspace_projs = [embed_slice(sites, range_spins, p)
                               for p in projectors]
     end
@@ -267,8 +267,8 @@ let
     # --------------
     # Gli oscillatori partono tutti dallo stato vuoto
     osc_sx_init_state = MPS(sites[range_osc_left], "Emp")
-    spin_init_state = MPS(sites[range_spins],
-                          ["Up"; repeat(["Dn"], n_spin_sites-1)])
+    spin_init_state = parse_init_state(sites[spin_range],
+                                       parameters["chain_initial_state"])
     osc_dx_init_state = MPS(sites[range_osc_right], "Emp")
     current_state = chain(osc_sx_init_state,
                           spin_init_state,
@@ -281,8 +281,7 @@ let
     spin_current = [[real(inner(current_state, j * current_state))
                      for j in spin_current_ops]]
     spin_chain_levels = [levels(num_eigenspace_projs,
-                                current_state,
-                                SiteType("S=1/2"))]
+                                current_state)]
 
     # Evoluzione temporale
     # --------------------

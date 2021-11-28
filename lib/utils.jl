@@ -76,7 +76,7 @@ end
 # =============================================
 # Per calcolare gli autostati dell'operatore numero: calcolo anche la somma
 # di tutti i coefficienti (così da verificare che sia pari a 1).
-function levels(projs::Vector{MPO}, state::MPS, ::SiteType"S=1/2")
+function levels(projs::Vector{MPO}, state::MPS)
   lev = [real(inner(state, p * state)) for p in projs]
   return [lev; sum(lev)]
 end
@@ -86,10 +86,7 @@ function levels(projs::Vector{MPS}, state::MPS)
 end
 
 # Rilevazione della dimensione dei legami tra i siti degli MPS o MPO
-function linkdims(m::MPS)
-  return [ITensors.dim(linkind(m, j)) for j ∈ 1:length(m)-1]
-end
-function linkdims(m::MPO)
+function linkdims(m::Union{MPS, MPO})
   return [ITensors.dim(linkind(m, j)) for j ∈ 1:length(m)-1]
 end
 

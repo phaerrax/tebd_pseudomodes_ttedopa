@@ -28,34 +28,6 @@ ITensors.op(::OpName"id", ::SiteType"S=1/2") = I₂
 ITensors.op(::OpName"zero", ::SiteType"S=1/2") = [0 0
                                                   0 0]
 
-# Proiettori sugli autostati dell'operatore numero
-# ------------------------------------------------
-# La seguente funzione restituisce i nomi per costruire i MPS degli
-# stati della base dell'intero spazio della catena (suddivisi per
-# numero di occupazione complessivo).
-function chain_basis_states(n_sites::Int, level::Int, ::SiteType"S=1/2")
-  return unique(permutations([repeat(["Up"], level);
-                              repeat(["Dn"], n_sites - level)]))
-end
-
-# La seguente funzione crea un proiettore su ciascun sottospazio con
-# livello di occupazione definito.
-function level_subspace_proj(sites::Vector{Index{Int64}},
-                             level::Int,
-                             ::SiteType"S=1/2")
-  # Metodo "crudo": prendo tutti i vettori della base ortonormale di
-  # ciascun autospazio, ne creo i proiettori ortogonali e li sommo tutti.
-  # Forse poco efficiente, ma funziona.
-  N = length(sites)
-  projs = [projector(MPS(sites, names); normalize=false)
-           for names in chain_basis_states(N, level, SiteType("S=1/2"))]
-  result = projs[1]
-  for p in projs[2:end]
-    result = add(result, p)
-  end
-  return result
-end
-
 # Spazio degli spin vettorizzato
 # ==============================
 ITensors.space(::SiteType"vecS=1/2") = 4
@@ -186,37 +158,59 @@ end
 
 # Base di autostati per la catena
 # -------------------------------
-#= Come misurare il "contributo" di ogni autospazio dell'operatore numero
-   N su uno stato rappresentato dalla matrice densità ρ?
-   Se Pₙ è la proiezione sull'autospazio dell'autovalore n di N, il
-   valore cercato è cₙ = tr(ρ Pₙ).
-   Il proiettore Pₙ lo posso costruire sommando i proiettori su ogni singolo
-   autostato nell'n-esimo autospazio: è un metodo grezzo ma dovrebbe
-   funzionare. Calcolando prima dell'avvio dell'evoluzione temporale tutti
-   i proiettori si dovrebbe risparmiare tempo, dovento effettuare poi solo
-   n_sites operazioni ad ogni istante di tempo.                         
+#=
+Come misurare il "contributo" di ogni autospazio dell'operatore numero
+N su uno stato rappresentato dalla matrice densità ρ?
+Se Pₙ è la proiezione sull'autospazio dell'autovalore n di N, il
+valore cercato è cₙ = tr(ρ Pₙ), oppure cₙ = (ψ,Pₙψ⟩ a seconda di com'è
+descritto lo stato del sistema.
+Il proiettore Pₙ lo posso costruire sommando i proiettori su ogni singolo
+autostato nell'n-esimo autospazio: è un metodo grezzo ma dovrebbe
+funzionare. Calcolando prima dell'avvio dell'evoluzione temporale tutti
+i proiettori si dovrebbe risparmiare tempo, dovento effettuare poi solo
+n_sites operazioni ad ogni istante di tempo.                         
+
+La seguente funzione restituisce i nomi per costruire i MPS degli
+stati della base dell'intero spazio della catena (suddivisi per
+numero di occupazione complessivo).
 =#
-# La seguente funzione restituisce i nomi per costruire i MPS degli
-# stati della base dell'intero spazio della catena (suddivisi per
-# numero di occupazione complessivo).
-function chain_basis_states(n_sites::Int, level::Int)
-  return unique(permutations(vcat(repeat(["Up:Up"], level),
-                                  repeat(["Dn:Dn"], n_sites - level))))
+function chain_basis_states(::SiteType"S=1/2", n_sites::Int, level::Int)
+  return unique(permutations([repeat(["Up"], level);
+                              repeat(["Dn"], n_sites - level)]))
+end
+function chain_basis_states(::SiteType"vecS=1/2", n_sites::Int, level::Int)
+  return unique(permutations([repeat(["Up:Up"], level);
+                              repeat(["Dn:Dn"], n_sites - level)]))
 end
 
 # La seguente funzione crea un proiettore su ciascun sottospazio con
 # livello di occupazione definito.
+# Metodo "crudo": prendo tutti i vettori della base ortonormale di
+# ciascun autospazio, ne creo i proiettori ortogonali e li sommo tutti.
+# Forse poco efficiente, ma funziona.
 function level_subspace_proj(sites::Vector{Index{Int64}}, level::Int)
-  # Metodo "crudo": prendo tutti i vettori della base ortonormale di
-  # ciascun autospazio, ne creo i proiettori ortogonali e li sommo tutti.
-  # Forse poco efficiente, ma funziona.
   N = length(sites)
-  proj = MPS(sites, "zero")
-  for names in chain_basis_states(N, level)
-    proj = add(proj, MPS(sites, names); cutoff=1e-10)
+  # Controllo che i siti forniti siano degli spin ½.
+  if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
+    st = SiteType("S=1/2")
+    projs = [projector(MPS(sites, names); normalize=false)
+             for names in chain_basis_states(st, N, level)]
+  elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
+    st = SiteType("vecS=1/2")
+    projs = [MPS(sites, names)
+             for names in chain_basis_states(st, N, level)]
+  else
+    throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
+                        "\"S=1/2\" oppure \"vecS=1/2\"."))
   end
-  return proj
+  #return sum(projs) non funziona…
+  P = projs[1]
+  for p in projs[2:end]
+    P += p
+  end
+  return P
 end
+
 
 # Autostati del primo livello
 # ---------------------------
@@ -237,10 +231,17 @@ end
 function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
   N = length(sites)
   if k ∈ 1:N
-    # Ricorda che questa è la vettorizzazione della matrice densità costruita
-    # a partire dallo stato a singola eccitazione: vec(sₖ⊗ sₖᵀ).
-    states = [i == k ? "Up:Up" : "Dn:Dn" for i = 1:N]
-    return MPS(sites, states)
+    # Controllo che i siti forniti siano degli spin ½.
+    if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
+      states = [i == k ? "Up" : "Dn" for i ∈ 1:N]
+    elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
+      # Questa è la vettorizzazione della matrice densità costruita
+      # a partire dallo stato a singola eccitazione: vec(sₖ⊗sₖᵀ).
+      states = [i == k ? "Up:Up" : "Dn:Dn" for i ∈ 1:N]
+    else
+      throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
+                          "\"S=1/2\" oppure \"vecS=1/2\"."))
+    end
   elseif k > N
     throw(DomainError(k,
                       "Si è tentato di costruire uno stato con eccitazione "*
@@ -252,30 +253,34 @@ function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
                       "localizzata nel sito $k, che non appartiene alla "*
                       "catena: inserire un valore tra 1 e $N."))
   end
+  return MPS(sites, states)
 end
+
 function chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
   # Occhio ai coefficienti: questo, come sopra, non è il vettore vⱼ ma è
-  # vec(vⱼ⊗ vⱼᵀ): di conseguenza i coefficienti della combinazione lineare
-  # qui sopra devono essere usati al quadrato.
+  # vec(vₖ⊗vₖᵀ) = vₖ⊗vₖ: di conseguenza i coefficienti della combinazione
+  # lineare qui sopra devono essere usati al quadrato.
   # Il prodotto interno tra matrici vettorizzate è tale che
-  # ⟨vec(a⊗ aᵀ),vec(b⊗ bᵀ)⟩ = tr((a⊗ aᵀ)ᵀ b⊗ bᵀ) = (aᵀb)².
+  # ⟨vec(a⊗aᵀ),vec(b⊗bᵀ)⟩ = tr((a⊗aᵀ)ᵀ b⊗bᵀ) = (aᵀb)².
   # Non mi aspetto che la norma di questo MPS sia 1, pur avendo
   # usato i coefficienti normalizzati. Quello che deve fare 1 è invece la
-  # somma dei prodotti interni di vec(sₖ⊗ sₖᵀ), per k=1:N, con questo vettore.
+  # somma dei prodotti interni di vec(sₖ⊗sₖ), per k=1:N, con questo vettore.
   # Ottengo poi che ⟨Pₙ,vⱼ⟩ = 1 solo se n=j, 0 altrimenti.
   N = length(sites)
-  if j ∈ 1:N
-    state = MPS(sites, "zero")
-    for k=1:N
-      state += 2/(N+1) * sin(j*k*π / (N+1))^2 * single_ex_state(sites, k)
-    end
-    return state
-  else
+  if !all(x -> SiteType("S=1/2") ∈ x, sitetypes.(sites)) &&
+     !all(x -> SiteType("vecS=1/2") ∈ x, sitetypes.(sites))
+    throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
+                        "\"S=1/2\" oppure \"vecS=1/2\"."))
+  end
+  if j ∉ 1:N
     throw(DomainError(j,
                       "Si è tentato di costruire un autostato della catena "*
                       "con indice $j, che non è valido: bisogna fornire un "*
                       "indice tra 1 e $N."))
   end
+  states = [2/(N+1) * sin(j*k*π / (N+1))^2 * single_ex_state(sites, k)
+            for k ∈ 1:N]
+  return sum(states)
 end
 
 # Scelta dello stato iniziale della catena
@@ -284,12 +289,16 @@ end
 # far partire la catena di spin. La seguente funzione traduce la stringa
 # nell'MPS desiderato, in modo case-insensitive. Le opzioni sono:
 # · "empty": stato vuoto
-# · "1locM": stato con una (sola) eccitazione localizzata nel sito M (M=1:N)
-# · "1eigM": autostato del primo livello con M nodi (M=0:N-1)
+# · "1locM": stato con una (sola) eccitazione localizzata nel sito M ∈ {1,…,N}
+# · "1eigM": autostato del primo livello con M ∈ {0,…,N-1} nodi
 function parse_init_state(sites::Vector{Index{Int64}}, state::String)
   state = lowercase(state)
   if state == "empty"
-    v = MPS(sites, "Dn:Dn")
+    if all(x -> SiteType("S=1/2") ∈ x, sitetypes.(sites))
+      v = MPS(sites, "Dn")
+    elseif all(x -> SiteType("vecS=1/2") ∈ x, sitetypes.(sites))
+      v = MPS(sites, "Dn:Dn")
+    end
   elseif occursin(r"^1loc", state)
     j = parse(Int, replace(state, "1loc" => ""))
     v = single_ex_state(sites, j)
@@ -297,6 +306,10 @@ function parse_init_state(sites::Vector{Index{Int64}}, state::String)
     j = parse(Int, replace(state, "1eig" => ""))
     # Il j-esimo autostato ha j-1 nodi 
     v = chain_L1_state(sites, j + 1)
+  else
+    throw(DomainError(state,
+                      "Stato non riconosciuto; scegliere tra «empty», «1locN» "*
+                      "oppure «1eigN»."))
   end
   return v
 end
