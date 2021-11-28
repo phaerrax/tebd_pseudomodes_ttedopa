@@ -28,40 +28,6 @@ ITensors.op(::OpName"id", ::SiteType"S=1/2") = I₂
 ITensors.op(::OpName"zero", ::SiteType"S=1/2") = [0 0
                                                   0 0]
 
-# Operatori della corrente di spin
-# --------------------------------
-# Jₖ = -λ/2 (σˣ⊗σʸ - σʸ⊗σˣ)
-function J⁺tag(::SiteType"S=1/2", left_site::Int, i::Int)
-  # Questa funzione restituisce i nomi degli operatori da assegnare al
-  # sito i-esimo per la parte σˣ⊗σʸ di Jₖ, k == left_site
-  if i == left_site
-    str = "σx"
-  elseif i == left_site + 1
-    str = "σy"
-  else
-    str = "id"
-  end
-  return str
-end
-function J⁻tag(::SiteType"S=1/2", left_site::Int, i::Int)
-  # Come `J⁺tag`, ma per σʸ⊗σˣ
-  if i == left_site
-    str = "σy"
-  elseif i == left_site + 1
-    str = "σx"
-  else
-    str = "id"
-  end
-  return str
-end
-function spin_current_op_list(::SiteType"S=1/2", sites::Vector{Index{Int64}})
-  N = length(sites)
-  J⁺ = [MPO(sites, [J⁺tag(SiteType("S=1/2"), k, i) for i = 1:N]) for k = 1:N-1]
-  J⁻ = [MPO(sites, [J⁻tag(SiteType("S=1/2"), k, i) for i = 1:N]) for k = 1:N-1]
-  spin_current_op_list = -0.5 .* (J⁺ .- J⁻)
-  return spin_current_op_list
-end
-
 # Proiettori sugli autostati dell'operatore numero
 # ------------------------------------------------
 # La seguente funzione restituisce i nomi per costruire i MPS degli
@@ -151,11 +117,21 @@ function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
 end
 
 # Operatori della corrente di spin
-# --------------------------------
-# Jₖ = -λ/2 (σ ˣ⊗ σ ʸ-σ ʸ⊗ σ ˣ)
-function J⁺tag(left_site::Int, i::Int)
+# ================================
+# Jₖ,ₖ₊₁ = -λ/2 (σˣ₍ₖ₎σʸ₍ₖ₊₁₎ - σʸ₍ₖ₎σˣ₍ₖ₊₁₎)
+function J⁺tag(::SiteType"S=1/2", left_site::Int, i::Int)
   # Questa funzione restituisce i nomi degli operatori da assegnare al
-  # sito i-esimo per la parte σ ˣ⊗ σ ʸ di Jₖ, k == left_side
+  # sito i-esimo per la parte σˣ⊗σʸ di Jₖ,ₖ₊₁ (k ≡ left_site)
+  if i == left_site
+    str = "σx"
+  elseif i == left_site + 1
+    str = "σy"
+  else
+    str = "id"
+  end
+  return str
+end
+function J⁺tag(::SiteType"vecS=1/2", left_site::Int, i::Int)
   if i == left_site
     str = "vecσx"
   elseif i == left_site + 1
@@ -165,8 +141,19 @@ function J⁺tag(left_site::Int, i::Int)
   end
   return str
 end
-function J⁻tag(left_site::Int, i::Int)
-  # Come `J⁺tag`, ma per σ ʸ⊗ σ ˣ
+
+function J⁻tag(::SiteType"S=1/2", left_site::Int, i::Int)
+  # Come `J⁺tag`, ma per σʸ⊗σˣ
+  if i == left_site
+    str = "σy"
+  elseif i == left_site + 1
+    str = "σx"
+  else
+    str = "id"
+  end
+  return str
+end
+function J⁻tag(::SiteType"vecS=1/2", left_site::Int, i::Int)
   if i == left_site
     str = "vecσy"
   elseif i == left_site + 1
@@ -176,13 +163,26 @@ function J⁻tag(left_site::Int, i::Int)
   end
   return str
 end
-function spin_current_op_list(sites::Vector{Index{Int64}}, ::SiteType"vecS=1/2")
+
+function spin_current_op_list(sites::Vector{Index{Int64}})
   N = length(sites)
-  J⁺ = [MPS(sites, [J⁺tag(k, i) for i = 1:N]) for k = 1:N-1]
-  J⁻ = [MPS(sites, [J⁻tag(k, i) for i = 1:N]) for k = 1:N-1]
-  spin_current_op_list = [-0.5 * (j⁺ - j⁻) for (j⁺, j⁻) in zip(J⁺, J⁻)]
-  return spin_current_op_list
+  # Controllo che i siti forniti siano degli spin ½.
+  if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
+    st = SiteType("S=1/2")
+    MPtype = MPO
+  elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
+    st = SiteType("vecS=1/2")
+    MPtype = MPS
+  else
+    throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
+                        "\"S=1/2\" oppure \"vecS=1/2\"."))
+  end
+  #
+  J⁺ = [MPtype(sites, [J⁺tag(st, k, i) for i = 1:N]) for k = 1:N-1]
+  J⁻ = [MPtype(sites, [J⁻tag(st, k, i) for i = 1:N]) for k = 1:N-1]
+  return -0.5 .* (J⁺ .- J⁻)
 end
+
 
 # Base di autostati per la catena
 # -------------------------------

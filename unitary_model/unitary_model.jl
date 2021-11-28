@@ -68,7 +68,7 @@ let
     range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
     # - la corrente di spin
-    list = spin_current_op_list(SiteType("S=1/2"), sites[range_spins])
+    list = spin_current_op_list(sites[range_spins])
     spin_current_ops = [embed_slice(sites, range_spins, j)
                         for j in list]
     # - l'occupazione degli autospazi dell'operatore numero
@@ -251,7 +251,7 @@ let
     # =======================
     if !preload
       # - la corrente di spin
-      list = spin_current_op_list("S=1/2", sites[range_spins])
+      list = spin_current_op_list(sites[range_spins])
       spin_current_ops = [embed_slice(sites, range_spins, j)
                           for j in list]
       # - l'occupazione degli autospazi dell'operatore numero
