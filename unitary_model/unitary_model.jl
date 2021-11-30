@@ -53,10 +53,10 @@ let
   osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
   L_sites_list = [p["number_of_oscillators_left"] for p in parameter_lists]
   R_sites_list = [p["number_of_oscillators_right"] for p in parameter_lists]
-  if all(x -> x == first(S_sites_list), S_sites_list) &&
-     all(x -> x == first(osc_dim_list), osc_dim_list) &&
-     all(x -> x == first(L_sites_list), L_sites_list) &&
-     all(x -> x == first(R_sites_list), R_sites_list)
+  if allequal(S_sites_list) &&
+     allequal(osc_dim_list) &&
+     allequal(L_sites_list) &&
+     allequal(R_sites_list)
     preload = true
     n_spin_sites = first(S_sites_list)
     osc_dim = first(osc_dim_list)

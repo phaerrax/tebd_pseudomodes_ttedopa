@@ -64,6 +64,10 @@ function load_parameters(file_list)
   return parameter_lists
 end
 
+function allequal(a)
+  return all(x -> x == first(a), a)
+end
+
 # Costruzione della lista di istanti di tempo per la simulazione
 # ==============================================================
 function construct_step_list(parameters)
@@ -248,7 +252,7 @@ function categorise_parameters(parameter_lists)
   distinct = String[]
   for key in keys(parameter_lists[begin])
     test_list = [p[key] for p in parameter_lists]
-    if !all(x -> x == first(test_list), test_list)
+    if !allequal(test_list)
       push!(distinct, key)
     end
   end

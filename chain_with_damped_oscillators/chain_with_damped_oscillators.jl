@@ -54,8 +54,7 @@ let
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   n_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
   osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
-  if all(x -> x == first(n_sites_list), n_sites_list) &&
-     all(x -> x == first(osc_dim_list), osc_dim_list)
+  if allequal(n_sites_list) && allequal(osc_dim_list)
     preload = true
     n_sites = first(n_sites_list)
     osc_dim = first(osc_dim_list)
