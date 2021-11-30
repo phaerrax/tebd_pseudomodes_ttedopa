@@ -49,18 +49,18 @@ let
   # perciò non ha senso definire nel file comune. Essi sono l'operatore per
   # la coppia (1,2)
   function ITensors.op(::OpName"expℓ_sx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
-    L = ε * op("H1loc", s1) * op("id:id", s2) +
-        0.5ε * op("id:id", s1) * op("H1loc", s2) +
+    L = ε * op("H1loc", s1) * op("Id:Id", s2) +
+        0.5ε * op("Id:Id", s1) * op("H1loc", s2) +
         op("HspinInt", s1, s2) +
-        ξ * op("damping", s1) * op("id:id", s2)
+        ξ * op("damping", s1) * op("Id:Id", s2)
     return exp(t * L)
   end
   # e quello per la coppia (n-1,n)
   function ITensors.op(::OpName"expℓ_dx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
-    L = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-        ε * op("id:id", s1) * op("H1loc", s2) +
+    L = 0.5ε * op("H1loc", s1) * op("Id:Id", s2) +
+        ε * op("Id:Id", s1) * op("H1loc", s2) +
         op("HspinInt", s1, s2) +
-        ξ * op("id:id", s1) * op("damping", s2)
+        ξ * op("Id:Id", s1) * op("damping", s2)
     return exp(t * L)
   end
 

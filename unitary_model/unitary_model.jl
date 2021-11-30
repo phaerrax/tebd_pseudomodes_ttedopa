@@ -50,18 +50,21 @@ let
   # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   S_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
+  osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
   L_sites_list = [p["number_of_oscillators_left"] for p in parameter_lists]
   R_sites_list = [p["number_of_oscillators_right"] for p in parameter_lists]
   if all(x -> x == first(S_sites_list), S_sites_list) &&
+     all(x -> x == first(osc_dim_list), osc_dim_list) &&
      all(x -> x == first(L_sites_list), L_sites_list) &&
      all(x -> x == first(R_sites_list), R_sites_list)
     preload = true
     n_spin_sites = first(S_sites_list)
+    osc_dim = first(osc_dim_list)
     n_osc_left = first(L_sites_list)
     n_osc_right = first(R_sites_list)
-    sites = [siteinds("Osc", n_osc_left);
+    sites = [siteinds("Osc", n_osc_left; dim=osc_dim);
              siteinds("S=1/2", n_spin_sites);
-             siteinds("Osc", n_osc_right)]
+             siteinds("Osc", n_osc_right; dim=osc_dim)]
 
     range_osc_left = 1:n_osc_left
     range_spins = n_osc_left .+ (1:n_spin_sites)
@@ -101,6 +104,7 @@ let
     T = parameters["temperature"]
     γ = parameters["spectral_density_half_width"]
     ωc = parameters["frequency_cutoff"]
+    osc_dim = parameters["oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     τ = parameters["simulation_time_step"]
@@ -113,9 +117,9 @@ let
       n_spin_sites = parameters["number_of_spin_sites"]
       n_osc_left = parameters["number_of_oscillators_left"]
       n_osc_right = parameters["number_of_oscillators_right"]
-      sites = [siteinds("Osc", n_osc_left);
+      sites = [siteinds("Osc", n_osc_left; dim=osc_dim);
                siteinds("S=1/2", n_spin_sites);
-               siteinds("Osc", n_osc_right)]
+               siteinds("Osc", n_osc_right; dim=osc_dim)]
     end
 
     range_osc_left = 1:n_osc_left
@@ -148,8 +152,8 @@ let
     s1 = sites[1]
     s2 = sites[2]
     # Coppia di oscillatori all'estremo sinistro:
-    h = Ωₗ[end]      * op("num", s1) * op("id", s2) +
-        0.5Ωₗ[end-1] * op("id", s1) * op("num", s2) +
+    h = Ωₗ[end]      * op("N", s1) * op("Id", s2) +
+        0.5Ωₗ[end-1] * op("Id", s1) * op("N", s2) +
         κₗ[end] * op("a+", s1) * op("a-", s2) +
         κₗ[end] * op("a-", s1) * op("a+", s2)
     push!(links_odd, exp(-0.5im * τ * h))
@@ -162,8 +166,8 @@ let
       # (I coefficienti Ω e κ seguono una numerazione inversa!)
       s1 = sites[i]
       s2 = sites[i+1]
-      h = 0.5Ωₗ[j+1] * op("num", s1) * op("id", s2) +
-          0.5Ωₗ[j]   * op("id", s1) * op("num", s2) +
+      h = 0.5Ωₗ[j+1] * op("N", s1) * op("Id", s2) +
+          0.5Ωₗ[j]   * op("Id", s1) * op("N", s2) +
           κₗ[j] * op("a+", s1) * op("a-", s2) +
           κₗ[j] * op("a-", s1) * op("a+", s2)
       push!(links_odd, exp(-0.5im * τ * h))
@@ -172,8 +176,8 @@ let
       j = n_osc_left - i # (vedi sopra)
       s1 = sites[i]
       s2 = sites[i+1]
-      h = 0.5Ωₗ[j+1] * op("num", s1) * op("id", s2) +
-          0.5Ωₗ[j]   * op("id", s1)  * op("num", s2) +
+      h = 0.5Ωₗ[j+1] * op("N", s1) * op("Id", s2) +
+          0.5Ωₗ[j]   * op("Id", s1)  * op("N", s2) +
           κₗ[j] * op("a+", s1) * op("a-", s2) +
           κₗ[j] * op("a-", s1) * op("a+", s2)
       push!(links_even, exp(-im * τ * h))
@@ -181,8 +185,8 @@ let
     # La coppia oscillatore-spin di sinistra ricade tra i link pari:
     so = sites[n_osc_left] # primo oscillatore a sx
     ss = sites[n_osc_left+1] # primo spin a sx
-    h = 0.5*Ωₗ[1] * op("num", so) * op("id", ss) +
-        0.5ε      * op("id", so)  * op("Sz", ss) +
+    h = 0.5*Ωₗ[1] * op("N", so) * op("Id", ss) +
+        0.5ε      * op("Id", so)  * op("Sz", ss) +
         ηₗ * op("a+", so) * op("Sx", ss) + 
         ηₗ * op("a-", so) * op("Sx", ss)
     push!(links_even, exp(-im * τ * h))
@@ -191,8 +195,8 @@ let
       j += n_osc_left
       s1 = sites[j]
       s2 = sites[j+1]
-      h = 0.5ε * op("Sz", s1) * op("id", s2) +
-          0.5ε * op("id", s1) * op("Sz", s2) +
+      h = 0.5ε * op("Sz", s1) * op("Id", s2) +
+          0.5ε * op("Id", s1) * op("Sz", s2) +
           -0.5 * op("S+", s1) * op("S-", s2) +
           -0.5 * op("S-", s1) * op("S+", s2)
       push!(links_odd, exp(-0.5im * τ * h))
@@ -202,8 +206,8 @@ let
       j += n_osc_left
       s1 = sites[j]
       s2 = sites[j+1]
-      h = 0.5ε * op("Sz", s1) * op("id", s2) +
-          0.5ε * op("id", s1) * op("Sz", s2) +
+      h = 0.5ε * op("Sz", s1) * op("Id", s2) +
+          0.5ε * op("Id", s1) * op("Sz", s2) +
           -0.5 * op("S+", s1) * op("S-", s2) +
           -0.5 * op("S-", s1) * op("S+", s2)
       push!(links_even, exp(-im * τ * h))
@@ -211,8 +215,8 @@ let
     # La coppia oscillatore-spin di destra ricade anch'essa tra i link pari:
     ss = sites[n_osc_left+n_spin_sites] # ultimo spin (a dx)
     so = sites[n_osc_left+n_spin_sites+1] # primo oscillatore a dx
-    h = 0.5ε *     op("Sz", ss) * op("id", so) +
-        0.5Ωᵣ[1] * op("id", ss) * op("num", so) +
+    h = 0.5ε *     op("Sz", ss) * op("Id", so) +
+        0.5Ωᵣ[1] * op("Id", ss) * op("N", so) +
         ηᵣ * op("Sx", ss) * op("a+", so) + 
         ηᵣ * op("Sx", ss) * op("a-", so) 
     push!(links_even, exp(-im * τ * h))
@@ -220,8 +224,8 @@ let
     for j = 1:2:n_osc_right
       s1 = sites[n_osc_left + n_spin_sites + j]
       s2 = sites[n_osc_left + n_spin_sites + j+1]
-      h = 0.5Ωᵣ[j]   * op("num", s1) * op("id", s2) +
-          0.5Ωᵣ[j+1] * op("id", s1)  * op("num", s2) +
+      h = 0.5Ωᵣ[j]   * op("N", s1) * op("Id", s2) +
+          0.5Ωᵣ[j+1] * op("Id", s1)  * op("N", s2) +
           κᵣ[j] * op("a+", s1) * op("a-", s2) +
           κᵣ[j] * op("a-", s1) * op("a+", s2)
       push!(links_odd, exp(-0.5im * τ * h))
@@ -230,8 +234,8 @@ let
     for j = 2:2:n_osc_right-1
       s1 = sites[n_osc_left + n_spin_sites + j]
       s2 = sites[n_osc_left + n_spin_sites + j+1]
-      h = 0.5Ωᵣ[j]   * op("num", s1) * op("id", s2) +
-          0.5Ωᵣ[j+1] * op("id", s1)  * op("num", s2) +
+      h = 0.5Ωᵣ[j]   * op("N", s1) * op("Id", s2) +
+          0.5Ωᵣ[j+1] * op("Id", s1)  * op("N", s2) +
           κᵣ[j] * op("a+", s1) * op("a-", s2) +
           κᵣ[j] * op("a-", s1) * op("a+", s2)
       push!(links_even, exp(-im * τ * h))
@@ -239,8 +243,8 @@ let
     # Arrivo infine alla coppia di oscillatori più a destra (una coppia dispari):
     s1 = sites[end-1]
     s2 = sites[end]
-    h = 0.5Ωᵣ[end-1] * op("num", s1) * op("id", s2) +
-        Ωᵣ[end]      * op("id", s1)  * op("num", s2) +
+    h = 0.5Ωᵣ[end-1] * op("N", s1) * op("Id", s2) +
+        Ωᵣ[end]      * op("Id", s1)  * op("N", s2) +
         κᵣ[end] * op("a+", s1) * op("a-", s2) +
         κᵣ[end] * op("a-", s1) * op("a+", s2)
     push!(links_odd, exp(-0.5im * τ * h))
@@ -266,17 +270,17 @@ let
     # Stato iniziale
     # --------------
     # Gli oscillatori partono tutti dallo stato vuoto
-    osc_sx_init_state = MPS(sites[range_osc_left], "Emp")
+    osc_sx_init_state = MPS(sites[range_osc_left], "0")
     spin_init_state = parse_init_state(sites[spin_range],
                                        parameters["chain_initial_state"])
-    osc_dx_init_state = MPS(sites[range_osc_right], "Emp")
+    osc_dx_init_state = MPS(sites[range_osc_right], "0")
     current_state = chain(osc_sx_init_state,
                           spin_init_state,
                           osc_dx_init_state)
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    occ_n = [expect(current_state, "num")]
+    occ_n = [expect(current_state, "N")]
     bond_dimensions = [linkdims(current_state)]
     spin_current = [[real(inner(current_state, j * current_state))
                      for j in spin_current_ops]]
@@ -295,12 +299,12 @@ let
                             maxdim=max_dim)
       if skip_count % skip_steps == 0
         push!(occ_n,
-              expect(current_state, "num"))
+              expect(current_state, "N"))
         push!(spin_current,
               [real(inner(current_state, j * current_state))
                for j in spin_current_ops])
         push!(spin_chain_levels,
-              levels(num_eigenspace_projs, current_state, SiteType("S=1/2")))
+              levels(num_eigenspace_projs, current_state))
         push!(bond_dimensions,
               linkdims(current_state))
       end
@@ -327,8 +331,7 @@ let
     end
     tmp_list = hcat(bond_dimensions...)
     len = n_osc_left + n_spin_sites + n_osc_right
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:len-1])
+    for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 1:len-1])
       push!(dict, name => tmp_list[j,:])
     end
     table = DataFrame(dict)

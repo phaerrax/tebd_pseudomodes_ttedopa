@@ -53,35 +53,38 @@ let
   # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   n_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
-  if all(x -> x == first(n_sites_list), n_sites_list)
+  osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
+  if all(x -> x == first(n_sites_list), n_sites_list) &&
+     all(x -> x == first(osc_dim_list), osc_dim_list)
     preload = true
     n_sites = first(n_sites_list)
-    sites = vcat(
-                 [Index(osc_dim^2, "vecOsc")],
-                 siteinds("vecS=1/2", n_sites),
-                 [Index(osc_dim^2, "vecOsc")]
-                )
-    single_ex_states = [chain(MPS(sites[1:1], "vecid"),
+    osc_dim = first(osc_dim_list)
+
+    sites = [siteinds("vecOsc", 1; dim=osc_dim);
+             siteinds("vecS=1/2", n_sites);
+             siteinds("vecOsc", 1; dim=osc_dim)]
+
+    single_ex_states = [chain(MPS(sites[1:1], "vecId"),
                               single_ex_state(sites[2:end-1], k),
-                              MPS(sites[end:end], "vecid"))
+                              MPS(sites[end:end], "vecId"))
                         for k = 1:n_sites]
     # - i numeri di occupazione: per gli spin della catena si prende il prodotto
     #   interno con gli elementi di single_ex_states già definiti; per gli
     #   oscillatori, invece, uso
-    osc_num_sx = MPS(sites, vcat(["vecnum"],
-                                 repeat(["vecid"], n_sites),
-                                 ["vecid"]))
-    osc_num_dx = MPS(sites, vcat(["vecid"],
-                                 repeat(["vecid"], n_sites),
-                                 ["vecnum"]))
+    osc_num_sx = MPS(sites, vcat(["vecN"],
+                                 repeat(["vecId"], n_sites),
+                                 ["vecId"]))
+    osc_num_dx = MPS(sites, vcat(["vecId"],
+                                 repeat(["vecId"], n_sites),
+                                 ["vecN"]))
     occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
 
     # - la corrente di spin
     # Prima costruisco gli operatori sulla catena di spin, poi li
     # estendo con l'identità sui restanti siti.
-    spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
+    spin_current_ops = [chain(MPS(sites[1:1], "vecId"),
                               j,
-                              MPS(sites[end:end], "vecid"))
+                              MPS(sites[end:end], "vecId"))
                         for j in spin_current_op_list(sites[2:end-1])]
 
     # - l'occupazione degli autospazi dell'operatore numero
@@ -89,21 +92,21 @@ let
     # dell'operatore numero della catena di spin, vale a dire calcolo
     # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
     # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
+    num_eigenspace_projs = [chain(MPS(sites[1:1], "vecId"),
                                   level_subspace_proj(sites[2:end-1], n),
-                                  MPS(sites[end:end], "vecid"))
+                                  MPS(sites[end:end], "vecId"))
                             for n=0:n_sites]
 
     # - l'occupazione dei livelli degli oscillatori
     osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                   MPS(sites[2:end], "vecid"))
-                             for n=1:osc_dim]
-    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
+                                   MPS(sites[2:end], "vecId"))
+                             for n=0:osc_dim-1]
+    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecId"),
                                     osc_levels_proj(sites[end], n))
-                              for n=1:osc_dim]
+                              for n=0:osc_dim-1]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecid")
+    full_trace = MPS(sites, "vecId")
   else
     preload = false
   end
@@ -124,6 +127,7 @@ let
     γᵣ = parameters["oscillator_damping_coefficient_right"]
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
+    osc_dim = parameters["oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -134,14 +138,13 @@ let
     # ========================
     if !preload
       n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
-      sites = vcat(
-                   [Index(osc_dim^2, "vecOsc")],
-                   siteinds("vecS=1/2", n_sites),
-                   [Index(osc_dim^2, "vecOsc")]
-                  )
-      single_ex_states = [chain(MPS(sites[1:1], "vecid"),
+      sites = [siteinds("vecOsc", 1; dim=osc_dim);
+               siteinds("vecS=1/2", n_sites);
+               siteinds("vecOsc", 1; dim=osc_dim)]
+
+      single_ex_states = [chain(MPS(sites[1:1], "vecId"),
                                 single_ex_state(sites[2:end-1], k),
-                                MPS(sites[end:end], "vecid"))
+                                MPS(sites[end:end], "vecId"))
                           for k = 1:n_sites]
     end
 
@@ -161,19 +164,19 @@ let
     # - operatore per la coppia oscillatore-spin di sinistra
     sL = sites[1]
     s1 = sites[2]
-    ℓ_sx = ω * op("H1loc", sL) * op("id:id", s1) +
-           0.5ε * op("id:id", sL) * op("H1loc", s1) +
-           im*κ * op("asum:id", sL) * op("σx:id", s1) +
-           -im*κ* op("id:asum", sL)  * op("id:σx", s1) +
-           γₗ * op("damping", sL; ω=ω, T=T) * op("id:id", s1)
+    ℓ_sx = ω * op("H1loc", sL) * op("Id:Id", s1) +
+           0.5ε * op("Id:Id", sL) * op("H1loc", s1) +
+           im*κ * op("asum:Id", sL) * op("σx:Id", s1) +
+           -im*κ* op("Id:asum", sL)  * op("Id:σx", s1) +
+           γₗ * op("damping", sL; ω=ω, T=T) * op("Id:Id", s1)
     # - e quello per la coppia oscillatore-spin di destra
     sn = sites[end-1]
     sR = sites[end]
-    ℓ_dx = 0.5ε * op("H1loc", sn) * op("id:id", sR) +
-           ω * op("id:id", sn) * op("H1loc", sR) +
-           im*κ * op("σx:id", sn) * op("asum:id", sR) +
-           -im*κ * op("id:σx", sn) * op("id:asum", sR) +
-           γᵣ * op("id:id", sn) * op("damping", sR; ω=ω, T=0)
+    ℓ_dx = 0.5ε * op("H1loc", sn) * op("Id:Id", sR) +
+           ω * op("Id:Id", sn) * op("H1loc", sR) +
+           im*κ * op("σx:Id", sn) * op("asum:Id", sR) +
+           -im*κ * op("Id:σx", sn) * op("Id:asum", sR) +
+           γᵣ * op("Id:Id", sn) * op("damping", sR; ω=ω, T=0)
     #
     function links_odd(τ)
       return [exp(τ * ℓ_sx);
@@ -193,36 +196,36 @@ let
     # =======================
     if !preload
       # - i numeri di occupazione
-      osc_num_sx = MPS(sites, vcat(["vecnum"],
-                                   repeat(["vecid"], n_sites),
-                                   ["vecid"]))
-      osc_num_dx = MPS(sites, vcat(["vecid"],
-                                   repeat(["vecid"], n_sites),
-                                   ["vecnum"]))
+      osc_num_sx = MPS(sites, vcat(["vecN"],
+                                   repeat(["vecId"], n_sites),
+                                   ["vecId"]))
+      osc_num_dx = MPS(sites, vcat(["vecId"],
+                                   repeat(["vecId"], n_sites),
+                                   ["vecN"]))
       occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
 
       # - la corrente di spin
-      spin_current_ops = [chain(MPS(sites[1:1], "vecid"),
+      spin_current_ops = [chain(MPS(sites[1:1], "vecId"),
                                 j,
-                                MPS(sites[end:end], "vecid"))
+                                MPS(sites[end:end], "vecId"))
                           for j in spin_current_op_list(sites[2:end-1])]
 
       # - l'occupazione degli autospazi dell'operatore numero
-      num_eigenspace_projs = [chain(MPS(sites[1:1], "vecid"),
+      num_eigenspace_projs = [chain(MPS(sites[1:1], "vecId"),
                                     level_subspace_proj(sites[2:end-1], n),
-                                    MPS(sites[end:end], "vecid"))
+                                    MPS(sites[end:end], "vecId"))
                               for n=0:n_sites]
 
       # - l'occupazione dei livelli degli oscillatori
       osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                     MPS(sites[2:end], "vecid"))
-                               for n=1:osc_dim]
-      osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecid"),
+                                     MPS(sites[2:end], "vecId"))
+                               for n=0:osc_dim-1]
+      osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecId"),
                                       osc_levels_proj(sites[end], n))
-                                for n=1:osc_dim]
+                                for n=0:osc_dim-1]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
-      full_trace = MPS(sites, "vecid")
+      full_trace = MPS(sites, "vecId")
     end
 
     # Simulazione
@@ -232,7 +235,7 @@ let
     # L'oscillatore sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
     osc_sx_init_state = MPS([state(sites[1], "ThermEq"; ω, T)])
-    osc_dx_init_state = MPS([state(sites[end], "Emp:Emp")])
+    osc_dx_init_state = MPS([state(sites[end], "0")])
     current_state = chain(osc_sx_init_state,
                           parse_init_state(sites[2:end-1],
                                            parameters["chain_initial_state"]),
@@ -294,10 +297,10 @@ let
         operatori che estraggono tutte le coordinate del vettore.
         =#
         mat = Array{Complex}(undef, osc_dim, osc_dim)
-        for j = 1:osc_dim, k = 1:osc_dim
+        for j = 0:osc_dim-1, k = 0:osc_dim-1
           proj = chain(MPS([state(sites[1], "mat_comp"; j, k)]),
-                       MPS(sites[2:end], "vecid"))
-          mat[j, k] = inner(proj, current_state)
+                       MPS(sites[2:end], "vecId"))
+          mat[j+1, k+1] = inner(proj, current_state)
         end
         # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
         # la positività degli autovalori devo tagliare via la loro parte reale,

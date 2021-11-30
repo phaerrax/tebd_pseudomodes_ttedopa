@@ -163,7 +163,7 @@ function embed_slice(sites::Array{Index{Int64}},
   Prende un MPO definito solo su una fetta dei siti e lo estende con operatori
   identità per creare un MPO definito su tutti i siti.
   È richiesto che per i SiteType degli elementi di sites non compresi nella
-  fetta data sia definito un operatore di nome "id".
+  fetta data sia definito un operatore di nome "Id".
 
   Argomenti
   ---------
@@ -186,14 +186,14 @@ function embed_slice(sites::Array{Index{Int64}},
     mpo = slice
   elseif range[begin] == 1
     mpo = chain(slice,
-                MPO(sites[range[end]+1 : end], "id"))
+                MPO(sites[range[end]+1 : end], "Id"))
   elseif range[end] == length(sites)
-    mpo = chain(MPO(sites[1 : range[begin]-1], "id"),
+    mpo = chain(MPO(sites[1 : range[begin]-1], "Id"),
                 slice)
   else
-    mpo = chain(MPO(sites[1 : range[begin]-1], "id"),
+    mpo = chain(MPO(sites[1 : range[begin]-1], "Id"),
                 slice,
-                MPO(sites[range[end]+1 : end], "id"))
+                MPO(sites[range[end]+1 : end], "Id"))
   end
   return mpo
 end

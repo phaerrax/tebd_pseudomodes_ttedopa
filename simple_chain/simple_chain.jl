@@ -10,6 +10,7 @@ root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
 # Sali di due cartelle. root_path è la cartella principale del progetto.
 include(lib_path * "/utils.jl")
+include(lib_path * "/spin_chain_space.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin isolata,
 # usando le tecniche dei MPS ed MPO.
@@ -56,14 +57,6 @@ let
                             [j == n ? "Up" : "Dn" for j = 1:n_sites])
                         for n = 1:n_sites]
 
-    # Nuovi operatori di ITensors
-    # ===========================
-    # Identità su S=1/2
-    ITensors.op(::OpName"id", ::SiteType"S=1/2") = [
-      1 0
-      0 1
-    ]
-
     # Costruzione dell'operatore di evoluzione
     # ========================================
     # In questo sistema semplice non sto usando la matrice identità e l'equazione
@@ -78,24 +71,24 @@ let
     links_odd = ITensor[]
     s1 = sites[1]
     s2 = sites[2]
-    h_loc = ε * op("Sz", s1) * op("id", s2) +
-            1/2 * ε * op("id", s1) * op("Sz", s2) +
+    h_loc = ε * op("Sz", s1) * op("Id", s2) +
+            1/2 * ε * op("Id", s1) * op("Sz", s2) +
             -1/2 * op("S+", s1) * op("S-", s2) +
             -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_odd, exp(-0.5im * time_step * h_loc))
     for j = 3:2:n_sites-3
       s1 = sites[j]
       s2 = sites[j+1]
-      h_loc = 1/2 * ε * op("Sz", s1) * op("id", s2) +
-              1/2 * ε * op("id", s1) * op("Sz", s2) +
+      h_loc = 1/2 * ε * op("Sz", s1) * op("Id", s2) +
+              1/2 * ε * op("Id", s1) * op("Sz", s2) +
               -1/2 * op("S+", s1) * op("S-", s2) +
               -1/2 * op("S-", s1) * op("S+", s2)
       push!(links_odd, exp(-0.5im * time_step * h_loc))
     end
     s1 = sites[end-1] # j = n_sites-1
     s2 = sites[end] # j = n_sites
-    h_loc = 1/2 * ε * op("Sz", s1) * op("id", s2) +
-            ε * op("id", s1) * op("Sz", s2) +
+    h_loc = 1/2 * ε * op("Sz", s1) * op("Id", s2) +
+            ε * op("Id", s1) * op("Sz", s2) +
             -1/2 * op("S+", s1) * op("S-", s2) +
             -1/2 * op("S-", s1) * op("S+", s2)
     push!(links_odd, exp(-0.5im * time_step * h_loc))
@@ -104,8 +97,8 @@ let
     for j = 2:2:n_sites-2
       s1 = sites[j]
       s2 = sites[j+1]
-      h_loc = 1/2 * ε * op("Sz", s1) * op("id", s2) +
-              1/2 * ε * op("id", s1) * op("Sz", s2) +
+      h_loc = 1/2 * ε * op("Sz", s1) * op("Id", s2) +
+              1/2 * ε * op("Id", s1) * op("Sz", s2) +
               -1/2 * op("S+", s1) * op("S-", s2) +
               -1/2 * op("S-", s1) * op("S+", s2)
       push!(links_even, exp(-1.0im * time_step * h_loc))
