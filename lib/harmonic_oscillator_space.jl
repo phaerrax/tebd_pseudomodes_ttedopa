@@ -62,18 +62,18 @@ ITensor nel modo appropriato (vedere src/physics/site_types/qudit.jl alla
 riga 73 come esempio).
 =#
 function ITensors.op(on::OpName, st::SiteType"Osc", s::Index; kwargs...)
-  return itensor(op(on, st; d=ITensors.dim(s), kwargs...), s', dag(s))
+  return itensor(op(on, st; dim=ITensors.dim(s), kwargs...), s', dag(s))
 end
 
-ITensors.op(::OpName"a+", ::SiteType"Osc"; d=2) = a⁺(d)
-ITensors.op(::OpName"a-", ::SiteType"Osc"; d=2) = a⁻(d)
-ITensors.op(::OpName"Id", ::SiteType"Osc"; d=2) = id(d)
-ITensors.op(::OpName"N", ::SiteType"Osc"; d=2) = num(d)
+ITensors.op(::OpName"a+", ::SiteType"Osc"; dim=2) = a⁺(dim)
+ITensors.op(::OpName"a-", ::SiteType"Osc"; dim=2) = a⁻(dim)
+ITensors.op(::OpName"Id", ::SiteType"Osc"; dim=2) = id(dim)
+ITensors.op(::OpName"N", ::SiteType"Osc"; dim=2) = num(dim)
 
 # Spazio degli oscillatori vettorizzato
 # =====================================
-function ITensors.space(::SiteType"vecOsc"; d=2)
-  return d^2
+function ITensors.space(::SiteType"vecOsc"; dim=2)
+  return dim^2
 end
 
 # Stati
@@ -99,7 +99,7 @@ delle due combinazioni di cui sopra, calcola dall'Index fornito come argomento
 la dimensione giusta, la aggiunge ai kwargs e chiama poi la seconda combinazione.
 =#
 function ITensors.state(sn::StateName, st::SiteType"vecOsc", s::Index; kwargs...)
-  return state(sn, st; d=isqrt(ITensors.dim(s)), kwargs...)
+  return state(sn, st; dim=isqrt(ITensors.dim(s)), kwargs...)
   # Uso `isqrt` che prende un Int e restituisce un Int; il fatto che tronchi la
   # parte decimale non dovrebbe mai essere un problema, dato che dim(s) per
   # costruzione è il quadrato di un intero.
@@ -123,19 +123,19 @@ che venga saltata.
 ITensors.state(sn::StateName, st::SiteType, s::Index; kwargs...) = nothing
 
 # Gli stati della base canonica (êₙ:êₙ) ≡ êₙ ⊗ êₙ
-function ITensors.state(::StateName{N}, ::SiteType"vecOsc"; d=2) where {N}
+function ITensors.state(::StateName{N}, ::SiteType"vecOsc"; dim=2) where {N}
   n = parse(Int, String(N))
-  v = zeros(d)
+  v = zeros(dim)
   v[n + 1] = 1.0
   return v ⊗ v
 end
 
 # Lo stato di equilibrio termico Z⁻¹vec(exp(-βH)) = Z⁻¹vec(exp(-ω/T N))
-function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; d=2, ω, T)
+function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; dim=2, ω, T)
   if T == 0
-    v = state(StateName("0"), st; d=d)
+    v = state(StateName("0"), st; dim=dim)
   else
-    mat = exp(-ω / T * num(d))
+    mat = exp(-ω / T * num(dim))
     mat /= tr(mat)
     v = vcat(mat[:])
   end
@@ -145,9 +145,9 @@ end
 # Stati del tipo êⱼ ⊗ êₖ (servono ad esempio per poter calcolare, tramite una
 # proiezione su di essi, la componente j,k di una matrice definita su un sito
 # di tipo "vecOsc").
-function ITensors.state(::StateName"mat_comp", ::SiteType"vecOsc"; d=2, j::Int, k::Int)
-  êⱼ = zeros(d)
-  êₖ = zeros(d)
+function ITensors.state(::StateName"mat_comp", ::SiteType"vecOsc"; dim=2, j::Int, k::Int)
+  êⱼ = zeros(dim)
+  êₖ = zeros(dim)
   êⱼ[j + 1] = 1.0
   êₖ[k + 1] = 1.0
   return êⱼ ⊗ êₖ
@@ -155,27 +155,27 @@ end
 
 # Stati che sono operatori vettorizzati (per costruire le osservabili)
 # --------------------------------------------------------------------
-ITensors.state(::StateName"veca+", ::SiteType"vecOsc"; d=2) = vcat(a⁺(d)[:])
-ITensors.state(::StateName"veca-", ::SiteType"vecOsc"; d=2) = vcat(a⁻(d)[:])
-ITensors.state(::StateName"vecN", ::SiteType"vecOsc"; d=2) = vcat(num(d)[:])
-ITensors.state(::StateName"vecId", ::SiteType"vecOsc"; d=2) = vcat(id(d)[:])
+ITensors.state(::StateName"veca+", ::SiteType"vecOsc"; dim=2) = vcat(a⁺(dim)[:])
+ITensors.state(::StateName"veca-", ::SiteType"vecOsc"; dim=2) = vcat(a⁻(dim)[:])
+ITensors.state(::StateName"vecN", ::SiteType"vecOsc"; dim=2) = vcat(num(dim)[:])
+ITensors.state(::StateName"vecId", ::SiteType"vecOsc"; dim=2) = vcat(id(dim)[:])
 
 # Operatori
 # ---------
 function ITensors.op(on::OpName, st::SiteType"vecOsc", s::Index; kwargs...)
-  return itensor(op(on, st; d=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
+  return itensor(op(on, st; dim=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
 end
 # Operatori semplici sullo spazio degli oscillatori
-ITensors.op(::OpName"Id:Id", ::SiteType"vecOsc"; d=2) = id(d) ⊗ id(d)
+ITensors.op(::OpName"Id:Id", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ id(dim)
 # - interazione con la catena
-ITensors.op(::OpName"Id:asum", ::SiteType"vecOsc"; d=2) = id(d) ⊗ (a⁺(d)+a⁻(d))
-ITensors.op(::OpName"asum:Id", ::SiteType"vecOsc"; d=2) = (a⁺(d)+a⁻(d)) ⊗ id(d)
+ITensors.op(::OpName"Id:asum", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ (a⁺(dim)+a⁻(dim))
+ITensors.op(::OpName"asum:Id", ::SiteType"vecOsc"; dim=2) = (a⁺(dim)+a⁻(dim)) ⊗ id(dim)
 # - Hamiltoniano del sistema libero
-ITensors.op(::OpName"N:Id", ::SiteType"vecOsc"; d=2) = num(d) ⊗ id(d)
-ITensors.op(::OpName"Id:N", ::SiteType"vecOsc"; d=2) = id(d) ⊗ num(d)
+ITensors.op(::OpName"N:Id", ::SiteType"vecOsc"; dim=2) = num(dim) ⊗ id(dim)
+ITensors.op(::OpName"Id:N", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ num(dim)
 # - termini di dissipazione
-ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc"; d=2) = transpose(a⁺(d)) ⊗ a⁻(d)
-ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; d=2) = transpose(a⁻(d)) ⊗ a⁺(d)
+ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc"; dim=2) = transpose(a⁺(dim)) ⊗ a⁻(dim)
+ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; dim=2) = transpose(a⁻(dim)) ⊗ a⁺(dim)
 
 # Composizione dell'Hamiltoniano per i termini degli oscillatori
 # - termini locali dell'Hamiltoniano
