@@ -62,7 +62,7 @@ ITensor nel modo appropriato (vedere src/physics/site_types/qudit.jl alla
 riga 73 come esempio).
 =#
 function ITensors.op(on::OpName, st::SiteType"Osc", s::Index; kwargs...)
-  return itensor(op(on, st; d=dim(s), kwargs...), s', dag(s))
+  return itensor(op(on, st; d=ITensors.dim(s), kwargs...), s', dag(s))
 end
 
 ITensors.op(::OpName"a+", ::SiteType"Osc"; d=2) = a⁺(d)
@@ -99,7 +99,7 @@ delle due combinazioni di cui sopra, calcola dall'Index fornito come argomento
 la dimensione giusta, la aggiunge ai kwargs e chiama poi la seconda combinazione.
 =#
 function ITensors.state(sn::StateName, st::SiteType"vecOsc", s::Index; kwargs...)
-  return state(sn, st; d=isqrt(dim(s)), kwargs...)
+  return state(sn, st; d=isqrt(ITensors.dim(s)), kwargs...)
   # Uso `isqrt` che prende un Int e restituisce un Int; il fatto che tronchi la
   # parte decimale non dovrebbe mai essere un problema, dato che dim(s) per
   # costruzione è il quadrato di un intero.
@@ -163,7 +163,7 @@ ITensors.state(::StateName"vecId", ::SiteType"vecOsc"; d=2) = vcat(id(d)[:])
 # Operatori
 # ---------
 function ITensors.op(on::OpName, st::SiteType"vecOsc", s::Index; kwargs...)
-  return itensor(op(on, st; d=isqrt(dim(s)), kwargs...), s', dag(s))
+  return itensor(op(on, st; d=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
 end
 # Operatori semplici sullo spazio degli oscillatori
 ITensors.op(::OpName"Id:Id", ::SiteType"vecOsc"; d=2) = id(d) ⊗ id(d)
