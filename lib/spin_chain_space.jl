@@ -24,6 +24,13 @@ ITensors.op(::OpName"N", s::SiteType"S=1/2") = op(OpName"ProjUp"(), s)
 ITensors.op(::OpName"Id", ::SiteType"S=1/2") = I₂
 # La matrice nulla
 ITensors.op(::OpName"0", ::SiteType"S=1/2") = [0 0; 0 0]
+# Matrici di Pauli
+ITensors.op(::OpName"σx", ::SiteType"S=1/2") = σˣ
+ITensors.op(::OpName"σy", ::SiteType"S=1/2") = σʸ
+ITensors.op(::OpName"σz", ::SiteType"S=1/2") = σᶻ
+# Operatori di scala
+ITensors.op(::OpName"σ+", ::SiteType"S=1/2") = σ⁺
+ITensors.op(::OpName"σ-", ::SiteType"S=1/2") = σ⁻
 
 # Spazio degli spin vettorizzato
 # ==============================
