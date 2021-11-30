@@ -198,6 +198,47 @@ function embed_slice(sites::Array{Index{Int64}},
   return mpo
 end
 
+function embed_slice(sites::Array{Index{Int64}},
+                     range::UnitRange{Int},
+                     slice::MPS)
+  #=
+  Lo stesso di `embed_slice` per gli MPO, ma per gli MPS (e con "vecId" al
+  posto di "Id"). Utile per gli stati vettorizzati che rappresentano
+  osservabili da misurare.
+
+  Argomenti
+  ---------
+  · `sites::Array{Index{Int64}}`: l'array di siti dell'intero sistema.
+
+  · `range::UnitRange{Int}`: un intervallo che indica il sito iniziale e il
+    sito finale del MPO fornito che deve essere esteso.
+
+  · `slice::Array{ITensors}`: il MPS da estendere.
+  =#
+  # Controllo dei parametri
+  if length(slice) != length(range)
+    throw(DimensionMismatch("Le dimensioni di slice e range non combaciano."))
+  end
+  if !issubset(range, eachindex(sites))
+    throw(BoundsError(range, sites))
+  end
+
+  if range[begin] == 1 && range[end] == length(sites)
+    mpo = slice
+  elseif range[begin] == 1
+    mpo = chain(slice,
+                MPS(sites[range[end]+1 : end], "vecId"))
+  elseif range[end] == length(sites)
+    mpo = chain(MPS(sites[1 : range[begin]-1], "vecId"),
+                slice)
+  else
+    mpo = chain(MPS(sites[1 : range[begin]-1], "vecId"),
+                slice,
+                MPS(sites[range[end]+1 : end], "vecId"))
+  end
+  return mpo
+end
+
 # Grafici
 # =======
 function categorise_parameters(parameter_lists)

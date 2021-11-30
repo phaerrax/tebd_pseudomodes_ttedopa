@@ -60,49 +60,48 @@ let
     n_sites = first(n_sites_list)
     osc_dim = first(osc_dim_list)
 
+    spin_range = 1 .+ (1:n_sites)
+
     sites = [siteinds("vecOsc", 1; dim=osc_dim);
              siteinds("vecS=1/2", n_sites);
              siteinds("vecOsc", 1; dim=osc_dim)]
 
-    single_ex_states = [chain(MPS(sites[1:1], "vecId"),
-                              single_ex_state(sites[2:end-1], k),
-                              MPS(sites[end:end], "vecId"))
+    single_ex_states = [embed_slice(sites,
+                                    spin_range,
+                                    single_ex_state(sites[spin_range], k))
                         for k = 1:n_sites]
     # - i numeri di occupazione: per gli spin della catena si prende il prodotto
     #   interno con gli elementi di single_ex_states già definiti; per gli
     #   oscillatori, invece, uso
-    osc_num_sx = MPS(sites, vcat(["vecN"],
-                                 repeat(["vecId"], n_sites),
-                                 ["vecId"]))
-    osc_num_dx = MPS(sites, vcat(["vecId"],
-                                 repeat(["vecId"], n_sites),
-                                 ["vecN"]))
-    occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
+    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_sites+1)])
+    osc_num_dx = MPS(sites, [repeat(["vecId"], n_sites+1); "vecN"])
+
+    occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
 
     # - la corrente di spin
     # Prima costruisco gli operatori sulla catena di spin, poi li
     # estendo con l'identità sui restanti siti.
-    spin_current_ops = [chain(MPS(sites[1:1], "vecId"),
-                              j,
-                              MPS(sites[end:end], "vecId"))
-                        for j in spin_current_op_list(sites[2:end-1])]
+    spin_current_ops = [embed_slice(sites, spin_range, j)
+                        for j in spin_current_op_list(sites[spin_range])]
 
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
     # dell'operatore numero della catena di spin, vale a dire calcolo
     # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
     # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [chain(MPS(sites[1:1], "vecId"),
-                                  level_subspace_proj(sites[2:end-1], n),
-                                  MPS(sites[end:end], "vecId"))
+    num_eigenspace_projs = [embed_slice(sites,
+                                        spin_range,
+                                        level_subspace_proj(sites[spin_range], n))
                             for n=0:n_sites]
 
     # - l'occupazione dei livelli degli oscillatori
-    osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                   MPS(sites[2:end], "vecId"))
+    osc_levels_projs_left = [embed_slice(sites,
+                                         1:1,
+                                         osc_levels_proj(sites[1], n))
                              for n=0:osc_dim-1]
-    osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecId"),
-                                    osc_levels_proj(sites[end], n))
+    osc_levels_projs_right = [embed_slice(sites,
+                                          n_sites+2:n_sites+2,
+                                          osc_levels_proj(sites[end], n))
                               for n=0:osc_dim-1]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
@@ -196,32 +195,28 @@ let
     # =======================
     if !preload
       # - i numeri di occupazione
-      osc_num_sx = MPS(sites, vcat(["vecN"],
-                                   repeat(["vecId"], n_sites),
-                                   ["vecId"]))
-      osc_num_dx = MPS(sites, vcat(["vecId"],
-                                   repeat(["vecId"], n_sites),
-                                   ["vecN"]))
-      occ_n_list = vcat([osc_num_sx], single_ex_states, [osc_num_dx])
+      osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_sites+1)])
+      osc_num_dx = MPS(sites, [repeat(["vecId"], n_sites+1); "vecN"])
+      occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
 
       # - la corrente di spin
-      spin_current_ops = [chain(MPS(sites[1:1], "vecId"),
-                                j,
-                                MPS(sites[end:end], "vecId"))
-                          for j in spin_current_op_list(sites[2:end-1])]
+      spin_current_ops = [embed_slice(sites, spin_range, j)
+                          for j in spin_current_op_list(sites[spin_range])]
 
       # - l'occupazione degli autospazi dell'operatore numero
-      num_eigenspace_projs = [chain(MPS(sites[1:1], "vecId"),
-                                    level_subspace_proj(sites[2:end-1], n),
-                                    MPS(sites[end:end], "vecId"))
+      num_eigenspace_projs = [embed_slice(sites,
+                                          spin_range,
+                                          level_subspace_proj(sites[spin_range], n))
                               for n=0:n_sites]
 
       # - l'occupazione dei livelli degli oscillatori
-      osc_levels_projs_left = [chain(osc_levels_proj(sites[1], n),
-                                     MPS(sites[2:end], "vecId"))
+      osc_levels_projs_left = [embed_slice(sites,
+                                           1:1,
+                                           osc_levels_proj(sites[1], n))
                                for n=0:osc_dim-1]
-      osc_levels_projs_right = [chain(MPS(sites[1:end-1], "vecId"),
-                                      osc_levels_proj(sites[end], n))
+      osc_levels_projs_right = [embed_slice(sites,
+                                            n_sites+2:n_sites+2,
+                                            osc_levels_proj(sites[end], n))
                                 for n=0:osc_dim-1]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
@@ -298,8 +293,9 @@ let
         =#
         mat = Array{Complex}(undef, osc_dim, osc_dim)
         for j = 0:osc_dim-1, k = 0:osc_dim-1
-          proj = chain(MPS([state(sites[1], "mat_comp"; j, k)]),
-                       MPS(sites[2:end], "vecId"))
+          proj = embed_slice(sites,
+                             1:1,
+                             MPS([state(sites[1], "mat_comp"; j, k)]))
           mat[j+1, k+1] = inner(proj, current_state)
         end
         # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
