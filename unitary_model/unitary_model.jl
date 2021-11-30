@@ -44,6 +44,8 @@ let
   spin_current_super = []
   bond_dimensions_super = []
   spin_chain_levels_super = []
+  osc_chain_coefficients_left_super = []
+  osc_chain_coefficients_right_super = []
 
   # Precaricamento
   # ==============
@@ -145,6 +147,13 @@ let
                                          (0, ωc),
                                          n_osc_right;
                                          Nquad=nquad)
+
+    # Raccolgo i coefficienti in due array (uno per quelli a sx, l'altro per
+    # quelli a dx) per poterli disegnare assieme nei grafici.
+    # I coefficienti κ sono uno in meno degli Ω: aggiungo uno zero all'inizio.
+    osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
+    osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
+
     # Per semplicità assumo che n_osc_left, n_osc_right e n_spin_sites siano
     # TUTTI pari.
     links_odd = ITensor[]
@@ -345,6 +354,8 @@ let
     push!(spin_current_super, spin_current)
     push!(spin_chain_levels_super, spin_chain_levels)
     push!(bond_dimensions_super, bond_dimensions)
+    push!(osc_chain_coefficients_left_super, osc_chain_coefficients_left)
+    push!(osc_chain_coefficients_right_super, osc_chain_coefficients_right)
   end
 
   #= Grafici
@@ -478,6 +489,32 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "chain_levels.png")
+ 
+  # Grafico dei coefficienti della chain map
+  # ----------------------------------------
+  plt = plot_standalone(osc_chain_coefficients_left_super,
+                        parameter_lists;
+                        labels=[L"\Omega_i", L"\kappa_i"],
+                        linestyles=[:solid, :solid],
+                        x_label=L"i",
+                        y_label="Coefficiente",
+                        plot_title="Coefficienti della catena di "*
+                                   "oscillatori (sx)",
+                        plot_size=plot_size
+                        )
+  savefig(plt, "osc_left_coefficients.png")
+
+  plt = plot_standalone(osc_chain_coefficients_right_super,
+                        parameter_lists;
+                        labels=[L"\Omega_i", L"\kappa_i"],
+                        linestyles=[:solid, :solid],
+                        x_label=L"i",
+                        y_label="Coefficiente",
+                        plot_title="Coefficienti della catena di "*
+                                   "oscillatori (dx)",
+                        plot_size=plot_size
+                        )
+  savefig(plt, "osc_right_coefficients.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

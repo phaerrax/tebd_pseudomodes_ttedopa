@@ -302,8 +302,10 @@ function shared_title_fake_plot(subject::String, parameters)
 end
 #
 function plot_time_series(data_super, parameter_super; displayed_sites, labels, linestyles, x_label, y_label, plot_title, plot_size)
-  #= Disegna un grafico a partire dagli array "_super" ottenuti dalla
-     simulazione qui sopra.
+  #= Disegna un grafico dei dati di un array "_super" al variare del tempo,
+     ottenuti dalle simulazioni associate ai vari insiemi di parametri
+     in `parameter_super`, raggruppando in un unica immagine i grafici
+     relativi alla stessa grandezza.
 
      Argomenti
      ---------
@@ -371,6 +373,83 @@ function plot_time_series(data_super, parameter_super; displayed_sites, labels, 
     for (j, lab, lst) in zip(displayed_sites, labels, linestyles)
       plot!(this_plot, time_step_list_filtered,
                        dataᵀ[j,:],
+                       ylim=ylimits,
+                       label=lab,
+                       linestyle=lst,
+                       legend=:outerright,
+                       left_margin=5mm,
+                       bottom_margin=5mm
+                      )
+    end
+    xlabel!(this_plot, x_label)
+    ylabel!(this_plot, y_label)
+    title!(this_plot, subplot_title(p, distinct_parameters))
+    push!(subplots, this_plot)
+  end
+  group_plot = Plots.plot(
+    shared_title_fake_plot(plot_title, parameter_super),
+    Plots.plot(subplots...,
+               layout=(Int(ceil(length(subplots)/2)), 2),
+               size=plot_size),
+    layout=grid(2, 1, heights=[0.1, 0.9])
+  )
+  return group_plot
+end
+#
+function plot_standalone(data_super, parameter_super; labels, linestyles, x_label, y_label, plot_title, plot_size)
+  #= Disegna un grafico dei dati di un array "_super" che non dipendono dal
+     tempo, ottenuti dalle simulazioni associate ai vari insiemi di parametri
+     in `parameter_super`, raggruppando in un unica immagine i grafici
+     relativi alla stessa grandezza.
+
+     Argomenti
+     ---------
+   · `data_super::Array{Any}`: un array di dimensione uguale a quella di
+     parameter_lists.
+     Ciascun elemento di data_super è un array che contiene dei dati
+     da graficare, eventualmente un insieme di array da rappresentare
+     contemporaneamente.
+
+   · `labels::Array{String}`: un array di dimensione M che contiene le
+     etichette da assegnare alla linea di ciascuna quantità da disegnare.
+
+   · `linestyles::Array{Symbol}`: come `labels`, ma per gli stili delle linee.
+
+   · `input_xlabel::String`: etichetta delle ascisse (comune a tutti)
+
+   · `input_ylabel::String`: etichetta delle ordinate (comune a tutti)
+
+   · `plot_title::String`: titolo grande del grafico
+
+   · `plot_size`: una Pair che indica la dimensione complessiva del grafico
+  =#
+  subplots = []
+  distinct_parameters, _ = categorise_parameters(parameter_super)
+  #
+  # Calcola il minimo e il massimo valore delle ordinate tra tutti i dati,
+  # per poter impostare una scala universale che mostri tutti i grafici
+  # nello stesso modo (e non tagli fuori nulla).
+  # In pratica: `extrema` calcola gli estremi di un Array multidimensionale, ma
+  # i miei data_super sono invece Vector di Vector (di Vector, talvolta) quindi non
+  # si può fare semplicemente: calcolo prima la lista degli estremi di ciascun
+  # `data`, poi prendo gli estremi di tutto.
+  if data_super[1][1] isa Vector
+    # Alcuni data_super sono Vector³, altri Vector², e nel primo caso c'è
+    # un ulteriore livello da sbrogliare.
+    y_minima = [minimum([minimum(data₂) for data₂ in data₁])
+                for data₁ in data_super]
+    y_maxima = [maximum([maximum(data₂) for data₂ in data₁])
+                for data₁ in data_super]
+  else
+    y_minima = [minimum(data) for data in data_super]
+    y_maxima = [maximum(data) for data in data_super]
+  end
+  ylimits = (minimum(y_minima), maximum(y_maxima))
+  #
+  for (p, data) in zip(parameter_super, data_super)
+    this_plot = plot()
+    for (j, (lab, lst)) in enumerate(zip(labels, linestyles))
+      plot!(this_plot, data[:,j],
                        ylim=ylimits,
                        label=lab,
                        linestyle=lst,
