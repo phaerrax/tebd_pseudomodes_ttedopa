@@ -2,89 +2,88 @@ using LinearAlgebra
 using ITensors
 using Combinatorics
 
+const ⊗ = kron
+
 # Matrici di Pauli e affini
 # -------------------------
-σˣ = [0 1
-      1 0]
-σʸ = [0  -im
-      im 0  ]
-σᶻ = [1 0
-      0 -1]
-σ⁺ = [0 1
-      0 0]
-σ⁻ = [0 0
-      1 0]
-I₂ = [1 0
-      0 1]
+σˣ = [0 1; 1 0]
+σʸ = [0 -im; im 0]
+σᶻ = [1 0; 0 -1]
+σ⁺ = [0 1; 0 0]
+σ⁻ = [0 0; 1 0]
+I₂ = [1 0; 0 1]
+ê₊ = [1; 0]
+ê₋ = [0; 1]
 
 # Il vettore nullo:
-ITensors.state(::StateName"zero", ::SiteType"S=1/2") = [ 0 0 ]
+ITensors.state(::StateName"0", ::SiteType"S=1/2") = [0; 0]
 # Definisco l'operatore numero per un singolo spin, che altro non è che
 # la proiezione sullo stato |↑⟩.
-ITensors.op(::OpName"num", s::SiteType"S=1/2") = op(OpName("ProjUp"), s)
+ITensors.op(::OpName"N", s::SiteType"S=1/2") = op(OpName"ProjUp"(), s)
 # La matrice identità
-ITensors.op(::OpName"id", ::SiteType"S=1/2") = I₂
+ITensors.op(::OpName"Id", ::SiteType"S=1/2") = I₂
 # La matrice nulla
-ITensors.op(::OpName"zero", ::SiteType"S=1/2") = [0 0
-                                                  0 0]
+ITensors.op(::OpName"0", ::SiteType"S=1/2") = [0 0; 0 0]
 
 # Spazio degli spin vettorizzato
 # ==============================
 ITensors.space(::SiteType"vecS=1/2") = 4
 
-# Questi "stati" contengono sia degli stati veri e propri, come Up:Up e Dn:Dn,
-# sia la vettorizzazione di alcuni operatori che mi servono per calcolare le
-# osservabili sugli MPS (siccome sono vettori, devo definirli per forza così)
-ITensors.state(::StateName"Up:Up", ::SiteType"vecS=1/2") = [ 1 0 0 0 ]
-ITensors.state(::StateName"Dn:Dn", ::SiteType"vecS=1/2") = [ 0 0 0 1 ]
-ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2") = [ 0 1 1 0 ]
-ITensors.state(::StateName"vecσy", ::SiteType"vecS=1/2") = [ 0 im -im 0 ]
-ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2") = [ 1 0 0 -1 ]
-ITensors.state(::StateName"vecid", ::SiteType"vecS=1/2") = [ 1 0 0 1 ]
-ITensors.state(::StateName"zero", ::SiteType"vecS=1/2")  = [ 0 0 0 0 ]
+# Stati (veri e propri)
+# ---------------------
+ITensors.state(::StateName"Up", ::SiteType"vecS=1/2") = ê₊ ⊗ ê₊
+ITensors.state(::StateName"Dn", ::SiteType"vecS=1/2") = ê₋ ⊗ ê₋
 
-# Operatori semplici sullo spazio degli spin (vettorizzato)
-# ---------------------------------------------------------
+# Stati che sono operatori vettorizzati (per costruire le osservabili)
+# --------------------------------------------------------------------
+ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2") = vcat(σˣ[:])
+ITensors.state(::StateName"vecσy", ::SiteType"vecS=1/2") = vcat(σʸ[:])
+ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2") = vcat(σᶻ[:])
+ITensors.state(::StateName"vecId", ::SiteType"vecS=1/2") = vcat(I₂[:])
+ITensors.state(::StateName"vec0", ::SiteType"vecS=1/2") = [0; 0; 0; 0]
+
+# Operatori
+# ---------
 # - identità
-ITensors.op(::OpName"id:id", ::SiteType"vecS=1/2") = kron(I₂, I₂)
+ITensors.op(::OpName"Id:Id", ::SiteType"vecS=1/2") = I₂ ⊗ I₂
 # - termini per l'Hamiltoniano locale
-ITensors.op(::OpName"σz:id", ::SiteType"vecS=1/2") = kron(σᶻ, I₂)
-ITensors.op(::OpName"id:σz", ::SiteType"vecS=1/2") = kron(I₂, σᶻ)
+ITensors.op(::OpName"σz:Id", ::SiteType"vecS=1/2") = σᶻ ⊗ I₂
+ITensors.op(::OpName"Id:σz", ::SiteType"vecS=1/2") = I₂ ⊗ σᶻ
 # - termini per l'Hamiltoniano bilocale
-ITensors.op(::OpName"id:σ+", ::SiteType"vecS=1/2") = kron(I₂, σ⁺)
-ITensors.op(::OpName"σ+:id", ::SiteType"vecS=1/2") = kron(σ⁺, I₂)
-ITensors.op(::OpName"id:σ-", ::SiteType"vecS=1/2") = kron(I₂, σ⁻)
-ITensors.op(::OpName"σ-:id", ::SiteType"vecS=1/2") = kron(σ⁻, I₂)
+ITensors.op(::OpName"Id:σ+", ::SiteType"vecS=1/2") = I₂ ⊗ σ⁺
+ITensors.op(::OpName"σ+:Id", ::SiteType"vecS=1/2") = σ⁺ ⊗ I₂
+ITensors.op(::OpName"Id:σ-", ::SiteType"vecS=1/2") = I₂ ⊗ σ⁻
+ITensors.op(::OpName"σ-:Id", ::SiteType"vecS=1/2") = σ⁻ ⊗ I₂
 # - termini di smorzamento
-ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = kron(σˣ, σˣ)
-ITensors.op(::OpName"σx:id", ::SiteType"vecS=1/2") = kron(σˣ, I₂)
-ITensors.op(::OpName"id:σx", ::SiteType"vecS=1/2") = kron(I₂, σˣ)
+ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = σˣ ⊗ σˣ
+ITensors.op(::OpName"σx:Id", ::SiteType"vecS=1/2") = σˣ ⊗ I₂
+ITensors.op(::OpName"Id:σx", ::SiteType"vecS=1/2") = I₂ ⊗ σˣ
 
 # Composizione dell'Hamiltoniano per i termini di spin
 # ----------------------------------------------------
 # - termini locali dell'Hamiltoniano
 function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
-  h = op("σz:id", s) - op("id:σz", s)
+  h = op("σz:Id", s) - op("Id:σz", s)
   return 0.5im * h
 end
 # - termini bilocali dell'Hamiltoniano
 function ITensors.op(::OpName"HspinInt", ::SiteType"vecS=1/2", s1::Index, s2::Index)
-  h = op("id:σ-", s1) * op("id:σ+", s2) +
-      op("id:σ+", s1) * op("id:σ-", s2) -
-      op("σ-:id", s1) * op("σ+:id", s2) -
-      op("σ+:id", s1) * op("σ-:id", s2)
+  h = op("Id:σ-", s1) * op("Id:σ+", s2) +
+      op("Id:σ+", s1) * op("Id:σ-", s2) -
+      op("σ-:Id", s1) * op("σ+:Id", s2) -
+      op("σ+:Id", s1) * op("σ-:Id", s2)
   return 0.5im * h
 end
 # - esponenziale del termine che coinvolge solo spin
 function ITensors.op(::OpName"expHspin", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number)
-  ℓ = 0.5ε * op("H1loc", s1) * op("id:id", s2) +
-      0.5ε * op("id:id", s1) * op("H1loc", s2) +
+  ℓ = 0.5ε * op("H1loc", s1) * op("Id:Id", s2) +
+      0.5ε * op("Id:Id", s1) * op("H1loc", s2) +
       op("HspinInt", s1, s2)
   return exp(t * ℓ)
 end
 # - termine di smorzamento per uno spin
 function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
-  d = op("σx:σx", s) - op("id:id", s)
+  d = op("σx:σx", s) - op("Id:Id", s)
   return d
 end
 
@@ -99,7 +98,7 @@ function J⁺tag(::SiteType"S=1/2", left_site::Int, i::Int)
   elseif i == left_site + 1
     str = "σy"
   else
-    str = "id"
+    str = "Id"
   end
   return str
 end
@@ -109,7 +108,7 @@ function J⁺tag(::SiteType"vecS=1/2", left_site::Int, i::Int)
   elseif i == left_site + 1
     str = "vecσy"
   else
-    str = "vecid"
+    str = "vecId"
   end
   return str
 end
@@ -121,7 +120,7 @@ function J⁻tag(::SiteType"S=1/2", left_site::Int, i::Int)
   elseif i == left_site + 1
     str = "σx"
   else
-    str = "id"
+    str = "Id"
   end
   return str
 end
@@ -131,7 +130,7 @@ function J⁻tag(::SiteType"vecS=1/2", left_site::Int, i::Int)
   elseif i == left_site + 1
     str = "vecσx"
   else
-    str = "vecid"
+    str = "vecId"
   end
   return str
 end
@@ -174,13 +173,9 @@ La seguente funzione restituisce i nomi per costruire i MPS degli
 stati della base dell'intero spazio della catena (suddivisi per
 numero di occupazione complessivo).
 =#
-function chain_basis_states(::SiteType"S=1/2", n_sites::Int, level::Int)
+function chain_basis_states(n_sites::Int, level::Int)
   return unique(permutations([repeat(["Up"], level);
                               repeat(["Dn"], n_sites - level)]))
-end
-function chain_basis_states(::SiteType"vecS=1/2", n_sites::Int, level::Int)
-  return unique(permutations([repeat(["Up:Up"], level);
-                              repeat(["Dn:Dn"], n_sites - level)]))
 end
 
 # La seguente funzione crea un proiettore su ciascun sottospazio con
@@ -192,13 +187,11 @@ function level_subspace_proj(sites::Vector{Index{Int64}}, level::Int)
   N = length(sites)
   # Controllo che i siti forniti siano degli spin ½.
   if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
-    st = SiteType("S=1/2")
     projs = [projector(MPS(sites, names); normalize=false)
-             for names in chain_basis_states(st, N, level)]
+             for names in chain_basis_states(N, level)]
   elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
-    st = SiteType("vecS=1/2")
     projs = [MPS(sites, names)
-             for names in chain_basis_states(st, N, level)]
+             for names in chain_basis_states(N, level)]
   else
     throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
                         "\"S=1/2\" oppure \"vecS=1/2\"."))
@@ -231,23 +224,8 @@ end
 function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
   N = length(sites)
   if k ∈ 1:N
-    # Controllo che i siti forniti siano degli spin ½.
-    if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
-      states = [i == k ? "Up" : "Dn" for i ∈ 1:N]
-    elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
-      # Questa è la vettorizzazione della matrice densità costruita
-      # a partire dallo stato a singola eccitazione: vec(sₖ⊗sₖᵀ).
-      states = [i == k ? "Up:Up" : "Dn:Dn" for i ∈ 1:N]
-    else
-      throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
-                          "\"S=1/2\" oppure \"vecS=1/2\"."))
-    end
-  elseif k > N
-    throw(DomainError(k,
-                      "Si è tentato di costruire uno stato con eccitazione "*
-                      "localizzata nel sito $k, ma la catena è composta da "*
-                      "$N siti."))
-  elseif k < 1
+    states = [i == k ? "Up" : "Dn" for i ∈ 1:N]
+  else
     throw(DomainError(k,
                       "Si è tentato di costruire uno stato con eccitazione "*
                       "localizzata nel sito $k, che non appartiene alla "*
@@ -267,11 +245,6 @@ function chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
   # somma dei prodotti interni di vec(sₖ⊗sₖ), per k=1:N, con questo vettore.
   # Ottengo poi che ⟨Pₙ,vⱼ⟩ = 1 solo se n=j, 0 altrimenti.
   N = length(sites)
-  if !all(x -> SiteType("S=1/2") ∈ x, sitetypes.(sites)) &&
-     !all(x -> SiteType("vecS=1/2") ∈ x, sitetypes.(sites))
-    throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
-                        "\"S=1/2\" oppure \"vecS=1/2\"."))
-  end
   if j ∉ 1:N
     throw(DomainError(j,
                       "Si è tentato di costruire un autostato della catena "*
@@ -294,11 +267,7 @@ end
 function parse_init_state(sites::Vector{Index{Int64}}, state::String)
   state = lowercase(state)
   if state == "empty"
-    if all(x -> SiteType("S=1/2") ∈ x, sitetypes.(sites))
-      v = MPS(sites, "Dn")
-    elseif all(x -> SiteType("vecS=1/2") ∈ x, sitetypes.(sites))
-      v = MPS(sites, "Dn:Dn")
-    end
+    v = MPS(sites, "Dn")
   elseif occursin(r"^1loc", state)
     j = parse(Int, replace(state, "1loc" => ""))
     v = single_ex_state(sites, j)
