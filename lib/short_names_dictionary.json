@@ -8,6 +8,7 @@
   "MP_compression_error": "compr_err",
   "TS_expansion_order": "T-S order",
   "spin_damping_coefficient": "κ",
+  "oscillator_space_dimension": "dₒ",
   "oscillator_spin_interaction_coefficient": "κ",
   "oscillator_damping_coefficient_left": "γₗ",
   "oscillator_damping_coefficient_right": "γᵣ",

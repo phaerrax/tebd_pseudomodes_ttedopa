@@ -33,13 +33,15 @@ In aggiunta, `damped_chain.jl` richiede anche
 - `temperature`
 
 `chain_with_damper_oscillators.jl` richiede
+- `oscillator_space_dimension`
 - `oscillator_spin_interaction_coefficient`
 - `oscillator_damping_coefficient_left`
 - `oscillator_damping_coefficient_right`
 - `oscillator_frequency`
 - `temperature`
 
-e infine `unitary_model` richiede
+e infine `unitary_model.jl` richiede
+- `oscillator_space_dimension`
 - `number_of_oscillators_left`
 - `number_of_oscillators_right`
 - `frequency_cutoff`

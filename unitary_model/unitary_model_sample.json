@@ -3,6 +3,7 @@
   "number_of_spin_sites": 10,
   "number_of_oscillators_left": 20,
   "number_of_oscillators_right": 10,
+  "oscillator_space_dimension": 5,
   "frequency_cutoff": 250,
   "simulation_end_time": 10,
   "simulation_time_step": 0.01,
