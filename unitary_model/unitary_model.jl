@@ -402,15 +402,16 @@ let
                          plot_size=plot_size)
   savefig(plt, "occ_n_osc_right.png")
 
-  #=
-  # Grafico dei numeri di occupazione (oscillatori + totale catena)
-  # ---------------------------------------------------------------
+  # Grafico dei numeri di occupazione (tot oscillatori + tot catena)
+  # ----------------------------------------------------------------
   data_super = []
   for occ_n in occ_n_super
     data = []
     for row in occ_n
-      push!(data,
-            [first(row), sum(row[2:end-1]), last(row)])
+      push!(data, [sum(row[range_osc_left]),
+                   sum(row[range_spins]),
+                   sum(row[range_osc_right]),
+                   sum(row)])
     end
     push!(data_super, data)
   end
@@ -418,15 +419,14 @@ let
   plt = plot_time_series(data_super,
                          parameter_lists;
                          displayed_sites=nothing,
-                         labels=["L", "catena", "R"],
-                         linestyles=[:solid, :dot, :solid],
+                         labels=["osc. sx", "catena", "osc. dx", "tutti"],
+                         linestyles=repeat([:solid], 4),
                          x_label=L"\lambda\, t",
                          y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione (oscillatori + totale catena)",
+                         plot_title="Numeri di occupazione (sommati)",
                          plot_size=plot_size
                         )
   savefig(plt, "occ_n_sums.png")
-  =#
 
   # Grafico dei ranghi del MPS
   # --------------------------
