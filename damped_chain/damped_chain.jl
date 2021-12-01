@@ -14,6 +14,7 @@ root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
 # Sali di due cartelle. root_path è la cartella principale del progetto.
 include(lib_path * "/utils.jl")
+include(lib_path * "/plotting.jl")
 include(lib_path * "/spin_chain_space.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
