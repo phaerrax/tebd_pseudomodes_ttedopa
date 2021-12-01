@@ -163,8 +163,7 @@ let
     # Coppia di oscillatori all'estremo sinistro:
     h = Ωₗ[end]      * op("N", s1) * op("Id", s2) +
         0.5Ωₗ[end-1] * op("Id", s1) * op("N", s2) +
-        κₗ[end] * op("a+", s1) * op("a-", s2) +
-        κₗ[end] * op("a-", s1) * op("a+", s2)
+        κₗ[end] * op("OscInt", s1, s2)
     push!(links_odd, exp(-0.5im * τ * h))
     # Riparto dall'oscillatore #1 della catena a sinistra (è quello attaccato al
     # sito di spin) e la attraverso verso sinistra, a due a due:
@@ -177,8 +176,7 @@ let
       s2 = sites[i+1]
       h = 0.5Ωₗ[j+1] * op("N", s1) * op("Id", s2) +
           0.5Ωₗ[j]   * op("Id", s1) * op("N", s2) +
-          κₗ[j] * op("a+", s1) * op("a-", s2) +
-          κₗ[j] * op("a-", s1) * op("a+", s2)
+          κₗ[j] * op("OscInt", s1, s2)
       push!(links_odd, exp(-0.5im * τ * h))
     end
     for i = 2:2:n_osc_left-1
@@ -187,27 +185,22 @@ let
       s2 = sites[i+1]
       h = 0.5Ωₗ[j+1] * op("N", s1) * op("Id", s2) +
           0.5Ωₗ[j]   * op("Id", s1)  * op("N", s2) +
-          κₗ[j] * op("a+", s1) * op("a-", s2) +
-          κₗ[j] * op("a-", s1) * op("a+", s2)
+          κₗ[j] * op("OscInt", s1, s2)
       push!(links_even, exp(-im * τ * h))
     end
     # La coppia oscillatore-spin di sinistra ricade tra i link pari:
     so = sites[n_osc_left] # primo oscillatore a sx
     ss = sites[n_osc_left+1] # primo spin a sx
     h = 0.5*Ωₗ[1] * op("N", so) * op("Id", ss) +
-        0.5ε      * op("Id", so)  * op("σz", ss) +
-        ηₗ * op("a+", so) * op("σx", ss) + 
-        ηₗ * op("a-", so) * op("σx", ss)
+        0.25ε     * op("Id", so)  * op("σz", ss) +
+        ηₗ * op("X", so) * op("σx", ss)
     push!(links_even, exp(-im * τ * h))
     # Continuo con le coppie (dispari, pari) della catena di spin:
     for j = 1:2:n_spin_sites-1
       j += n_osc_left
       s1 = sites[j]
       s2 = sites[j+1]
-      h = 0.5ε * op("σz", s1) * op("Id", s2) +
-          0.5ε * op("Id", s1) * op("σz", s2) +
-          -0.5 * op("σ+", s1) * op("σ-", s2) +
-          -0.5 * op("σ-", s1) * op("σ+", s2)
+      h = 0.5ε * op("SpinLoc", s1, s2) + op("SpinInt", s1, s2)
       push!(links_odd, exp(-0.5im * τ * h))
     end
     # e poi con le coppie (pari, dispari):
@@ -215,19 +208,15 @@ let
       j += n_osc_left
       s1 = sites[j]
       s2 = sites[j+1]
-      h = 0.5ε * op("σz", s1) * op("Id", s2) +
-          0.5ε * op("Id", s1) * op("σz", s2) +
-          -0.5 * op("σ+", s1) * op("σ-", s2) +
-          -0.5 * op("σ-", s1) * op("σ+", s2)
+      h = 0.5ε * op("SpinLoc", s1, s2) + op("SpinInt", s1, s2)
       push!(links_even, exp(-im * τ * h))
     end
     # La coppia oscillatore-spin di destra ricade anch'essa tra i link pari:
     ss = sites[n_osc_left+n_spin_sites] # ultimo spin (a dx)
     so = sites[n_osc_left+n_spin_sites+1] # primo oscillatore a dx
-    h = 0.5ε *     op("σz", ss) * op("Id", so) +
+    h = 0.25ε *    op("σz", ss) * op("Id", so) +
         0.5Ωᵣ[1] * op("Id", ss) * op("N", so) +
-        ηᵣ * op("σx", ss) * op("a+", so) + 
-        ηᵣ * op("σx", ss) * op("a-", so) 
+        ηᵣ * op("σx", ss) * op("X", so)
     push!(links_even, exp(-im * τ * h))
     # Continuo con la serie di oscillatori a destra, prima le coppie dispari:
     for j = 1:2:n_osc_right
@@ -235,8 +224,7 @@ let
       s2 = sites[n_osc_left + n_spin_sites + j+1]
       h = 0.5Ωᵣ[j]   * op("N", s1) * op("Id", s2) +
           0.5Ωᵣ[j+1] * op("Id", s1)  * op("N", s2) +
-          κᵣ[j] * op("a+", s1) * op("a-", s2) +
-          κᵣ[j] * op("a-", s1) * op("a+", s2)
+          κᵣ[j] * op("OscInt", s1, s2)
       push!(links_odd, exp(-0.5im * τ * h))
     end
     # e poi le coppie pari:
@@ -245,8 +233,7 @@ let
       s2 = sites[n_osc_left + n_spin_sites + j+1]
       h = 0.5Ωᵣ[j]   * op("N", s1) * op("Id", s2) +
           0.5Ωᵣ[j+1] * op("Id", s1)  * op("N", s2) +
-          κᵣ[j] * op("a+", s1) * op("a-", s2) +
-          κᵣ[j] * op("a-", s1) * op("a+", s2)
+          κᵣ[j] * op("OscInt", s1, s2)
       push!(links_even, exp(-im * τ * h))
     end
     # Arrivo infine alla coppia di oscillatori più a destra (una coppia dispari):
@@ -254,8 +241,7 @@ let
     s2 = sites[end]
     h = 0.5Ωᵣ[end-1] * op("N", s1) * op("Id", s2) +
         Ωᵣ[end]      * op("Id", s1)  * op("N", s2) +
-        κᵣ[end] * op("a+", s1) * op("a-", s2) +
-        κᵣ[end] * op("a-", s1) * op("a+", s2)
+        κᵣ[end] * op("OscInt", s1, s2)
     push!(links_odd, exp(-0.5im * τ * h))
 
     evo = [links_odd; links_even; links_odd]

@@ -69,6 +69,13 @@ ITensors.op(::OpName"a+", ::SiteType"Osc"; dim=2) = a⁺(dim)
 ITensors.op(::OpName"a-", ::SiteType"Osc"; dim=2) = a⁻(dim)
 ITensors.op(::OpName"Id", ::SiteType"Osc"; dim=2) = id(dim)
 ITensors.op(::OpName"N", ::SiteType"Osc"; dim=2) = num(dim)
+ITensors.op(::OpName"X", ::SiteType"Osc"; dim=2) = a⁺(dim) + a⁻(dim)
+
+# Termini dell'Hamiltoniano dopo la chain map
+# -------------------------------------------
+function ITensors.op(::OpName"OscInt", ::SiteType"Osc", s1::Index, s2::Index)
+  return op("a+", s1)*op("a-", s2) + op("a-", s1)*op("a+", s2)
+end
 
 # Spazio degli oscillatori vettorizzato
 # =====================================
@@ -160,8 +167,8 @@ ITensors.state(::StateName"veca-", ::SiteType"vecOsc"; dim=2) = vcat(a⁻(dim)[:
 ITensors.state(::StateName"vecN", ::SiteType"vecOsc"; dim=2) = vcat(num(dim)[:])
 ITensors.state(::StateName"vecId", ::SiteType"vecOsc"; dim=2) = vcat(id(dim)[:])
 
-# Operatori
-# ---------
+# Operatori generici per oscillatori vettorizzati
+# -----------------------------------------------
 function ITensors.op(on::OpName, st::SiteType"vecOsc", s::Index; kwargs...)
   return itensor(op(on, st; dim=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
 end
@@ -177,13 +184,14 @@ ITensors.op(::OpName"Id:N", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ num(dim)
 ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc"; dim=2) = transpose(a⁺(dim)) ⊗ a⁻(dim)
 ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; dim=2) = transpose(a⁻(dim)) ⊗ a⁺(dim)
 
-# Composizione dell'Hamiltoniano per i termini degli oscillatori
-# - termini locali dell'Hamiltoniano
+# Termini nell'equazione di Lindblad per oscillatori vettorizzati
+# ---------------------------------------------------------------
+# Termini antihermitiani locali
 function ITensors.op(::OpName"H1loc", ::SiteType"vecOsc", s::Index)
   h = op("N:Id", s) - op("Id:N", s)
   return im * h
 end
-# - termini di smorzamento
+# Termini di smorzamento
 function ITensors.op(::OpName"damping", ::SiteType"vecOsc", s::Index; ω::Number, T::Number)
   if T == 0
     n = 0

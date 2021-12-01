@@ -32,6 +32,15 @@ ITensors.op(::OpName"σz", ::SiteType"S=1/2") = σᶻ
 ITensors.op(::OpName"σ+", ::SiteType"S=1/2") = σ⁺
 ITensors.op(::OpName"σ-", ::SiteType"S=1/2") = σ⁻
 
+# Hamiltoniano locale di una coppia di spin adiacenti
+function ITensors.op(::OpName"SpinLoc", ::SiteType"S=1/2", s1::Index, s2::Index)
+  return 0.5 * (op("σz", s1)*op("Id", s2) + op("Id", s1)*op("σz", s2))
+end
+# Hamiltoniano di interazione tra due spin
+function ITensors.op(::OpName"SpinInt", ::SiteType"S=1/2", s1::Index, s2::Index)
+  return -0.5 * (op("σ-", s1)*op("σ+", s2) + op("σ+", s1)*op("σ-", s2))
+end
+
 # Spazio degli spin vettorizzato
 # ==============================
 ITensors.space(::SiteType"vecS=1/2") = 4
