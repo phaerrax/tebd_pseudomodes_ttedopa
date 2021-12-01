@@ -1,5 +1,3 @@
-using Measures
-using LinearAlgebra
 using JSON
 using Base.Filesystem
 using ITensors

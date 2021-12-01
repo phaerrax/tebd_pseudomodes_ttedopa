@@ -1,11 +1,8 @@
 #!/usr/bin/julia
 
 using ITensors
-using Plots
 using LaTeXStrings
 using ProgressMeter
-using LinearAlgebra
-using JSON
 using Base.Filesystem
 using DataFrames
 using CSV

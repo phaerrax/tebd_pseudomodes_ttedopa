@@ -1,9 +1,7 @@
 #!/usr/bin/julia
 
 using ITensors
-using Plots
 using LaTeXStrings
-using JSON
 using ProgressMeter
 
 root_path = dirname(dirname(Base.source_path()))
