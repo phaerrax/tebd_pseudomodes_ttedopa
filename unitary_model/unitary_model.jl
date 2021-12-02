@@ -43,6 +43,7 @@ let
   spin_chain_levels_super = []
   osc_chain_coefficients_left_super = []
   osc_chain_coefficients_right_super = []
+  snapshot_super = []
 
   # Precaricamento
   # ==============
@@ -304,6 +305,8 @@ let
       skip_count += 1
     end
 
+    snapshot = occ_n[end]
+
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => time_step_list[1:skip_steps:end])
     tmp_list = hcat(occ_n...)
@@ -339,6 +342,7 @@ let
     push!(bond_dimensions_super, bond_dimensions)
     push!(osc_chain_coefficients_left_super, osc_chain_coefficients_left)
     push!(osc_chain_coefficients_right_super, osc_chain_coefficients_right)
+    push!(snapshot_super, snapshot)
   end
 
   #= Grafici
@@ -498,6 +502,19 @@ let
                         plot_size=plot_size
                         )
   savefig(plt, "osc_right_coefficients.png")
+
+  # Istantanea dei numeri di occupazione alla fine
+  # ----------------------------------------------
+  plt = plot_standalone(snapshot_super,
+                        parameter_lists;
+                        labels=[nothing],
+                        linestyles=[:solid],
+                        x_label=L"i",
+                        y_label="Numero di occupazione",
+                        plot_title="Numeri di occupazione alla fine",
+                        plot_size=plot_size
+                        )
+  savefig(plt, "snapshot.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
