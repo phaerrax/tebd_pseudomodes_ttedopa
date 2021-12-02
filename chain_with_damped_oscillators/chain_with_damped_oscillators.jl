@@ -297,8 +297,10 @@ let
         # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
         # la positività degli autovalori devo tagliare via la loro parte reale,
         # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
-        if any(x -> x < 0, real.(eigvals(mat)))
-          @warn "La matrice densità del primo sito non è semidefinita positiva."
+        for x in real.(eigvals(mat))
+          if x < -max_err
+            @warn "La matrice densità del primo sito non è semidefinita positiva: trovato $x"
+          end
         end
         diff = sqrt(norm(mat - mat'))
         push!(hermiticity_monitor,
