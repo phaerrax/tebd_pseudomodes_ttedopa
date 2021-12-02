@@ -51,76 +51,55 @@ let
     # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
     sites = siteinds("S=1/2", n_sites)
 
-    # Stati di singola eccitazione
-    single_ex_states = [MPS(sites,
-                            [j == n ? "Up" : "Dn" for j = 1:n_sites])
-                        for n = 1:n_sites]
-
     # Costruzione dell'operatore di evoluzione
     # ========================================
-    # In questo sistema semplice non sto usando la matrice identità e l'equazione
-    # di Lindblad per calcolare la traiettoria del sistema, quindi non mi servono
-    # le funzioni definite nei vari file ausiliari.
-    # Uso l'espansione di Trotter-Suzuki al 2° ordine.
+    # Ricorda che gli estremi della catena vanno trattati a parte.
+    site_energies = [2ε; repeat([ε], n_sites-2); 2ε]
+    # L'Hamiltoniano dei singoli siti è moltiplicato per 0.5, dato che ogni
+    # termine essere diviso tra i due hⱼ,ⱼ₊₁ che coinvolgono il sito; i 2ε
+    # ai capi "annullano" questo fattore (che per i siti agli estremi non
+    # deve esserci).
+    H_list = ITensor[]
+    for j = 1:n_sites-1
+      s1 = sites[j]
+      s2 = sites[j+1]
+      h_loc = 0.5op("SpinLoc", s1, s2;
+                    ε1=site_energies[j], ε2=site_energies[j+1]) +
+              op("SpinInt", s1, s2)
+      push!(H_list, h_loc)
+    end
+
+    function links_odd(τ)
+      return [(exp(-im * τ * h)) for h in H_list[1:2:end]]
+    end
+    function links_even(τ)
+      return [(exp(-im * τ * h)) for h in H_list[2:2:end]]
+    end
     #
-    # Ricorda:
-    # - gli h_loc agli estremi della catena vanno trattati separatamente
-    # - Sz è 1/2*sigma_z, la matrice sigma_z si chiama id, e così per le
-    #   altre matrici di Pauli
-    links_odd = ITensor[]
-    s1 = sites[1]
-    s2 = sites[2]
-    h_loc = ε * op("Sz", s1) * op("Id", s2) +
-            1/2 * ε * op("Id", s1) * op("Sz", s2) +
-            -1/2 * op("S+", s1) * op("S-", s2) +
-            -1/2 * op("S-", s1) * op("S+", s2)
-    push!(links_odd, exp(-0.5im * time_step * h_loc))
-    for j = 3:2:n_sites-3
-      s1 = sites[j]
-      s2 = sites[j+1]
-      h_loc = 1/2 * ε * op("Sz", s1) * op("Id", s2) +
-              1/2 * ε * op("Id", s1) * op("Sz", s2) +
-              -1/2 * op("S+", s1) * op("S-", s2) +
-              -1/2 * op("S-", s1) * op("S+", s2)
-      push!(links_odd, exp(-0.5im * time_step * h_loc))
-    end
-    s1 = sites[end-1] # j = n_sites-1
-    s2 = sites[end] # j = n_sites
-    h_loc = 1/2 * ε * op("Sz", s1) * op("Id", s2) +
-            ε * op("Id", s1) * op("Sz", s2) +
-            -1/2 * op("S+", s1) * op("S-", s2) +
-            -1/2 * op("S-", s1) * op("S+", s2)
-    push!(links_odd, exp(-0.5im * time_step * h_loc))
+    evo = evolution_operator(links_odd,
+                             links_even,
+                             time_step,
+                             parameters["TS_expansion_order"])
 
-    links_even = ITensor[]
-    for j = 2:2:n_sites-2
-      s1 = sites[j]
-      s2 = sites[j+1]
-      h_loc = 1/2 * ε * op("Sz", s1) * op("Id", s2) +
-              1/2 * ε * op("Id", s1) * op("Sz", s2) +
-              -1/2 * op("S+", s1) * op("S-", s2) +
-              -1/2 * op("S-", s1) * op("S+", s2)
-      push!(links_even, exp(-1.0im * time_step * h_loc))
-    end
-
-    time_evolution_oplist = vcat(links_odd, links_even, links_odd)
-
-    # Lo stato iniziale ha un'eccitazione nel primo sito
-    current_state = single_ex_states[1]
+    # Simulazione
+    # ===========
+    # Determina lo stato iniziale a partire dalla stringa data nei parametri
+    current_state = parse_init_state(sites,
+                                     parameters["chain_initial_state"])
 
     # Misuro le osservabili sullo stato iniziale
-    occ_n = [[abs2(inner(s, current_state)) for s in single_ex_states]]
-    #maxdim_monitor = Int[]
+    occ_n = [expect(current_state, "N")]
 
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
     skip_count = 1
     for _ in time_step_list[2:end]
-      current_state = apply(time_evolution_oplist, current_state; cutoff=max_err, maxdim=max_dim)
+      current_state = apply(evo,
+                            current_state;
+                            cutoff=max_err,
+                            maxdim=max_dim)
       if skip_count % skip_steps == 0
-        push!(occ_n,
-              [abs2(inner(s, current_state)) for s in single_ex_states])
-        #push!(maxdim_monitor, maxlinkdim(current_state))
+        push!(occ_n, expect(current_state, "N"))
       end
       next!(progress)
       skip_count += 1
@@ -159,7 +138,7 @@ let
                          plot_title="Numeri di occupazione",
                          plot_size=plot_size
                         )
-  savefig(plt, "occupation_numbers.png")
+  savefig(plt, "occ_n.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
