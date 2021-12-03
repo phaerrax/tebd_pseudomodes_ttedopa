@@ -32,26 +32,6 @@ ITensors.op(::OpName"σz", ::SiteType"S=1/2") = σᶻ
 ITensors.op(::OpName"σ+", ::SiteType"S=1/2") = σ⁺
 ITensors.op(::OpName"σ-", ::SiteType"S=1/2") = σ⁻
 
-# Hamiltoniano locale di una coppia di spin adiacenti
-function ITensors.op(::OpName"SpinLoc",
-					 ::SiteType"S=1/2",
-					 s1::Index,
-					 s2::Index;
-					 ε1::Real=1,
-					 ε2::Real=1)
-  return 0.5ε1 * op("σz", s1) * op("Id", s2) +
-         0.5ε2 * op("Id", s1) * op("σz", s2)
-end
-# Hamiltoniano di interazione tra due spin
-function ITensors.op(::OpName"SpinInt",
-                     ::SiteType"S=1/2",
-                     s1::Index,
-                     s2::Index;
-                     λ::Real=1)
-  return -0.5λ * (op("σ-", s1) * op("σ+", s2) +
-                  op("σ+", s1) * op("σ-", s2))
-end
-
 # Spazio degli spin vettorizzato
 # ==============================
 ITensors.space(::SiteType"vecS=1/2") = 4
@@ -73,6 +53,7 @@ ITensors.state(::StateName"vec0", ::SiteType"vecS=1/2") = [0; 0; 0; 0]
 # ---------
 # - identità
 ITensors.op(::OpName"Id:Id", ::SiteType"vecS=1/2") = I₂ ⊗ I₂
+ITensors.op(::OpName"Id", ::SiteType"vecS=1/2") = I₂ ⊗ I₂
 # - termini per l'Hamiltoniano locale
 ITensors.op(::OpName"σz:Id", ::SiteType"vecS=1/2") = σᶻ ⊗ I₂
 ITensors.op(::OpName"Id:σz", ::SiteType"vecS=1/2") = I₂ ⊗ σᶻ
@@ -85,34 +66,7 @@ ITensors.op(::OpName"σ-:Id", ::SiteType"vecS=1/2") = σ⁻ ⊗ I₂
 ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = σˣ ⊗ σˣ
 ITensors.op(::OpName"σx:Id", ::SiteType"vecS=1/2") = σˣ ⊗ I₂
 ITensors.op(::OpName"Id:σx", ::SiteType"vecS=1/2") = I₂ ⊗ σˣ
-
-# Composizione dell'Hamiltoniano per i termini di spin
-# ----------------------------------------------------
-# - termini locali dell'Hamiltoniano
-function ITensors.op(::OpName"H1loc", ::SiteType"vecS=1/2", s::Index)
-  h = op("σz:Id", s) - op("Id:σz", s)
-  return 0.5im * h
-end
-# - termini bilocali dell'Hamiltoniano
-function ITensors.op(::OpName"HspinInt", ::SiteType"vecS=1/2", s1::Index, s2::Index)
-  h = op("Id:σ-", s1) * op("Id:σ+", s2) +
-      op("Id:σ+", s1) * op("Id:σ-", s2) -
-      op("σ-:Id", s1) * op("σ+:Id", s2) -
-      op("σ+:Id", s1) * op("σ-:Id", s2)
-  return 0.5im * h
-end
-# - esponenziale del termine che coinvolge solo spin
-function ITensors.op(::OpName"expHspin", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number)
-  ℓ = 0.5ε * op("H1loc", s1) * op("Id:Id", s2) +
-      0.5ε * op("Id:Id", s1) * op("H1loc", s2) +
-      op("HspinInt", s1, s2)
-  return exp(t * ℓ)
-end
-# - termine di smorzamento per uno spin
-function ITensors.op(::OpName"damping", ::SiteType"vecS=1/2", s::Index)
-  d = op("σx:σx", s) - op("Id:Id", s)
-  return d
-end
+ITensors.op(::OpName"Damping", ::SiteType"vecS=1/2") = (σˣ ⊗ σˣ) - (I₂ ⊗ I₂)
 
 # Operatori della corrente di spin
 # ================================

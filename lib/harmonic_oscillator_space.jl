@@ -71,12 +71,6 @@ ITensors.op(::OpName"Id", ::SiteType"Osc"; dim=2) = id(dim)
 ITensors.op(::OpName"N", ::SiteType"Osc"; dim=2) = num(dim)
 ITensors.op(::OpName"X", ::SiteType"Osc"; dim=2) = a⁺(dim) + a⁻(dim)
 
-# Termini dell'Hamiltoniano dopo la chain map
-# -------------------------------------------
-function ITensors.op(::OpName"OscInt", ::SiteType"Osc", s1::Index, s2::Index)
-  return op("a+", s1)*op("a-", s2) + op("a-", s1)*op("a+", s2)
-end
-
 # Spazio degli oscillatori vettorizzato
 # =====================================
 function ITensors.space(::SiteType"vecOsc"; dim=2)
@@ -174,6 +168,7 @@ function ITensors.op(on::OpName, st::SiteType"vecOsc", s::Index; kwargs...)
 end
 # Operatori semplici sullo spazio degli oscillatori
 ITensors.op(::OpName"Id:Id", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ id(dim)
+ITensors.op(::OpName"Id", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ id(dim)
 # - interazione con la catena
 ITensors.op(::OpName"Id:asum", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ (a⁺(dim)+a⁻(dim))
 ITensors.op(::OpName"asum:Id", ::SiteType"vecOsc"; dim=2) = (a⁺(dim)+a⁻(dim)) ⊗ id(dim)
@@ -186,13 +181,8 @@ ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; dim=2) = transpose(a⁻(dim)) 
 
 # Termini nell'equazione di Lindblad per oscillatori vettorizzati
 # ---------------------------------------------------------------
-# Termini antihermitiani locali
-function ITensors.op(::OpName"H1loc", ::SiteType"vecOsc", s::Index)
-  h = op("N:Id", s) - op("Id:N", s)
-  return im * h
-end
 # Termini di smorzamento
-function ITensors.op(::OpName"damping", ::SiteType"vecOsc", s::Index; ω::Number, T::Number)
+function ITensors.op(::OpName"Damping", ::SiteType"vecOsc", s::Index; ω::Number, T::Number)
   if T == 0
     n = 0
   else

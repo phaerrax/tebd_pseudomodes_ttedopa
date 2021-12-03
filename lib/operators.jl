@@ -3,13 +3,9 @@ using ITensors
 # Hamiltoniani locali
 function Hlocal(s::Index)
   if SiteType("S=1/2") ∈ sitetypes(s)
-    h = op("σz", s)
+    h = 0.5op("σz", s)
   elseif SiteType("Osc") ∈ sitetypes(s)
     h = op("N", s)
-  elseif SiteType("vecS=1/2") ∈ sitetypes(s)
-    h = op("σz:Id", s) - op("Id:σz", s)
-  elseif SiteType("vecOsc") ∈ sitetypes(s)
-    h = op("N:Id", s) - op("Id:N", s)
   else
     throw(DomainError(s, "SiteType non riconosciuto."))
   end
@@ -35,28 +31,35 @@ function Hinteraction(s1::Index, s2::Index)
 end
 
 # Lindblad locali
-function Llocal(s::Index)
+function ℓlocal(s::Index)
   if SiteType("vecS=1/2") ∈ sitetypes(s)
-    L = im * (op("σz:Id", s) - op("Id:σz", s))
+    ℓ = 0.5im * (op("σz:Id", s) - op("Id:σz", s))
   elseif SiteType("vecOsc") ∈ sitetypes(s)
-    L = im * (op("N:Id", s) - op("Id:N", s))
+    ℓ = im * (op("N:Id", s) - op("Id:N", s))
   else
     throw(DomainError(s, "SiteType non riconosciuto."))
   end
-  return L
+  return ℓ
 end
 
 # Lindblad di interazione
-function Linteraction(s1::Index, s2::Index)
-  if SiteType("vecS=1/2") ∈ sitetypes(s1) && SiteType("vecS=1/2") ∈ sitetypes(s2)
-    L = -0.5im * (op("σ-:Id", s1) * op("σ+:Id", s2) +
+function ℓinteraction(s1::Index, s2::Index)
+  if SiteType("vecS=1/2") ∈ sitetypes(s1) &&
+     SiteType("vecS=1/2") ∈ sitetypes(s2)
+    ℓ = -0.5im * (op("σ-:Id", s1) * op("σ+:Id", s2) +
                   op("σ+:Id", s1) * op("σ-:Id", s2) -
                   op("Id:σ-", s1) * op("Id:σ+", s2) -
                   op("Id:σ+", s1) * op("Id:σ-", s2))
-  elseif SiteType("vecOsc") ∈ sitetypes(s1) && SiteType("vecS=1/2") ∈ sitetypes(s2)
-  elseif SiteType("vecS=1/2") ∈ sitetypes(s1) && SiteType("vecOsc") ∈ sitetypes(s2)
+  elseif SiteType("vecOsc") ∈ sitetypes(s1) &&
+         SiteType("vecS=1/2") ∈ sitetypes(s2)
+    ℓ = im * (op("asum:Id", s1) * op("σx:Id", s2) -
+              op("Id:asum", s1) * op("Id:σx", s2))
+  elseif SiteType("vecS=1/2") ∈ sitetypes(s1) &&
+         SiteType("vecOsc") ∈ sitetypes(s2)
+    ℓ = im * (op("σx:Id", s1) * op("asum:Id", s2) -
+              op("Id:σx", s1) * op("Id:asum", s2))
   else
-    throw(DomainError(s, "SiteType non riconosciuto."))
+    throw(DomainError((s1, s2), "SiteType non riconosciuti."))
   end
-  return L
+  return ℓ
 end
