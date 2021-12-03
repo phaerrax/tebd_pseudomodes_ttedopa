@@ -13,6 +13,7 @@ lib_path = root_path * "/lib"
 include(lib_path * "/utils.jl")
 include(lib_path * "/plotting.jl")
 include(lib_path * "/spin_chain_space.jl")
+include(lib_path * "/operators.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -40,28 +41,6 @@ let
   bond_dimensions_super = []
   chain_levels_super = []
 
-  # Definizione degli operatori nell'equazione di Lindblad
-  # ======================================================
-  # Molti operatori sono già definiti in spin_chain_space.jl: rimangono quelli
-  # particolari per questo sistema, che sono specifici di questo sistema e
-  # perciò non ha senso definire nel file comune. Essi sono l'operatore per
-  # la coppia (1,2)
-  function ITensors.op(::OpName"expℓ_sx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
-    L = ε * op("H1loc", s1) * op("Id:Id", s2) +
-        0.5ε * op("Id:Id", s1) * op("H1loc", s2) +
-        op("HspinInt", s1, s2) +
-        ξ * op("damping", s1) * op("Id:Id", s2)
-    return exp(t * L)
-  end
-  # e quello per la coppia (n-1,n)
-  function ITensors.op(::OpName"expℓ_dx", ::SiteType"vecS=1/2", s1::Index, s2::Index; t::Number, ε::Number, ξ::Number)
-    L = 0.5ε * op("H1loc", s1) * op("Id:Id", s2) +
-        ε * op("Id:Id", s1) * op("H1loc", s2) +
-        op("HspinInt", s1, s2) +
-        ξ * op("Id:Id", s1) * op("damping", s2)
-    return exp(t * L)
-  end
-
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
     max_err = parameters["MP_compression_error"]
@@ -80,26 +59,41 @@ let
 
     # Costruzione della catena
     # ========================
-    n_sites = parameters["number_of_spin_sites"] # per ora deve essere un numero pari
+    n_spin_sites = parameters["number_of_spin_sites"] # per ora deve essere un numero pari
     # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
-    sites = siteinds("vecS=1/2", n_sites)
+    sites = siteinds("vecS=1/2", n_spin_sites)
 
     # Stati di singola eccitazione
-    single_ex_states = [single_ex_state(sites, j) for j = 1:n_sites]
+    single_ex_states = [single_ex_state(sites, j) for j = 1:n_spin_sites]
 
     # Costruzione dell'operatore di evoluzione
     # ========================================
+    localcf = repeat([ε], n_spin_sites)
+    localcf[begin] *= 2
+    localcf[end] *= 2
+    interactioncf = repeat([1], n_spin_sites-1)
+    # Il j° elemento qui è il coefficiente del termine (j,j+1).
+
+    ℓlist = ITensor[]
+    for j ∈ 1:length(sites)-1
+      s1 = sites[j]
+      s2 = sites[j+1]
+      ℓ = 0.5localcf[j] * ℓlocal(s1) * op("Id", s2) +
+          0.5localcf[j+1] * op("Id", s1) * ℓlocal(s2) +
+          interactioncf[j] * ℓinteraction(s1, s2)
+      push!(ℓlist, ℓ)
+    end
+    # Aggiungo agli estremi della catena gli operatori di dissipazione
     ξL = T==0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
     ξR = κ
-
+    ℓlist[begin] += ξL * op("Damping", sites[begin]) * op("Id", sites[begin+1])
+    ℓlist[end] += ξR * op("Id", sites[end-1]) * op("Damping", sites[end])
+    #
     function links_odd(τ)
-      return [op("expℓ_sx", sites[1], sites[2]; t=τ, ε=ε, ξ=ξL);
-              [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε) for j = 3:2:n_sites-3];
-              op("expℓ_dx", sites[n_sites-1], sites[n_sites]; t=τ, ε=ε, ξ=ξR)]
+      return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
     end
     function links_even(τ)
-      return [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε)
-              for j = 2:2:n_sites-2]
+      return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
     end
     #
     evo = evolution_operator(links_odd,
@@ -117,7 +111,7 @@ let
     # dell'operatore numero della catena di spin, vale a dire calcolo
     # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
     # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [level_subspace_proj(sites, n) for n=0:n_sites]
+    num_eigenspace_projs = [level_subspace_proj(sites, n) for n=0:n_spin_sites]
 
     # Simulazione
     # ===========
@@ -157,19 +151,19 @@ let
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => time_step_list[1:skip_steps:end])
     tmp_list = hcat(occ_n...)
-    for (j, name) in enumerate([Symbol("occ_n_spin$n") for n = 1:n_sites])
+    for (j, name) in enumerate([Symbol("occ_n_spin$n") for n = 1:n_spin_sites])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(spin_current...)
-    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_sites-1])
+    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_spin_sites-1])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_sites])
+    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(bond_dimensions...)
-    for (j, name) in enumerate([Symbol("bond_dim$n") for n = 1:n_sites-1])
+    for (j, name) in enumerate([Symbol("bond_dim$n") for n = 1:n_spin_sites-1])
       push!(dict, name => tmp_list[j,:])
     end
     table = DataFrame(dict)

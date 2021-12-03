@@ -10,6 +10,7 @@ lib_path = root_path * "/lib"
 include(lib_path * "/utils.jl")
 include(lib_path * "/plotting.jl")
 include(lib_path * "/spin_chain_space.jl")
+include(lib_path * "/operators.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin isolata,
 # usando le tecniche dei MPS ed MPO.
@@ -53,27 +54,32 @@ let
 
     # Costruzione dell'operatore di evoluzione
     # ========================================
-    # Ricorda che gli estremi della catena vanno trattati a parte.
-    site_energies = [2ε; repeat([ε], n_sites-2); 2ε]
     # L'Hamiltoniano dei singoli siti è moltiplicato per 0.5, dato che ogni
     # termine essere diviso tra i due hⱼ,ⱼ₊₁ che coinvolgono il sito; i 2ε
     # ai capi "annullano" questo fattore (che per i siti agli estremi non
     # deve esserci).
-    H_list = ITensor[]
-    for j = 1:n_sites-1
+    localcf = repeat([ε], n_sites)
+    localcf[begin] *= 2
+    localcf[end] *= 2
+    # Idem ma per i termini di interazione, a due siti; il j° elemento è
+    # il coefficiente del termine (j,j+1).
+    interactioncf = repeat([1], n_sites-1)
+
+    hlist = ITensor[]
+    for j ∈ 1:length(sites)-1
       s1 = sites[j]
       s2 = sites[j+1]
-      h_loc = 0.5op("SpinLoc", s1, s2;
-                    ε1=site_energies[j], ε2=site_energies[j+1]) +
-              op("SpinInt", s1, s2)
-      push!(H_list, h_loc)
+      h = 0.5localcf[j] * Hlocal(s1) * op("Id", s2) +
+          0.5localcf[j+1] * op("Id", s1) * Hlocal(s2) +
+          interactioncf[j] * Hinteraction(s1, s2)
+      push!(hlist, h)
     end
 
     function links_odd(τ)
-      return [(exp(-im * τ * h)) for h in H_list[1:2:end]]
+      return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
     end
     function links_even(τ)
-      return [(exp(-im * τ * h)) for h in H_list[2:2:end]]
+      return [(exp(-im * τ * h)) for h in hlist[2:2:end]]
     end
     #
     evo = evolution_operator(links_odd,

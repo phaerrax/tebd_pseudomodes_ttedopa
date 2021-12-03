@@ -14,6 +14,7 @@ include(lib_path * "/utils.jl")
 include(lib_path * "/plotting.jl")
 include(lib_path * "/spin_chain_space.jl")
 include(lib_path * "/harmonic_oscillator_space.jl")
+include(lib_path * "/operators.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -49,28 +50,28 @@ let
   # ==============
   # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  n_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
+  n_spin_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
   osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
-  if allequal(n_sites_list) && allequal(osc_dim_list)
+  if allequal(n_spin_sites_list) && allequal(osc_dim_list)
     preload = true
-    n_sites = first(n_sites_list)
+    n_spin_sites = first(n_spin_sites_list)
     osc_dim = first(osc_dim_list)
 
-    spin_range = 1 .+ (1:n_sites)
+    spin_range = 1 .+ (1:n_spin_sites)
 
     sites = [siteinds("vecOsc", 1; dim=osc_dim);
-             siteinds("vecS=1/2", n_sites);
+             siteinds("vecS=1/2", n_spin_sites);
              siteinds("vecOsc", 1; dim=osc_dim)]
 
     single_ex_states = [embed_slice(sites,
                                     spin_range,
                                     single_ex_state(sites[spin_range], k))
-                        for k = 1:n_sites]
+                        for k = 1:n_spin_sites]
     # - i numeri di occupazione: per gli spin della catena si prende il prodotto
     #   interno con gli elementi di single_ex_states già definiti; per gli
     #   oscillatori, invece, uso
-    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_sites+1)])
-    osc_num_dx = MPS(sites, [repeat(["vecId"], n_sites+1); "vecN"])
+    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
+    osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
 
     occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
 
@@ -88,7 +89,7 @@ let
     num_eigenspace_projs = [embed_slice(sites,
                                         spin_range,
                                         level_subspace_proj(sites[spin_range], n))
-                            for n=0:n_sites]
+                            for n=0:n_spin_sites]
 
     # - l'occupazione dei livelli degli oscillatori
     osc_levels_projs_left = [embed_slice(sites,
@@ -96,7 +97,7 @@ let
                                          osc_levels_proj(sites[1], n))
                              for n=0:osc_dim-1]
     osc_levels_projs_right = [embed_slice(sites,
-                                          n_sites+2:n_sites+2,
+                                          n_spin_sites+2:n_spin_sites+2,
                                           osc_levels_proj(sites[end], n))
                               for n=0:osc_dim-1]
 
@@ -132,54 +133,54 @@ let
     # Costruzione della catena
     # ========================
     if !preload
-      n_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
+      n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
       sites = [siteinds("vecOsc", 1; dim=osc_dim);
-               siteinds("vecS=1/2", n_sites);
+               siteinds("vecS=1/2", n_spin_sites);
                siteinds("vecOsc", 1; dim=osc_dim)]
 
       single_ex_states = [chain(MPS(sites[1:1], "vecId"),
                                 single_ex_state(sites[2:end-1], k),
                                 MPS(sites[end:end], "vecId"))
-                          for k = 1:n_sites]
+                          for k = 1:n_spin_sites]
     end
 
     #= Definizione degli operatori nell'equazione di Lindblad
        ======================================================
        I siti del sistema sono numerati come segue:
-       | 1 | 2 | ... | n_sites | n_sites+1 | n_sites+2 |
+       | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
          ↑   │                        │          ↑
          │   └───────────┬────────────┘          │
          │               │                       │
          │        catena di spin                 │
        oscillatore sx                    oscillatore dx
-       (Dato che non so come definire delle funzioni "op" che accettano Index di
-       tipi diversi, vecS=1/2 e vecOsc in questo caso, non posso spostare anche
-       questi due operatori ℓ_sx ed ℓ_dx nei file separati...)
     =#
-    # - operatore per la coppia oscillatore-spin di sinistra
-    sL = sites[1]
-    s1 = sites[2]
-    ℓ_sx = ω * op("H1loc", sL) * op("Id:Id", s1) +
-           0.5ε * op("Id:Id", sL) * op("H1loc", s1) +
-           im*κ * op("asum:Id", sL) * op("σx:Id", s1) +
-           -im*κ* op("Id:asum", sL)  * op("Id:σx", s1) +
-           γₗ * op("damping", sL; ω=ω, T=T) * op("Id:Id", s1)
-    # - e quello per la coppia oscillatore-spin di destra
-    sn = sites[end-1]
-    sR = sites[end]
-    ℓ_dx = 0.5ε * op("H1loc", sn) * op("Id:Id", sR) +
-           ω * op("Id:Id", sn) * op("H1loc", sR) +
-           im*κ * op("σx:Id", sn) * op("asum:Id", sR) +
-           -im*κ * op("Id:σx", sn) * op("Id:asum", sR) +
-           γᵣ * op("Id:Id", sn) * op("damping", sR; ω=ω, T=0)
+    localcf = [ω; repeat([ε], n_spin_sites); ω]
+    localcf[begin] *= 2
+    localcf[end] *= 2
+    # Idem ma per i termini di interazione, a due siti; il j° elemento è
+    # il coefficiente del termine (j,j+1).
+    interactioncf = [κ; repeat([1], n_spin_sites-1); κ]
+
+    ℓlist = ITensor[]
+    for j ∈ 1:length(sites)-1
+      s1 = sites[j]
+      s2 = sites[j+1]
+      ℓ = 0.5localcf[j] * ℓlocal(s1) * op("Id", s2) +
+          0.5localcf[j+1] * op("Id", s1) * ℓlocal(s2) +
+          interactioncf[j] * ℓinteraction(s1, s2)
+      push!(ℓlist, ℓ)
+    end
+    # Aggiungo agli estremi della catena gli operatori di dissipazione
+    ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
+                         op("Id", sites[begin+1])
+    ℓlist[end] += γᵣ * op("Id", sites[end-1]) *
+                       op("Damping", sites[end]; ω=ω, T=0)
     #
     function links_odd(τ)
-      return [exp(τ * ℓ_sx);
-              [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε) for j = 3:2:n_sites];
-              exp(τ * ℓ_dx)]
+      return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
     end
     function links_even(τ)
-      return [op("expHspin", sites[j], sites[j+1]; t=τ, ε=ε) for j = 2:2:n_sites+1]
+      return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
     end
     #
     evo = evolution_operator(links_odd,
@@ -191,8 +192,8 @@ let
     # =======================
     if !preload
       # - i numeri di occupazione
-      osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_sites+1)])
-      osc_num_dx = MPS(sites, [repeat(["vecId"], n_sites+1); "vecN"])
+      osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
+      osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
       occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
 
       # - la corrente di spin
@@ -203,7 +204,7 @@ let
       num_eigenspace_projs = [embed_slice(sites,
                                           spin_range,
                                           level_subspace_proj(sites[spin_range], n))
-                              for n=0:n_sites]
+                              for n=0:n_spin_sites]
 
       # - l'occupazione dei livelli degli oscillatori
       osc_levels_projs_left = [embed_slice(sites,
@@ -211,7 +212,7 @@ let
                                            osc_levels_proj(sites[1], n))
                                for n=0:osc_dim-1]
       osc_levels_projs_right = [embed_slice(sites,
-                                            n_sites+2:n_sites+2,
+                                            n_spin_sites+2:n_spin_sites+2,
                                             osc_levels_proj(sites[end], n))
                                 for n=0:osc_dim-1]
 
@@ -314,12 +315,12 @@ let
     dict = Dict(:time => time_step_list[1:skip_steps:end])
     tmp_list = hcat(occ_n...)
     for (j, name) in enumerate([:occ_n_left;
-                              [Symbol("occ_n_spin$n") for n = 1:n_sites];
+                              [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
                               :occ_n_right])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(spin_current...)
-    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_sites-1])
+    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_spin_sites-1])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(osc_levels_left...)
@@ -327,7 +328,7 @@ let
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_sites])
+    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(osc_levels_right...)
@@ -335,7 +336,7 @@ let
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(bond_dimensions...)
-    len = n_sites + 2
+    len = n_spin_sites + 2
     for (j, name) in enumerate([Symbol("bond_dim$n")
                                 for n ∈ 1:len-1])
       push!(dict, name => tmp_list[j,:])
