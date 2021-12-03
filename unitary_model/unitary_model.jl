@@ -15,6 +15,7 @@ include(lib_path * "/plotting.jl")
 include(lib_path * "/spin_chain_space.jl")
 include(lib_path * "/harmonic_oscillator_space.jl")
 include(lib_path * "/tedopa.jl")
+include(lib_path * "/operators.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -148,101 +149,44 @@ let
 
     # Raccolgo i coefficienti in due array (uno per quelli a sx, l'altro per
     # quelli a dx) per poterli disegnare assieme nei grafici.
-    # I coefficienti κ sono uno in meno degli Ω: aggiungo uno zero all'inizio.
+    # (I coefficienti κ sono uno in meno degli Ω! Per ora pareggio le lunghezze
+    # inserendo uno zero all'inizio dei κ…)
     osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
     osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
 
-    # Per semplicità assumo che n_osc_left, n_osc_right e n_spin_sites siano
-    # TUTTI pari.
-    links_odd = ITensor[]
-    links_even = ITensor[]
-    s1 = sites[1]
-    s2 = sites[2]
-    # Coppia di oscillatori all'estremo sinistro:
-    h = Ωₗ[end]      * op("N", s1) * op("Id", s2) +
-        0.5Ωₗ[end-1] * op("Id", s1) * op("N", s2) +
-        κₗ[end] * op("OscInt", s1, s2)
-    push!(links_odd, exp(-0.5im * τ * h))
-    # Riparto dall'oscillatore #1 della catena a sinistra (è quello attaccato al
-    # sito di spin) e la attraverso verso sinistra, a due a due:
-    for i = 3:2:n_osc_left-1
-      j = n_osc_left - i
-      # (i,i+1) = (3,4), (5,6), …, (N-1,N)
-      # (j,j+1) = (N-3,N-2), (N-5,N-4), …, (1,2)
-      # (I coefficienti Ω e κ seguono una numerazione inversa!)
-      s1 = sites[i]
-      s2 = sites[i+1]
-      h = 0.5Ωₗ[j+1] * op("N", s1) * op("Id", s2) +
-          0.5Ωₗ[j]   * op("Id", s1) * op("N", s2) +
-          κₗ[j] * op("OscInt", s1, s2)
-      push!(links_odd, exp(-0.5im * τ * h))
-    end
-    for i = 2:2:n_osc_left-1
-      j = n_osc_left - i # (vedi sopra)
-      s1 = sites[i]
-      s2 = sites[i+1]
-      h = 0.5Ωₗ[j+1] * op("N", s1) * op("Id", s2) +
-          0.5Ωₗ[j]   * op("Id", s1)  * op("N", s2) +
-          κₗ[j] * op("OscInt", s1, s2)
-      push!(links_even, exp(-im * τ * h))
-    end
-    # La coppia oscillatore-spin di sinistra ricade tra i link pari:
-    so = sites[n_osc_left] # primo oscillatore a sx
-    ss = sites[n_osc_left+1] # primo spin a sx
-    h = 0.5*Ωₗ[1] * op("N", so) * op("Id", ss) +
-        0.25ε     * op("Id", so)  * op("σz", ss) +
-        ηₗ * op("X", so) * op("σx", ss)
-    push!(links_even, exp(-im * τ * h))
-    # Continuo con le coppie (dispari, pari) della catena di spin:
-    for j = 1:2:n_spin_sites-1
-      j += n_osc_left
-      s1 = sites[j]
-      s2 = sites[j+1]
-      h = 0.5ε * op("SpinLoc", s1, s2) + op("SpinInt", s1, s2)
-      push!(links_odd, exp(-0.5im * τ * h))
-    end
-    # e poi con le coppie (pari, dispari):
-    for j = 2:2:n_spin_sites-2
-      j += n_osc_left
-      s1 = sites[j]
-      s2 = sites[j+1]
-      h = 0.5ε * op("SpinLoc", s1, s2) + op("SpinInt", s1, s2)
-      push!(links_even, exp(-im * τ * h))
-    end
-    # La coppia oscillatore-spin di destra ricade anch'essa tra i link pari:
-    ss = sites[n_osc_left+n_spin_sites] # ultimo spin (a dx)
-    so = sites[n_osc_left+n_spin_sites+1] # primo oscillatore a dx
-    h = 0.25ε *    op("σz", ss) * op("Id", so) +
-        0.5Ωᵣ[1] * op("Id", ss) * op("N", so) +
-        ηᵣ * op("σx", ss) * op("X", so)
-    push!(links_even, exp(-im * τ * h))
-    # Continuo con la serie di oscillatori a destra, prima le coppie dispari:
-    for j = 1:2:n_osc_right
-      s1 = sites[n_osc_left + n_spin_sites + j]
-      s2 = sites[n_osc_left + n_spin_sites + j+1]
-      h = 0.5Ωᵣ[j]   * op("N", s1) * op("Id", s2) +
-          0.5Ωᵣ[j+1] * op("Id", s1)  * op("N", s2) +
-          κᵣ[j] * op("OscInt", s1, s2)
-      push!(links_odd, exp(-0.5im * τ * h))
-    end
-    # e poi le coppie pari:
-    for j = 2:2:n_osc_right-1
-      s1 = sites[n_osc_left + n_spin_sites + j]
-      s2 = sites[n_osc_left + n_spin_sites + j+1]
-      h = 0.5Ωᵣ[j]   * op("N", s1) * op("Id", s2) +
-          0.5Ωᵣ[j+1] * op("Id", s1)  * op("N", s2) +
-          κᵣ[j] * op("OscInt", s1, s2)
-      push!(links_even, exp(-im * τ * h))
-    end
-    # Arrivo infine alla coppia di oscillatori più a destra (una coppia dispari):
-    s1 = sites[end-1]
-    s2 = sites[end]
-    h = 0.5Ωᵣ[end-1] * op("N", s1) * op("Id", s2) +
-        Ωᵣ[end]      * op("Id", s1)  * op("N", s2) +
-        κᵣ[end] * op("OscInt", s1, s2)
-    push!(links_odd, exp(-0.5im * τ * h))
+    # Il seguente vettore contiene i coefficienti dei termini di singolo sito
+    # dell'Hamiltoniano: moltiplico gli estremi per 2 in modo da compensare il
+    # fattore 0.5 che si prende ciascun termine locale di H, dato che deve
+    # essere condiviso tra due operatori (uno della serie pari, uno della
+    # serie dispari).
+    localcf = [reverse(Ωₗ); repeat([ε], n_spin_sites); Ωᵣ]
+    localcf[begin] *= 2
+    localcf[end] *= 2
+    # Idem ma per i termini di interazione, a due siti; il j° elemento è
+    # il coefficiente del termine (j,j+1).
+    interactioncf = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1); ηᵣ; κᵣ]
 
-    evo = [links_odd; links_even; links_odd]
+    hlist = ITensor[]
+    for j ∈ 1:length(sites)-1
+      s1 = sites[j]
+      s2 = sites[j+1]
+      h = 0.5localcf[j] * Hlocal(s1) * op("Id", s2) +
+          0.5localcf[j+1] * op("Id", s1) * Hlocal(s2) +
+          interactioncf[j] * Hinteraction(s1, s2)
+      push!(hlist, h)
+    end
+
+    function links_odd(τ)
+      return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
+    end
+    function links_even(τ)
+      return [(exp(-im * τ * h)) for h in hlist[2:2:end]]
+    end
+    #
+    evo = evolution_operator(links_odd,
+                             links_even,
+                             τ,
+                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
