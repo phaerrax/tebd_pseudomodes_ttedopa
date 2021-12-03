@@ -54,27 +54,10 @@ let
 
     # Costruzione dell'operatore di evoluzione
     # ========================================
-    # L'Hamiltoniano dei singoli siti è moltiplicato per 0.5, dato che ogni
-    # termine essere diviso tra i due hⱼ,ⱼ₊₁ che coinvolgono il sito; i 2ε
-    # ai capi "annullano" questo fattore (che per i siti agli estremi non
-    # deve esserci).
-    localcf = repeat([ε], n_sites)
-    localcf[begin] *= 2
-    localcf[end] *= 2
-    # Idem ma per i termini di interazione, a due siti; il j° elemento è
-    # il coefficiente del termine (j,j+1).
-    interactioncf = repeat([1], n_sites-1)
-
-    hlist = ITensor[]
-    for j ∈ 1:length(sites)-1
-      s1 = sites[j]
-      s2 = sites[j+1]
-      h = 0.5localcf[j] * Hlocal(s1) * op("Id", s2) +
-          0.5localcf[j+1] * op("Id", s1) * Hlocal(s2) +
-          interactioncf[j] * Hinteraction(s1, s2)
-      push!(hlist, h)
-    end
-
+    localcfs = repeat([ε], n_sites)
+    interactioncfs = repeat([1], n_sites-1)
+    hlist = twositeoperators(sites, localcfs, interactioncfs)
+    #
     function links_odd(τ)
       return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
     end

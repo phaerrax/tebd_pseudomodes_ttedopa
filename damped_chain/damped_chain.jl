@@ -68,21 +68,9 @@ let
 
     # Costruzione dell'operatore di evoluzione
     # ========================================
-    localcf = repeat([ε], n_spin_sites)
-    localcf[begin] *= 2
-    localcf[end] *= 2
-    interactioncf = repeat([1], n_spin_sites-1)
-    # Il j° elemento qui è il coefficiente del termine (j,j+1).
-
-    ℓlist = ITensor[]
-    for j ∈ 1:length(sites)-1
-      s1 = sites[j]
-      s2 = sites[j+1]
-      ℓ = 0.5localcf[j] * ℓlocal(s1) * op("Id", s2) +
-          0.5localcf[j+1] * op("Id", s1) * ℓlocal(s2) +
-          interactioncf[j] * ℓinteraction(s1, s2)
-      push!(ℓlist, ℓ)
-    end
+    localcfs = repeat([ε], n_spin_sites)
+    interactioncfs = repeat([1], n_spin_sites-1)
+    ℓlist = twositeoperators(localcfs, interactioncfs, sites)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
     ξL = T==0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
     ξR = κ

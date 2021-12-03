@@ -1,5 +1,43 @@
 using ITensors
 
+# Costruzione della lista di operatori 2-locali
+function twositeoperators(sites::Vector{Index{Int64}},
+                          localcfs::Vector{<:Real},
+                          interactioncfs::Vector{<:Real})
+  # Restituisce la lista di termini (che dovranno essere poi esponenziati nel
+  # modo consono alla simulazione) dell'Hamiltoniano o del “Lindbladiano” che
+  # agiscono sulle coppie di siti adiacenti della catena.
+  # L'elemento list[j] è l'operatore hⱼ,ⱼ₊₁ (o ℓⱼ,ⱼ₊₁, a seconda della notazione)
+  #
+  # Argomenti
+  # ---------
+  # · `sites::Vector{Index}`: un vettore di N elementi, contenente gli Index
+  #   che rappresentano i siti del sistema;
+  # · `localcfs::Vector{Index}`: un vettore di N elementi contenente i
+  #   coefficienti che moltiplicano i termini locali dell'Hamiltoniano o del
+  #   Lindbladiano
+  # · `interactioncfs::Vector{Index}`: un vettore di N-1 elementi contenente i
+  #   coefficienti che moltiplicano i termini di interazione tra siti adiacenti,
+  #   con la convenzione che l'elemento j è riferito al termine hⱼ,ⱼ₊₁/ℓⱼ,ⱼ₊₁.
+  list = ITensor[]
+  localcfs[begin] *= 2
+  localcfs[end] *= 2
+  # Anziché dividere per casi il ciclo che segue distinguendo i siti ai lati
+  # della catena (che non devono avere il fattore 0.5 scritto sotto), moltiplico
+  # qui per 2 i rispettivi coefficienti degli operatori locali.
+  for j ∈ 1:length(sites)-1
+    s1 = sites[j]
+    s2 = sites[j+1]
+    h = 0.5localcfs[j] * Hlocal(s1) * op("Id", s2) +
+        0.5localcfs[j+1] * op("Id", s1) * Hlocal(s2) +
+        interactioncfs[j] * Hinteraction(s1, s2)
+    push!(list, h)
+  end
+  return list
+end
+
+# Hamiltoniani
+# ============
 # Hamiltoniani locali
 function Hlocal(s::Index)
   if SiteType("S=1/2") ∈ sitetypes(s)
@@ -30,6 +68,8 @@ function Hinteraction(s1::Index, s2::Index)
   return h
 end
 
+# Lindblad
+# ========
 # Lindblad locali
 function ℓlocal(s::Index)
   if SiteType("vecS=1/2") ∈ sitetypes(s)

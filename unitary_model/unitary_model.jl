@@ -154,28 +154,10 @@ let
     osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
     osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
 
-    # Il seguente vettore contiene i coefficienti dei termini di singolo sito
-    # dell'Hamiltoniano: moltiplico gli estremi per 2 in modo da compensare il
-    # fattore 0.5 che si prende ciascun termine locale di H, dato che deve
-    # essere condiviso tra due operatori (uno della serie pari, uno della
-    # serie dispari).
-    localcf = [reverse(Ωₗ); repeat([ε], n_spin_sites); Ωᵣ]
-    localcf[begin] *= 2
-    localcf[end] *= 2
-    # Idem ma per i termini di interazione, a due siti; il j° elemento è
-    # il coefficiente del termine (j,j+1).
-    interactioncf = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1); ηᵣ; κᵣ]
-
-    hlist = ITensor[]
-    for j ∈ 1:length(sites)-1
-      s1 = sites[j]
-      s2 = sites[j+1]
-      h = 0.5localcf[j] * Hlocal(s1) * op("Id", s2) +
-          0.5localcf[j+1] * op("Id", s1) * Hlocal(s2) +
-          interactioncf[j] * Hinteraction(s1, s2)
-      push!(hlist, h)
-    end
-
+    localcfs = [reverse(Ωₗ); repeat([ε], n_spin_sites); Ωᵣ]
+    interactioncfs = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1); ηᵣ; κᵣ]
+    hlist = twositeoperators(localcfs, interactioncfs, sites)
+    #
     function links_odd(τ)
       return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
     end

@@ -154,22 +154,9 @@ let
          │        catena di spin                 │
        oscillatore sx                    oscillatore dx
     =#
-    localcf = [ω; repeat([ε], n_spin_sites); ω]
-    localcf[begin] *= 2
-    localcf[end] *= 2
-    # Idem ma per i termini di interazione, a due siti; il j° elemento è
-    # il coefficiente del termine (j,j+1).
-    interactioncf = [κ; repeat([1], n_spin_sites-1); κ]
-
-    ℓlist = ITensor[]
-    for j ∈ 1:length(sites)-1
-      s1 = sites[j]
-      s2 = sites[j+1]
-      ℓ = 0.5localcf[j] * ℓlocal(s1) * op("Id", s2) +
-          0.5localcf[j+1] * op("Id", s1) * ℓlocal(s2) +
-          interactioncf[j] * ℓinteraction(s1, s2)
-      push!(ℓlist, ℓ)
-    end
+    localcfs = [ω; repeat([ε], n_spin_sites); ω]
+    interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
+    ℓlist = twositeoperators(localcfs, interactioncfs, sites)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
     ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
                          op("Id", sites[begin+1])
