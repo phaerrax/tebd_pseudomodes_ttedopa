@@ -3,6 +3,7 @@
 import sys
 import getopt
 import json
+import csv
 from itertools import repeat
 import numpy as np
 import matplotlib.pyplot as plt
@@ -32,7 +33,7 @@ l = 1
 
 time_step = parameters["simulation_time_step"]
 end_time = parameters["simulation_end_time"]
-time_slices = np.arange(0, end_time, time_step)
+time_slices = np.arange(0, end_time + time_step, time_step)
 skip_steps = parameters["skip_steps"]
 
 up = np.array([1, 0])
@@ -115,3 +116,13 @@ ax.set_ylabel("$\chi_j$")
 ax.grid(True)
 
 plt.show()
+
+with open("python_output.csv", "w", newline='\n') as csvfile:
+    output_writer = csv.writer(csvfile, delimiter=',')
+    output_writer.writerow(["time"] + \
+                           ["occ_n"+str(j) for j in range(1,n_spin_sites+1)] + \
+                           ["rank"+str(j) for j in range(1,n_spin_sites)])
+    for j in range(len(time_slices)):
+        output_writer.writerow([str(time_slices[j])] + \
+                               [str(n) for n in occ_n[j]] + \
+                               [str(r) for r in ranks[j]])
