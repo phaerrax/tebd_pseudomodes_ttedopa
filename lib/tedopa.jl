@@ -21,10 +21,28 @@ function thermalisedJ(J::Function,
   return f * J(ω)
 end
 
-function chainmap_coefficients(J::Function,
-                               support::Tuple{Real, Real},
-                               L::Int;
-                               Nquad::Int)
+function unitweightfunction(J::Function, support::Tuple{Real,Real}, g::Real)
+  # Costruisce la misura su [0,1] per calcolare i polinomi ortogonali
+  # a partire dalla # funzione spettrale, imitando il codice di py-tedopa.
+  rescaledsupport = 1/g .* support
+
+  function w(x)
+    if x < first(rescaledsupport) || x > last(rescaledsupport)
+      println("$x ∉ $rescaledsupport")
+      throw(DomainError)
+    else
+      return g/π * J(g * x)
+    end
+  end
+
+  return w, rescaledsupport
+end
+
+function chainmapcoefficients(J::Function,
+                              support::Tuple{Real,Real},
+                              g::Real,
+                              L::Int;
+                              kwargs...)
   #=
   Calcola i coefficienti dell'Hamiltoniana ottenuta dalla "chain map", a
   partire da una data funzione spettrale.
@@ -34,8 +52,9 @@ function chainmap_coefficients(J::Function,
   · `J::Function`: una funzione dall'intervallo specificato in `support` a 
     valori non negativi.
 
-  · `support::Tuple{Real, Real}`: una coppia di numeri reali a indicare gli
-    estremi, in ordine, dell'intervallo in cui è definita la funzione J.
+  · `support::Tuple{Real,Real}`: determina il supporto della funzione
+
+  · `g::Real`: fattore di riscalamento per J
 
   · `L::Int`: la lunghezza della serie di oscillatori che si desidera
     costruire, nel senso del numero di oscillatori presenti.
@@ -43,18 +62,9 @@ function chainmap_coefficients(J::Function,
   · `Nquad::Int`: un parametro da passare ad OrthoPoly, che specifica il numero
     di nodi usati nel metodo delle quadrature per calcolare gli integrali. Per
     modificare la precisione dei risultati, modificare questo parametro.
-  =#
-  # Calcolo il coefficiente per l'operatore di interazione spin-oscillatore.
-  if support[1] < 0 && support[2] > 0
-    η = first(quadgk(J, support[1], 0, support[2]))
-    # La documentazione di quadgk suggerisce di usare questa forma nel caso
-    # in cui l'integranda sia singolare in qualche punto (in questo caso in 0).
-  else
-    η = first(quadgk(J, support[1], support[2]))
-  end
-  #=
-  I valori aₙ e bₙ sono i coefficienti nella formula di ricorsione
-  x πₙ(x) = πₙ₊₁(x) + aₙ πₙ(x) + bₙ πₙ₋₁(x)
+
+  I valori αₙ e βₙ sono i coefficienti nella formula di ricorsione
+  x πₙ(x) = πₙ₊₁(x) + αₙ πₙ(x) + βₙ πₙ₋₁(x)
   dove {πₙ}ₙ, con n ∈ ℕ è la sequenza di polinomi ortogonali monici
   associata alla funzione J; π₋₁ è il polinomio nullo.
   
@@ -67,9 +77,13 @@ function chainmap_coefficients(J::Function,
   Ωᵢ = αᵢ            per i∈{1,…,L},
   κᵢ = sqrt(βᵢ₊₁)    per i∈{1,…,L-1}.
   =#
-  measure = PolyChaos.Measure("measure", J, support, false, Dict())
-  poly = PolyChaos.OrthoPoly("poly", L, measure; Nquad=Nquad)
-  a = coeffs(poly)[:,1]
-  b = coeffs(poly)[:,2]
-  return a[1:L], sqrt.(b[2:L]), η
+  w, rescaledsupport = unitweightfunction(J, support, g)
+  measure = PolyChaos.Measure("measure", w, rescaledsupport, false, Dict())
+  poly = PolyChaos.OrthoPoly("poly", L, measure; kwargs...)
+  α = coeffs(poly)[:,1]
+  β = coeffs(poly)[:,2]
+  Ω = g .* α
+  κ = g .* sqrt.(β[2:end])
+  η = sqrt(β[1])
+  return Ω, κ, η
 end
