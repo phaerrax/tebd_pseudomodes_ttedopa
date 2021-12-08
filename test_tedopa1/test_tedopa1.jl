@@ -59,7 +59,6 @@ let
     Ω = parameters["ohmic_decay_factor"]
     a = parameters["ohmic_exponent"]
     b = parameters["ohmic_mult_factor"]
-    T = parameters["temperature"]
     ωc = parameters["frequency_cutoff"]
     osc_dim = parameters["oscillator_space_dimension"]
 
@@ -83,51 +82,33 @@ let
        I siti del sistema sono numerati come segue:
        - 1:n_osc_left -> catena di oscillatori a sinistra
        - n_osc_left+1:n_osc_left+n_spin_sites -> catena di spin
-       - n_osc_left+n_spin_sites+1:end -> catena di oscillatori a destra
     =#
     # Calcolo dei coefficienti dalla densità spettrale
     @info "Calcolo dei parametri TEDOPA in corso."
     support = (0, ωc)
     J(ω) = b * ℯ^(-ω/Ω) * (ω/Ω)^a
 
-    #(Ωₗ, κₗ, ηₗ) = chainmapcoefficients(J, support, ωc, n_osc_left; Nquad=nquad)
-    α = parse.(Float64, readlines("alphas.dat"))
-    β = parse.(Float64, readlines("betas.dat"))
-    #(Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(Jzero,
-    #                                     (0, ωc),
-    #                                     n_osc_right;
-    #                                     Nquad=nquad)
-    Ωₗ = ωc .* α[1:n_osc_left]
-    κₗ = ωc .* sqrt.(β[2:n_osc_left])
-    ηₗ = sqrt(β[1])
-    #open("omegas_julia.dat", "w") do f
-    #  for i in Ωₗ
-    #    println(f, i)
-    #  end
-    #end
-    #open("kappas.dat", "w") do f
-    #  for i in κₗ
-    #    println(f, i)
-    #  end
-    #end
-    #print(ηₗ)
+    (Ω, κ, η) = chainmapcoefficients(J, support, ωc, n_osc_left-1; Nquad=nquad)
+    @assert length(Ω) == n_osc_left
+    @assert length(κ) == n_osc_left-1
+    # Mi assicuro di avere il numero giusto di coefficienti (magari per
+    # sbaglio ne faccio generare a PolyChaos uno in più o in meno: in
+    # questo modo mi assicuro che la lunghezza sia quella corretta.)
     
-    # Raccolgo i coefficienti in due array (uno per quelli a sx, l'altro per
-    # quelli a dx) per poterli disegnare assieme nei grafici.
-    # (I coefficienti κ sono uno in meno degli Ω! Per ora pareggio le lunghezze
-    # inserendo uno zero all'inizio dei κ…)
-    osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
-    #osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
+    # Raccolgo i coefficienti in un array per poterli disegnare assieme nei
+    # grafici. (I coefficienti κ sono uno in meno degli Ω! Per ora
+    # pareggio le lunghezze inserendo uno zero all'inizio dei κ…)
+    osc_chain_coefficients_left = [Ω [0; κ]]
 
-    localcfs = [reverse(Ωₗ); repeat([ε], n_spin_sites)]
-    interactioncfs = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1)]
+    localcfs = [reverse(Ω); repeat([ε], n_spin_sites)]
+    interactioncfs = [reverse(κ); η; repeat([1], n_spin_sites-1)]
     hlist = twositeoperators(sites, localcfs, interactioncfs)
     #
     function links_odd(τ)
-      return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
+      return [exp(-im * τ * h) for h in hlist[1:2:end]]
     end
     function links_even(τ)
-      return [(exp(-im * τ * h)) for h in hlist[2:2:end]]
+      return [exp(-im * τ * h) for h in hlist[2:2:end]]
     end
     #
     evo = evolution_operator(links_odd,
@@ -154,17 +135,13 @@ let
     # Gli oscillatori partono tutti dallo stato vuoto
     osc_sx_init_state = MPS(sites[range_osc_left], "0")
     spin_init_state = MPS(sites[range_spins], "X+")
-    current_state = chain(osc_sx_init_state,
-                          spin_init_state)
+    current_state = chain(osc_sx_init_state, spin_init_state)
 
     # Misura della coerenza
     function spincoherence(ψ::MPS)
       # Lo spin si trova sull'ultimo sito del MPS
       orthogonalize!(ψ, length(ψ))
-      A = last(ψ) * prime(last(ψ))
-      # Contraggo gli indici di tipo Link e ottengo la matrice densità
-      (α₁, α₂) = filter(i -> hastags(i, "Link"), inds(A))
-      ρ = matrix(A * delta(α₁, α₂))
+      ρ = matrix(last(ψ) * dag(prime(last(ψ), "Site")))
       return abs(tr(ρ * [0 1; 0 0]))
     end
 
@@ -236,19 +213,14 @@ let
     push!(snapshot_super, snapshot)
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
+  # Grafici
+  # =======
   plot_size = (2, 0.5 + ceil(length(parameter_lists)/2)) .* (600, 400)
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
 
   # Grafico dei numeri di occupazione
-  # ---------------------------------------------
+  # ---------------------------------
   len = size(hcat(occ_n_super[begin]...), 1)
   plt = plot_time_series(occ_n_super,
                          parameter_lists;
@@ -290,41 +262,6 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "bond_dimensions.png")
-
-  #=
-  # Grafico della corrente di spin
-  # ------------------------------
-  len = size(hcat(spin_current_super[begin]...), 1)
-  plt = plot_time_series(spin_current_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["($j,$(j+1))" for j=1:len],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"j_{k,k+1}",
-                         plot_title="Corrente di spin",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "spin_current.png")
- 
-  # Grafico dell'occupazione degli autospazi di N della catena di spin
-  # ------------------------------------------------------------------
-  # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
-  # restanti valori.
-  len = size(hcat(spin_chain_levels_super[begin]...), 1) - 1
-  plt = plot_time_series(spin_chain_levels_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[string.(0:len-1); "total"],
-                         linestyles=[repeat([:solid], len); :dash],
-                         x_label=L"\lambda\, t",
-                         y_label=L"n",
-                         plot_title="Occupazione degli autospazi "
-                         * "della catena di spin",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "chain_levels.png")
-  =#
  
   # Grafico dei coefficienti della chain map
   # ----------------------------------------
@@ -335,10 +272,10 @@ let
                         x_label=L"i",
                         y_label="Coefficiente",
                         plot_title="Coefficienti della catena di "*
-                                   "oscillatori (sx)",
+                                   "oscillatori",
                         plot_size=plot_size
                         )
-  savefig(plt, "osc_left_coefficients.png")
+  savefig(plt, "osc_coefficients.png")
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------

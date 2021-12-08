@@ -1,0 +1,19 @@
+{
+  "spin_excitation_energy": 1000,
+  "spin_interaction_energy": 1,
+  "ohmic_decay_factor": 150,
+  "ohmic_exponent": 2,
+  "ohmic_mult_factor": 75,
+  "number_of_spin_sites": 1,
+  "number_of_oscillators_left": 150,
+  "number_of_oscillators_right": 0,
+  "oscillator_space_dimension": 8,
+  "frequency_cutoff": 2500,
+  "simulation_end_time": 0.2,
+  "simulation_time_step": 0.001,
+  "skip_steps": 2,
+  "MP_maximum_bond_dimension": 30,
+  "MP_compression_error": 1e-8,
+  "TS_expansion_order": 2,
+  "PolyChaos_nquad": 600
+}
