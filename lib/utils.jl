@@ -7,6 +7,16 @@ using ITensors
    il loro codice ad ogni nuovo file.
 =#
 
+function chop(x::Real; tolerance=1e-10)
+  # Imitazione della funzione "Chop" di Mathematica. Tronca l'argomento a zero
+  # se è al di sotto di una data soglia.
+  return abs(x) > tolerance ? x : zero(x)
+end
+
+function chop(x::Complex; tolerance=1e-10)
+  return Complex(chop(real(x)), chop(imag(x)))
+end
+
 # Manipolazione dei dati di oggetti di ITensors
 # =============================================
 function sitetypes(s::Index)
