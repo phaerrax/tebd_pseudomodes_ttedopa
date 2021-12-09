@@ -29,12 +29,10 @@ let
     cd(ARGS[1])
   end
 
-  # Leggo il file con i risultati di Python
-  pythoncsv = CSV.File(root_path * "/confronto_mpnum/python_output.csv")
-
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
+  occ_n_comp_super = []
   snapshot_comp_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
@@ -43,6 +41,7 @@ let
     max_dim = parameters["MP_maximum_bond_dimension"]
 
     # - parametri fisici
+    n_sites = parameters["number_of_spin_sites"] 
     ε = parameters["spin_excitation_energy"]
     # λ = 1
 
@@ -50,9 +49,13 @@ let
     time_step = parameters["simulation_time_step"]
     time_step_list = construct_step_list(parameters)
 
+    # Leggo il file con i risultati di Python
+    pythoncsv = CSV.File(replace(parameters["filename"],
+                                 ".json" => "_python.csv"))
+    occ_n_py = hcat([pythoncsv["occ_n$N"] for N∈1:n_sites]...)
+
     # Costruzione della catena
     # ========================
-    n_sites = parameters["number_of_spin_sites"] 
     # L'elemento site[i] è l'Index che si riferisce al sito i-esimo
     sites = siteinds("S=1/2", n_sites)
 
@@ -81,16 +84,20 @@ let
                                      parameters["chain_initial_state"])
 
     # Misuro le osservabili sullo stato iniziale
-    occ_n = [expect(current_state, "N")]
+    nums = expect(current_state, "N")
+    occ_n = [nums]
+    occ_n_comp = [nums - occ_n_py[1,:]]
 
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
-    for _ in time_step_list[2:end]
+    for (j, _) in zip(2:length(time_step_list), time_step_list[2:end])
       current_state = apply(evo,
                             current_state;
                             cutoff=max_err,
                             maxdim=max_dim)
-      push!(occ_n, expect(current_state, "N"))
+      nums = expect(current_state, "N")
+      push!(occ_n, nums)
+      push!(occ_n_comp, nums - occ_n_py[j,:])
       next!(progress)
     end
 
@@ -100,8 +107,8 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
+    push!(occ_n_comp_super, occ_n_comp)
     push!(snapshot_comp_super, [snapshot_jl snapshot_py])
-
   end
 
   # Grafici
@@ -132,26 +139,18 @@ let
 
   # Confronto con Python dell'andamento del primo sito
   # --------------------------------------------------
-  data_super = []
-  for occ_n ∈ occ_n_super
-    data = []
-    for (row, py_n) ∈ zip(occ_n, pythoncsv["occ_n1"])
-      push!(data, row[begin] - py_n)
-    end
-    push!(data_super, data)
-  end
-
-  plt = plot_time_series(data_super,
+  display = [1,5,10]
+  plt = plot_time_series(occ_n_comp_super,
                          parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["ITensors - mpnum"],
-                         linestyles=[:solid],
+                         displayed_sites=display,
+                         labels=string.(display),
+                         linestyles=repeat([:solid], length(display)),
                          x_label=L"\lambda\, t",
-                         y_label=L"\langle n_1\rangle",
+                         y_label=L"\langle n_i\rangle",
                          plot_title="Discrepanza tra ITensors e mpnum",
                          plot_size=plot_size
                         )
-  savefig(plt, "occ_n1_confronto.png")
+  savefig(plt, "occ_n_confronto.png")
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------

@@ -13,16 +13,31 @@ from scipy.linalg import expm
 from tqdm import tqdm
 
 # Comincio leggendo i parametri dal file JSON (che usa anche Julia)
+def usage():
+    print("Opzioni disponibili:\n\
+  -p, --parameters=<file> specifica il file da cui leggere i parametri\n\
+  -q, --quiet             non mostrare i grafici (opzionale)")
+
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "p:", ["--parameters="])
+    opts, args = getopt.getopt(sys.argv[1:], "qp:", ["--quiet","--parameters="])
 except getopt.error as err:
-    print(str(err))
+    print(err)
+    usage()
     sys.exit(2)
+
+suppress_plots = False
+if "-p" not in [o for (o, a) in opts] and\
+        "--parameters" not in [o for (o, a) in opts]:
+            print("L'opzione -p/--parameters è obbligatoria.")
+            sys.exit(2)
 
 for opt, arg in opts:
     if opt in ("-p", "--parameters"):
-        with open(arg, "r") as pfile:
+        input_filename = arg
+        with open(input_filename, "r") as pfile:
             parameters = json.loads(pfile.read())
+    if opt in ("-q", "--quiet"):
+        suppress_plots = True
 
 n_spin_sites = parameters["number_of_spin_sites"]
 max_err = parameters["MP_compression_error"]
@@ -34,6 +49,11 @@ l = 1
 time_step = parameters["simulation_time_step"]
 end_time = parameters["simulation_end_time"]
 time_slices = np.arange(0, end_time + time_step, time_step)
+# Quel `+ time_step` mi serve perché la lista includa anche l'istante finale
+# (cioè `end_time`). In questo modo però può anche capitare che la lista vada
+# anche oltre quell'istante, perciò ora la filtro per eliminare eventuali
+# istanti oltre il limite.
+time_slices = list(filter(lambda t: t <= end_time, time_slices))
 skip_steps = parameters["skip_steps"]
 
 up = np.array([1, 0])
@@ -97,27 +117,29 @@ with tqdm(range(1, n_steps)) as progress:
 fig, axes = plt.subplots(nrows = 1, ncols = 2, figsize = (10, 24))
 axes = axes.flatten()
 
-ax = axes[0]
-for j, row in enumerate(np.transpose(occ_n)):
-    label = "i" + str(j + 1)
-    ax.plot(time_slices, row, label=label)
-ax.set_title("Numeri di occupazione dei siti")
-ax.set_xlabel("t")
-ax.legend()
-ax.set_ylabel("$|(s_j,\psi(t))|^2$")
-ax.grid(True)
+if not suppress_plots:
+    ax = axes[0]
+    for j, row in enumerate(np.transpose(occ_n)):
+        label = "i" + str(j + 1)
+        ax.plot(time_slices, row, label=label)
+    ax.set_title("Numeri di occupazione dei siti")
+    ax.set_xlabel("t")
+    ax.legend()
+    ax.set_ylabel("$|(s_j,\psi(t))|^2$")
+    ax.grid(True)
 
-ax = axes[1]
-ax.plot(time_slices, ranks, label="mpnum")
-ax.set_title("Ranghi del MPS")
-ax.set_xlabel("t")
-ax.legend()
-ax.set_ylabel("$\chi_j$")
-ax.grid(True)
+    ax = axes[1]
+    ax.plot(time_slices, ranks, label="mpnum")
+    ax.set_title("Ranghi del MPS")
+    ax.set_xlabel("t")
+    ax.legend()
+    ax.set_ylabel("$\chi_j$")
+    ax.grid(True)
 
-plt.show()
+    plt.show()
 
-with open("python_output.csv", "w", newline='\n') as csvfile:
+output_filename = input_filename.replace(".json", "_python.csv")
+with open(output_filename, "w", newline='\n') as csvfile:
     output_writer = csv.writer(csvfile, delimiter=',')
     output_writer.writerow(["time"] + \
                            ["occ_n"+str(j) for j in range(1,n_spin_sites+1)] + \
