@@ -28,7 +28,7 @@ function subplot_title(values_dict, keys)
   # Carico il dizionario dei "nomi brevi" per i parametri.
   short_name = JSON.parse(read(f, String))
   close(f)
-  hidden_parameters = ["simulation_end_time", "skip_steps", "filename"]
+  hidden_parameters = ["skip_steps", "filename"]
   return join([short_name[k] * "=" * string(values_dict[k])
                for k in setdiff(keys, hidden_parameters)],
               ", ")
