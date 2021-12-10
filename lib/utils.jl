@@ -7,9 +7,27 @@ using ITensors
    il loro codice ad ogni nuovo file.
 =#
 
+# Entropia (di Von Neumann)
+# =========================
+function entropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
+  # Calcola l'entropia di entanglement della bipartizione (1,…,n)|(n+1,…,N)
+  # del sistema nello stato ψ usando la decomposizione di Schmidt.
+  orthogonalize!(ψ, n)
+  # Decomponi ψ[n] nei suoi valori singolari, trattando il Link tra il sito
+  # n-1 e il sito n e l'indice fisico come "indici di riga"; il Link tra il
+  # sito n e il sito n+1, che rimane, sarà l'"indice di colonna".
+  _, S, _ = svd(ψ[n], (linkind(ψ, n-1), sites[n]))
+  # Calcolo il quadrato dei valori singolari (aka i coefficienti di Schmidt
+  # della bipartizione), e infine da essi l'entropia.
+  sqdiagS = [S[j,j]^2 for j ∈ dim(S, 1)]
+  return -sum(p -> p * log(p), sqdiagS; init=0.0)
+end
+
+# Chop da Mathematica
+# ===================
+# Imitazione della funzione "Chop" di Mathematica. Tronca l'argomento a zero
+# se è al di sotto di una data soglia.
 function chop(x::Real; tolerance=1e-10)
-  # Imitazione della funzione "Chop" di Mathematica. Tronca l'argomento a zero
-  # se è al di sotto di una data soglia.
   return abs(x) > tolerance ? x : zero(x)
 end
 
