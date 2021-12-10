@@ -32,6 +32,7 @@ let
   # lista di parametri fornita.
   occ_n_super = []
   bond_dimensions_super = []
+  entropy_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
@@ -80,6 +81,7 @@ let
     # Misuro le osservabili sullo stato iniziale
     occ_n = [expect(current_state, "N")]
     bond_dimensions = [linkdims(current_state)]
+    S = [[entropy(current_state, sites, j) for j ∈ 2:n_sites-1]]
 
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
@@ -92,6 +94,7 @@ let
       if skip_count % skip_steps == 0
         push!(occ_n, expect(current_state, "N"))
         push!(bond_dimensions, linkdims(current_state))
+        push!(S, [entropy(current_state, sites, j) for j ∈ 2:n_sites-1])
       end
       next!(progress)
       skip_count += 1
@@ -100,6 +103,7 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
     push!(bond_dimensions_super, bond_dimensions)
+    push!(entropy_super, S)
   end
 
   #= Grafici
@@ -147,6 +151,21 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "bond_dimensions.png")
+
+  # Grafico dell'entropia di entanglement
+  # -------------------------------------
+  len = size(hcat(entropy_super[begin]...), 1)
+  plt = plot_time_series(entropy_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=string.(1 .+ 1:len),
+                         linestyles=repeat([:solid], len),
+                         x_label=L"\lambda\, t",
+                         y_label="Entropia di Von Neumann",
+                         plot_title="Entropia di entanglement",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "entropy.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
