@@ -31,6 +31,7 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
+  bond_dimensions_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
@@ -78,6 +79,7 @@ let
 
     # Misuro le osservabili sullo stato iniziale
     occ_n = [expect(current_state, "N")]
+    bond_dimensions = [linkdims(current_state)]
 
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
@@ -89,6 +91,7 @@ let
                             maxdim=max_dim)
       if skip_count % skip_steps == 0
         push!(occ_n, expect(current_state, "N"))
+        push!(bond_dimensions, linkdims(current_state))
       end
       next!(progress)
       skip_count += 1
@@ -96,6 +99,7 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
+    push!(bond_dimensions_super, bond_dimensions)
   end
 
   #= Grafici
@@ -128,6 +132,21 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "occ_n.png")
+
+  # Grafico dei ranghi del MPS
+  # --------------------------
+  len = size(hcat(bond_dimensions_super[begin]...), 1)
+  plt = plot_time_series(bond_dimensions_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=["($j,$(j+1))" for j=1:len],
+                         linestyles=repeat([:solid], len),
+                         x_label=L"\lambda\, t",
+                         y_label=L"\chi_{k,k+1}",
+                         plot_title="Ranghi del MPS",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "bond_dimensions.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
