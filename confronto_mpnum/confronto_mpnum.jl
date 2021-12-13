@@ -34,6 +34,7 @@ let
   occ_n_super = []
   occ_n_comp_super = []
   snapshot_comp_super = []
+  ranks_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
@@ -87,6 +88,7 @@ let
     nums = expect(current_state, "N")
     occ_n = [nums]
     occ_n_comp = [nums - occ_n_py[1,:]]
+    ranks = [linkdims(current_state)]
 
     message = "Simulazione $current_sim_n di $tot_sim_n:"
     progress = Progress(length(time_step_list), 1, message, 30)
@@ -98,6 +100,7 @@ let
       nums = expect(current_state, "N")
       push!(occ_n, nums)
       push!(occ_n_comp, nums - occ_n_py[j,:])
+      push!(ranks, linkdims(current_state))
       next!(progress)
     end
 
@@ -109,6 +112,7 @@ let
     push!(occ_n_super, occ_n)
     push!(occ_n_comp_super, occ_n_comp)
     push!(snapshot_comp_super, [snapshot_jl snapshot_py])
+    push!(ranks_super, ranks)
   end
 
   # Grafici
@@ -151,6 +155,21 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "occ_n_confronto.png")
+
+  # Grafico dei ranghi del MPS
+  # --------------------------
+  len = size(hcat(ranks_super[begin]...), 1)
+  plt = plot_time_series(ranks_super,
+                         parameter_lists;
+                         displayed_sites=nothing,
+                         labels=["($j,$(j+1))" for j=1:len],
+                         linestyles=repeat([:solid], len),
+                         x_label=L"\lambda\, t",
+                         y_label=L"\chi_{k,k+1}",
+                         plot_title="Ranghi del MPS",
+                         plot_size=plot_size
+                        )
+  savefig(plt, "ranks.png")
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------
