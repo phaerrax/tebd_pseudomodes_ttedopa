@@ -213,12 +213,12 @@ let
     # --------------
     # L'oscillatore sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
-    osc_sx_init_state = MPS([state(sites[1], "ThermEq"; ω, T)])
-    osc_dx_init_state = MPS([state(sites[end], "0")])
-    current_state = chain(osc_sx_init_state,
+    current_state = chain(parse_init_state_osc(sites[1],
+                                 parameters["left_oscillator_initial_state"];
+                                 ω=ω, T=T),
                           parse_init_state(sites[2:end-1],
                                            parameters["chain_initial_state"]),
-                          osc_dx_init_state)
+                          parse_init_state_osc(sites[end], "empty"))
 
     # Osservabili sullo stato iniziale
     # --------------------------------

@@ -200,3 +200,28 @@ function osc_levels_proj(site::Index{Int64}, level::Int)
   st = state(site, "$level")
   return MPS([st])
 end
+
+# Scelta dello stato iniziale dell'oscillatore
+# --------------------------------------------
+# Con un'apposita stringa nei parametri è possibile scegliere lo stato da cui
+# far partire l'oscillatore. La seguente funzione traduce la stringa
+# nell'MPS desiderato, in modo case-insensitive. Le opzioni sono:
+# · "thermal": stato di equilibrio termico
+# · "fockN": autostato dell'operatore numero con N quanti di eccitazione
+# · "empty": alias per "fock0"
+function parse_init_state_osc(site::Index{Int64}, statename::String; kwargs...)
+  statename = lowercase(statename)
+  if statename == "thermal"
+    s = state(site, "ThermEq"; kwargs...)
+  elseif occursin(r"^fock", statename)
+    j = parse(Int, replace(statename, "fock" => ""))
+    s = state(site, "$j")
+  elseif statename == "empty"
+    s = state(site, "0")
+  else
+    throw(DomainError(statename,
+                      "Stato non riconosciuto; scegliere tra «empty», «fockN» "*
+                      "oppure «thermal»."))
+  end
+  return MPS([s])
+end
