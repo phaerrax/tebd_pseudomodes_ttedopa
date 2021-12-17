@@ -70,7 +70,7 @@ let
     # ========================================
     localcfs = repeat([ε], n_spin_sites)
     interactioncfs = repeat([1], n_spin_sites-1)
-    ℓlist = twositeoperators(localcfs, interactioncfs, sites)
+    ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
     ξL = T==0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
     ξR = κ

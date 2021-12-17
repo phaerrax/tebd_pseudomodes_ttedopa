@@ -156,7 +156,7 @@ let
     =#
     localcfs = [ω; repeat([ε], n_spin_sites); ω]
     interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
-    ℓlist = twositeoperators(localcfs, interactioncfs, sites)
+    ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
     ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
                          op("Id", sites[begin+1])

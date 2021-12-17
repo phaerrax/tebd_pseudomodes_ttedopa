@@ -156,7 +156,7 @@ let
 
     localcfs = [reverse(Ωₗ); repeat([ε], n_spin_sites); Ωᵣ]
     interactioncfs = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1); ηᵣ; κᵣ]
-    hlist = twositeoperators(localcfs, interactioncfs, sites)
+    hlist = twositeoperators(sites, localcfs, interactioncfs)
     #
     function links_odd(τ)
       return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
