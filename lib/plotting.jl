@@ -232,64 +232,135 @@ function plot_standalone(data_super, parameter_super; labels, linestyles, x_labe
   )
   return group_plot
 end
-#
-function plot_superimposed(data_super, parameter_super; linestyle, x_label, y_label, plot_title, plot_size)
-  #= Disegna un grafico dei dati di un array "_super" al variare del tempo,
-     ottenuti dalle simulazioni associate ai vari insiemi di parametri
-     in `parameter_super`, raggruppando in un unica immagine i grafici
-     relativi alla stessa grandezza.
-     Rispetto a `plot_time_series`, questa funzione restituisce un solo
-     grafico con tutte le linee sovrapposte: è utile quindi quando si vuole
-     graficare una sola quantità per ogni insieme di parametri.
+
+function groupplot(x_super, y_super, parameter_super; labels, linestyles, commonxlabel, commonylabel, plottitle, plotsize)
+  #= Crea un'immagine che raggruppa i grafici dei dati delle coppie
+     (X,Y) ∈ x_super × y_super; in alto viene posto un titolo, grande, che
+     elenca anche i parametri usati nelle simulazioni e comuni a tutti i
+     grafici; ad ogni grafico invece viene assegnato un titolo che contiene
+     i parametri diversi tra una simulazione e l'altra.
 
      Argomenti
      ---------
-   · `data_super::Array{Any}`: un array di dimensione uguale a quella di
-     parameter_lists. Ciascun elemento di `data_super` è una lista che
-     rappresenta l'evoluzione nel tempo (durante la simulazione) di una
-     data grandezza.
+     · `x_super`: un array, ogni elemento del quale è una lista di numeri
+       che rappresentano le ascisse del grafico, ad esempio istanti di tempo,
+       numeri dei siti, eccetera.
 
-   · `linestyle::Array{Symbol}`: lo stile delle linee.
+     · `y_super`: un array, ogni elemento del quale è quello che si passerebbe
+       alla funzione Plots.plot insieme al rispettivo elemento Xᵢ ∈ x_super
+       per disegnarne il grafico. Questo significa che ogni Yᵢ ∈ y_super è una 
+       matrice M×N con M = length(Xᵢ); N è il numero di colonne, e ogni
+       colonna rappresenta una serie di dati da graficare. Ad esempio, per
+       graficare tutti assieme i numeri di occupazione di 10 siti si può
+       creare una matrice di 10 colonne: ogni riga della matrice conterrà
+       i numeri di occupazione dei siti a un certo istante di tempo.
 
-   · `input_xlabel::String`: etichetta delle ascisse (comune a tutti)
+     · `parameter_lists`: un array di dizionari, ciascuno contenente i
+       parametri che definiscono la simulazione dei dati degli elementi di
+       x_super e y_super.
 
-   · `input_ylabel::String`: etichetta delle ordinate (comune a tutti)
+     · `labels`: un array di dimensione M che contiene le etichette da
+       da assegnare alla linea di ciascuna quantità da disegnare. Per
+       semplicità, le etichette sono le stesse per tutti i grafici, quindi è
+       necessario fornire un array lungo almeno maxᵢ{length(Xᵢ)}; eventuali
+       etichette in eccesso dovrebbero venire ignorate.
 
-   · `plot_title::String`: titolo del grafico
+     · `linestyles`: come `labels`, ma per gli stili delle linee.
 
-   · `plot_size`: una Pair che indica la dimensione complessiva del grafico
+     · `commonxlabel`: etichetta delle ascisse (comune a tutti)
+
+     · `commonylabel`: etichetta delle ordinate (comune a tutti)
+
+     · `plottitle`: titolo grande del grafico
+
+     · `plotsize`: una Pair che indica la dimensione dei singoli grafici
   =#
+  # Per poter meglio confrontare a vista i dati, imposto una scala delle
+  # ordinate uguale per tutti i grafici.
+  yminima = minimum.(y_super)
+  ymaxima = maximum.(y_super)
+  ylimits = (minimum(yminima), maximum(ymaxima))
+  # Smisto i parametri in ripetuti e non, per creare i titoli dei grafici.
   distinct_parameters, _ = categorise_parameters(parameter_super)
-  #
-  # Calcola il minimo e il massimo valore delle ordinate tra tutti i dati,
-  # per poter impostare una scala universale che mostri tutti i grafici
-  # nello stesso modo (e non tagli fuori nulla).
-  # In pratica: `extrema` calcola gli estremi di un Array multidimensionale, ma
-  # i miei data_super sono invece Vector di Vector quindi non si può fare
-  # semplicemente: calcolo prima la lista degli estremi di ciascun
-  # `data`, poi prendo gli estremi di tutto.
-  y_minima = [minimum(data) for data in data_super]
-  y_maxima = [maximum(data) for data in data_super]
-  ylimits = (minimum(y_minima), maximum(y_maxima))
-  #
-  @assert allequal([p["skip_steps"] for p in parameter_super])
-  @assert allequal([p["simulation_end_time"] for p in parameter_super])
-  @assert allequal([p["simulation_time_step"] for p in parameter_super])
-  time_step_list = construct_step_list(parameter_super[begin])
-  skip_steps = parameter_super[begin]["skip_steps"]
-  time_step_list_filtered = time_step_list[1:skip_steps:end]
-  #
-  this_plot = plot()
-  for (p, data) in zip(parameter_super, data_super)
-    plot!(this_plot, time_step_list_filtered,
-                     data,
-                     ylim=ylimits,
-                     label=subplot_title(p, distinct_parameters),
-                     linestyle=linestyle,
-                     legend=:outerright)
+  # Calcolo la grandezza totale dell'immagine a partire da quella dei grafici.
+  figuresize = (2, Int(ceil(length(x_super)/2))+0.5) .* plotsize
+  # Creo i singoli grafici.
+  subplots = [plot(X,
+                   Y,
+                   ylim=ylimits,
+                   label=labels,
+                   linestyle=linestyles,
+                   legend=:outerright,
+                   xlabel=commonxlabel,
+                   ylabel=commonylabel,
+                   title=subplot_title(p, distinct_parameters),
+                   left_margin=5mm,
+                   bottom_margin=5mm,
+                   size=figuresize)
+              for (X, Y, p) in zip(x_super, y_super, parameter_super)]
+  # I grafici saranno disposti in una griglia con due colonne; se ho un numero
+  # dispari di grafici, ne creo uno vuoto in modo da riempire il buco che
+  # si crea (altrimenti mi becco un errore).
+  if isodd(length(subplots))
+    fakeplot = Plots.scatter(ones(2),
+                             marker=0,
+                             markeralpha=0,
+                             ticks=nothing,
+                             axis=false,
+                             grid=false,
+                             leg=false,
+                             size=figuresize)
+    push!(subplots, fakeplot)
   end
-  xlabel!(this_plot, x_label)
-  ylabel!(this_plot, y_label)
-  title!(this_plot, plot_title)
-  return this_plot
+  # Creo il grafico che raggruppa tutto, insieme al titolo principale.
+  group = Plots.plot(shared_title_fake_plot(plottitle, parameter_super),
+                     Plots.plot(subplots..., layout=(length(subplots)÷2, 2)),
+                     # Usa ÷ e non /, in modo da ottenere un Int!
+                     layout=grid(2, 1, heights=[0.1, 0.9]))
+  return group
+end
+
+function unifiedplot(x, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
+  #= Crea un grafico dei dati in `y_super`, tutti assieme, con `x` nelle ascisse;
+     in alto viene posto un titolo, grande, che elenca anche i parametri usati
+     nelle simulazioni e comuni a tutti i grafici; le etichette di ciascuna
+     serie del grafico contengono invece i parametri che differiscono tra una
+     simulazione e l'altra.
+
+     Argomenti
+     ---------
+     · `x`: un array con le ascisse del grafico.
+
+     · `y_super`: un array, ogni elemento del quale è una lista di ordinate
+       associate a `x` da rappresentare nel grafico.
+
+     · `parameter_lists`: un array di dizionari, ciascuno contenente i
+       parametri che definiscono la simulazione dei dati degli elementi di
+       ciascun elemento di y_super.
+
+     · `linestyles`: come `labels`, ma per gli stili delle linee.
+
+     · `xlabel`: etichetta delle ascisse
+
+     · `ylabel`: etichetta delle ordinate
+
+     · `plottitle`: titolo del grafico
+
+     · `plotsize`: una Pair che indica la dimensione del grafico
+  =#
+  # Smisto i parametri in ripetuti e non, per creare le etichette dei grafici.
+  distinct_parameters, _ = categorise_parameters(parameter_super)
+  # Imposto la dimensione della figura (con un po' di spazio per il titolo).
+  figuresize = (1, 1.25) .* plotsize
+  plt = Plots.plot(x,
+                   hcat(y_super...),
+                   label=hcat([subplot_title(p, distinct_parameters)
+                               for p in parameter_super]...),
+                   linestyle=linestyle,
+                   legend=:outerright,
+                   xlabel=xlabel,
+                   ylabel=ylabel,
+                   title=plottitle,
+                   size=figuresize)
+  return plt
 end
