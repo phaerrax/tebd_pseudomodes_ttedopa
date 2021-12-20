@@ -38,6 +38,7 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   occ_n_super = []
+  occ_n_osc_left_super = []
   spin_current_super = []
   bond_dimensions_super = []
   chain_levels_super = []
@@ -223,6 +224,7 @@ let
     # Osservabili sullo stato iniziale
     # --------------------------------
     occ_n = [[inner(s, current_state) for s in occ_n_list]]
+    occ_n_osc_left = [inner(occ_n_list[begin], current_state)]
     bond_dimensions = [linkdims(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
     chain_levels = [levels(num_eigenspace_projs, current_state)]
@@ -254,8 +256,12 @@ let
 
         push!(normalisation,
               trace)
+
         push!(occ_n,
               [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
+        push!(occ_n_osc_left,
+              real(inner(occ_n_list[begin], current_state)) ./ trace)
+
         push!(spin_current,
               [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
         push!(chain_levels,
@@ -338,6 +344,7 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(occ_n_super, occ_n)
+    push!(occ_n_osc_left_super, occ_n_osc_left)
     push!(spin_current_super, spin_current)
     push!(chain_levels_super, chain_levels)
     push!(osc_levels_left_super, osc_levels_left)
@@ -377,6 +384,18 @@ let
                          plot_size=plot_size
                         )
   savefig(plt, "occ_n_all.png")
+
+  # Grafico dell'occupazione del primo oscillatore (riunito)
+  # -------------------------------------------------------
+  plt = plot_superimposed(occ_n_osc_left_super,
+                          parameter_lists;
+                          linestyle=:solid,
+                          x_label=L"\lambda\, t",
+                          y_label=L"\langle n_L(t)\rangle",
+                          plot_title="Occupazione dell'oscillatore sx",
+                          plot_size=plot_size
+                         )
+  savefig(plt, "occ_n_osc_left.png")
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
@@ -434,31 +453,25 @@ let
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = plot_time_series(normalisation_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[nothing],
-                         linestyles=[:solid],
-                         x_label=L"\lambda\, t",
-                         y_label=L"\operatorname{tr}\,\rho(t)",
-                         plot_title="Normalizzazione della matrice densità",
-                         plot_size=plot_size
-                        )
+  plt = plot_superimposed(normalisation_super,
+                          parameter_lists;
+                          linestyle=:solid,
+                          x_label=L"\lambda\, t",
+                          y_label=L"\operatorname{tr}\,\rho(t)",
+                          plot_title="Normalizzazione della matrice densità",
+                          plot_size=plot_size)
   savefig(plt, "dm_normalisation.png")
 
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = plot_time_series(hermiticity_monitor_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[nothing],
-                         linestyles=[:solid],
-                         x_label=L"\lambda\, t",
-                         y_label=L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
-                         plot_title="Controllo hermitianità della matrice densità",
-                         plot_size=plot_size
-                        )
+  plt = plot_superimposed(hermiticity_monitor_super,
+                          parameter_lists;
+                          linestyle=:solid,
+                          x_label=L"\lambda\, t",
+                          y_label=L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
+                          plot_title="Controllo hermitianità della matrice densità",
+                          plot_size=plot_size)
   savefig(plt, "hermiticity_monitor.png")
 
   # Grafico della corrente di spin
