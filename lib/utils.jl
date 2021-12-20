@@ -96,6 +96,9 @@ end
 # Costruzione della lista di istanti di tempo per la simulazione
 # ==============================================================
 function construct_step_list(parameters)
+  # Restituisce la lista degli istanti di tempo attraversati dalla
+  # simulazione. Se "simulation_time_step" è un multiplo (intero) di
+  # "simulation_end_time", la lista comprenderà anche l'estremo finale.
   τ = parameters["simulation_time_step"]
   end_time = parameters["simulation_end_time"]
   return collect(range(0, end_time; step=τ))

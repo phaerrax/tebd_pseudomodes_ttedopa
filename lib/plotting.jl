@@ -232,4 +232,64 @@ function plot_standalone(data_super, parameter_super; labels, linestyles, x_labe
   )
   return group_plot
 end
+#
+function plot_superimposed(data_super, parameter_super; linestyle, x_label, y_label, plot_title, plot_size)
+  #= Disegna un grafico dei dati di un array "_super" al variare del tempo,
+     ottenuti dalle simulazioni associate ai vari insiemi di parametri
+     in `parameter_super`, raggruppando in un unica immagine i grafici
+     relativi alla stessa grandezza.
+     Rispetto a `plot_time_series`, questa funzione restituisce un solo
+     grafico con tutte le linee sovrapposte: è utile quindi quando si vuole
+     graficare una sola quantità per ogni insieme di parametri.
 
+     Argomenti
+     ---------
+   · `data_super::Array{Any}`: un array di dimensione uguale a quella di
+     parameter_lists. Ciascun elemento di `data_super` è una lista che
+     rappresenta l'evoluzione nel tempo (durante la simulazione) di una
+     data grandezza.
+
+   · `linestyle::Array{Symbol}`: lo stile delle linee.
+
+   · `input_xlabel::String`: etichetta delle ascisse (comune a tutti)
+
+   · `input_ylabel::String`: etichetta delle ordinate (comune a tutti)
+
+   · `plot_title::String`: titolo del grafico
+
+   · `plot_size`: una Pair che indica la dimensione complessiva del grafico
+  =#
+  distinct_parameters, _ = categorise_parameters(parameter_super)
+  #
+  # Calcola il minimo e il massimo valore delle ordinate tra tutti i dati,
+  # per poter impostare una scala universale che mostri tutti i grafici
+  # nello stesso modo (e non tagli fuori nulla).
+  # In pratica: `extrema` calcola gli estremi di un Array multidimensionale, ma
+  # i miei data_super sono invece Vector di Vector quindi non si può fare
+  # semplicemente: calcolo prima la lista degli estremi di ciascun
+  # `data`, poi prendo gli estremi di tutto.
+  y_minima = [minimum(data) for data in data_super]
+  y_maxima = [maximum(data) for data in data_super]
+  ylimits = (minimum(y_minima), maximum(y_maxima))
+  #
+  @assert allequal([p["skip_steps"] for p in parameter_super])
+  @assert allequal([p["simulation_end_time"] for p in parameter_super])
+  @assert allequal([p["simulation_time_step"] for p in parameter_super])
+  time_step_list = construct_step_list(parameter_super[begin])
+  skip_steps = parameter_super[begin]["skip_steps"]
+  time_step_list_filtered = time_step_list[1:skip_steps:end]
+  #
+  this_plot = plot()
+  for (p, data) in zip(parameter_super, data_super)
+    plot!(this_plot, time_step_list_filtered,
+                     data,
+                     ylim=ylimits,
+                     label=subplot_title(p, distinct_parameters),
+                     linestyle=linestyle,
+                     legend=:outerright)
+  end
+  xlabel!(this_plot, x_label)
+  ylabel!(this_plot, y_label)
+  title!(this_plot, plot_title)
+  return this_plot
+end
