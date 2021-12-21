@@ -114,10 +114,10 @@ with tqdm(range(1, n_steps)) as progress:
         ranks += [list(current_state.ranks)]
         occ_n += [occ_numbers(current_state)]
 
-fig, axes = plt.subplots(nrows = 1, ncols = 2, figsize = (10, 24))
-axes = axes.flatten()
-
 if not suppress_plots:
+    fig, axes = plt.subplots(nrows = 1, ncols = 2, figsize = (10, 24))
+    axes = axes.flatten()
+
     ax = axes[0]
     for j, row in enumerate(np.transpose(occ_n)):
         label = "i" + str(j + 1)
