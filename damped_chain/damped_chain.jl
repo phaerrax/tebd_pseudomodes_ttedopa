@@ -36,6 +36,7 @@ let
 
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
+  timesteps_super = []
   occ_n_super = []
   spin_current_super = []
   bond_dimensions_super = []
@@ -161,89 +162,79 @@ let
     CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
-    push!(occ_n_super, occ_n)
-    push!(spin_current_super, spin_current)
-    push!(chain_levels_super, chain_levels)
-    push!(bond_dimensions_super, bond_dimensions)
+    push!(timesteps_super, time_step_list[1:skip_steps:end])
+    push!(occ_n_super, hcat(occ_n...)')
+    push!(spin_current_super, hcat(spin_current...)')
+    push!(chain_levels_super, hcat(chain_levels...)')
+    push!(bond_dimensions_super, hcat(bond_dimensions...)')
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  plot_size = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
-
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+  # Grafici
+  # =======
+  
+  plotsize = (600, 400)
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  len = size(hcat(occ_n_super[begin]...), 1)
-  # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
-  # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
-  # funzione `plot_time_series` anche tutto ciò che varia con tale lunghezza,
-  # come `labels` e `linestyles`.
-  #
-  plt = plot_time_series(occ_n_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=string.(1:len),
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione",
-                         plot_size=plot_size
-                        )
+  N = size(occ_n_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  occ_n_super,
+                  parameter_lists;
+                  labels=["L" string.(1:N-2)... "R"],
+                  linestyles=[:dash repeat([:solid], N-2)... :dash],
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione",
+                  plotsize=plotsize)
+
   savefig(plt, "occ_n_all.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  len = size(hcat(bond_dimensions_super[begin]...), 1)
-  plt = plot_time_series(bond_dimensions_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["($j,$(j+1))" for j=1:len],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\chi_{k,k+1}",
-                         plot_title="Ranghi del MPS",
-                         plot_size=plot_size
-                        )
+  N = size(bond_dimensions_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  bond_dimensions_super,
+                  parameter_lists;
+                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
+                  linestyles=hcat(repeat([:solid], N)...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\chi_{k,k+1}(t)",
+                  plottitle="Ranghi del MPS",
+                  plotsize=plotsize)
+
   savefig(plt, "bond_dimensions.png")
 
   # Grafico della corrente di spin
   # ------------------------------
-  len = size(hcat(spin_current_super[begin]...), 1)
-  plt = plot_time_series(spin_current_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["($j,$(j+1))" for j=1:len],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"j_{k,k+1}",
-                         plot_title="Corrente di spin",
-                         plot_size=plot_size
-                        )
+  N = size(spin_current_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  spin_current_super,
+                  parameter_lists;
+                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
+                  linestyles=hcat(repeat([:solid], N)...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"j_{k,k+1}(t)",
+                  plottitle="Corrente di spin",
+                  plotsize=plotsize)
+
   savefig(plt, "spin_current.png")
 
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------
   # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
   # restanti valori.
-  len = size(hcat(chain_levels_super[begin]...), 1) - 1
-  plt = plot_time_series(chain_levels_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[string.(0:len-1); "total"],
-                         linestyles=[repeat([:solid], len); :dash],
-                         x_label=L"\lambda\, t",
-                         y_label=L"n",
-                         plot_title="Occupazione degli autospazi "
-                         * "dell'operatore numero",
-                         plot_size=plot_size
-                        )
+  N = size(chain_levels_super[begin])[2] - 1
+  plt = groupplot(timesteps_super,
+                  chain_levels_super,
+                  parameter_lists;
+                  labels=[string.(0:N-1)... "total"],
+                  linestyles=[repeat([:solid], N)... :dash],
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"n(",
+                  plottitle="Occupazione degli autospazi "
+                  * "della catena di spin",
+                  plotsize=plotsize)
+
   savefig(plt, "chain_levels.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.

@@ -38,6 +38,7 @@ let
 
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
+  timesteps_super = []
   occ_n_super = []
   coherence_super = []
   bond_dimensions_super = []
@@ -206,88 +207,90 @@ let
     #CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
-    push!(occ_n_super, occ_n)
+    push!(timesteps_super, time_step_list[1:skip_steps:end])
+    push!(occ_n_super, hcat(occ_n...)')
     push!(coherence_super, coherence)
-    push!(bond_dimensions_super, bond_dimensions)
+    push!(bond_dimensions_super, hcat(bond_dimensions...)')
     push!(osc_chain_coefficients_left_super, osc_chain_coefficients_left)
     push!(snapshot_super, snapshot)
   end
 
   # Grafici
   # =======
-  plot_size = (2, 0.5 + ceil(length(parameter_lists)/2)) .* (600, 400)
-
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+  plotsize = (600, 400)
 
   # Grafico dei numeri di occupazione
   # ---------------------------------
-  len = size(hcat(occ_n_super[begin]...), 1)
-  plt = plot_time_series(occ_n_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[string.(len-1:-1:1); "S"],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione",
-                         plot_size=plot_size)
+  N = size(occ_n_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  occ_n_super,
+                  parameter_lists;
+                  labels=[string.(N-1:-1:1)... "S"],
+                  linestyles=repeat([:solid]... len),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione",
+                  plotsize=plotsize)
+
   savefig(plt, "occ_n.png")
 
   # Grafico dell'elemento scelto della matrice densità ridotta dello spin
   # ---------------------------------------------------------------------
-  plt = plot_time_series(coherence_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=[nothing],
-                         linestyles=[:solid],
-                         x_label=L"\lambda\, t",
-                         y_label=L"(\rho_S)_{+,-}",
-                         plot_title="Coerenza dello spin",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "coherence.png")
+  plt = groupplot(timesteps_super,
+                  coherence_super,
+                  parameter_lists;
+                  labels=[nothing],
+                  linestyles=[:solid],
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"(\rho_S)_{+,-}(t)",
+                  plottitle="Coerenza dello spin",
+                  plotsize=plotsize)
 
+  savefig(plt, "coherence.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  len = size(hcat(bond_dimensions_super[begin]...), 1)
-  plt = plot_time_series(bond_dimensions_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["($j,$(j+1))" for j=1:len],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\chi_{k,k+1}",
-                         plot_title="Ranghi del MPS",
-                         plot_size=plot_size
-                        )
+  N = size(bond_dimensions_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  bond_dimensions_super,
+                  parameter_lists;
+                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
+                  linestyles=hcat(repeat([:solid], N)...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\chi_{k,k+1}(t)",
+                  plottitle="Ranghi del MPS",
+                  plotsize=plotsize)
+
   savefig(plt, "bond_dimensions.png")
  
   # Grafico dei coefficienti della chain map
   # ----------------------------------------
-  plt = plot_standalone(osc_chain_coefficients_left_super,
-                        parameter_lists;
-                        labels=[L"\Omega_i", L"\kappa_i"],
-                        linestyles=[:solid, :solid],
-                        x_label=L"i",
-                        y_label="Coefficiente",
-                        plot_title="Coefficienti della catena di "*
-                                   "oscillatori",
-                        plot_size=plot_size
-                        )
+  osc_sites = [reverse(1:length(chain[:,1]))
+               for chain in osc_chain_coefficients_left_super]
+  plt = groupplot(osc_sites,
+                  osc_chain_coefficients_left_super,
+                  parameter_lists;
+                  labels=[L"\Omega_i" L"\kappa_i"],
+                  linestyles=[:solid :solid],
+                  commonxlabel=L"i",
+                  commonylabel="Coefficiente",
+                  plottitle="Coefficienti della catena di "*
+                             "oscillatori",
+                  plotsize=plotsize)
+
   savefig(plt, "osc_coefficients.png")
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------
-  plt = plot_standalone(snapshot_super,
-                        parameter_lists;
-                        labels=[nothing],
-                        linestyles=[:solid],
-                        x_label=L"i",
-                        y_label="Numero di occupazione",
-                        plot_title="Numeri di occupazione alla fine",
-                        plot_size=plot_size
-                        )
+  plt = unifiedplot([reverse(range_osc_left); range_spins],
+                    snapshot_super,
+                    parameter_lists;
+                    linestyle=:solid,
+                    xlabel=L"i",
+                    ylabel="Numero di occupazione",
+                    plottitle="Numeri di occupazione alla fine",
+                    plotsize=plotsize)
+
   savefig(plt, "snapshot.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.

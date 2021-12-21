@@ -33,6 +33,7 @@ let
   occ_n_super = []
   bond_dimensions_super = []
   entropy_super = []
+  timesteps_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
@@ -100,10 +101,13 @@ let
       skip_count += 1
     end
 
-    # Salvo i risultati nei grandi contenitori
-    push!(occ_n_super, occ_n)
-    push!(bond_dimensions_super, bond_dimensions)
-    push!(entropy_super, S)
+    # Salvo i risultati nei grandi contenitori.
+    # Quando i dati sono salvati come liste di liste (come `occ_n`) devo
+    # prima convertirli in matrici, con X -> hcat(X...)'
+    push!(timesteps_super, time_step_list[1:skip_steps:end])
+    push!(occ_n_super, hcat(occ_n...)')
+    push!(bond_dimensions_super, hcat(bond_dimensions...)')
+    push!(entropy_super, hcat(S...)')
   end
 
   #= Grafici
@@ -113,58 +117,51 @@ let
      la grandezza del font o con il colore quelli che cambiano da una
      simulazione all'altra.
   =#
-  plot_size = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
-
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+  plotsize = (600, 400)
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  len = size(hcat(occ_n_super[begin]...), 1)
-  # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
-  # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
-  # funzione `plot_time_series` anche tutto ciò che varia con tale lunghezza,
-  # come `labels` e `linestyles`.
-  #
-  plt = plot_time_series(occ_n_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=string.(1:len),
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione",
-                         plot_size=plot_size
-                        )
+  N = size(occ_n_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  occ_n_super,
+                  parameter_lists;
+                  labels=hcat(string.(1:N)...),
+                  linestyles=hcat(repeat([:solid], N...)),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione",
+                  plotsize=plotsize)
+                  
   savefig(plt, "occ_n.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  len = size(hcat(bond_dimensions_super[begin]...), 1)
-  plt = plot_time_series(bond_dimensions_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["($j,$(j+1))" for j=1:len],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\chi_{k,k+1}",
-                         plot_title="Ranghi del MPS",
-                         plot_size=plot_size
-                        )
+  N = size(bond_dimensions_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  bond_dimensions_super,
+                  parameter_lists;
+                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
+                  linestyles=hcat(repeat([:solid], N)...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\chi_{k,k+1}(t)",
+                  plottitle="Ranghi del MPS",
+                  plotsize=plotsize)
+
   savefig(plt, "bond_dimensions.png")
 
   # Grafico dell'entropia di entanglement
   # -------------------------------------
-  len = size(hcat(entropy_super[begin]...), 1)
-  plt = plot_time_series(entropy_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=string.(1 .+ 1:len),
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label="Entropia di Von Neumann",
-                         plot_title="Entropia di entanglement",
-                         plot_size=plot_size
-                        )
+  N = size(entropy_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  entropy_super,
+                  parameter_lists;
+                  labels=hcat(string.(1 .+ 1:N)...),
+                  linestyles=hcat(repeat([:solid], N)...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"S_i(t)",
+                  plottitle="Entropia di entanglement delle bipartizioni",
+                  plotsize=plotsize)
+
   savefig(plt, "entropy.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.

@@ -35,6 +35,7 @@ let
   occ_n_comp_super = []
   snapshot_comp_super = []
   ranks_super = []
+  timesteps_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
@@ -109,79 +110,75 @@ let
                    for N ∈ 1:n_sites]
 
     # Salvo i risultati nei grandi contenitori
-    push!(occ_n_super, occ_n)
-    push!(occ_n_comp_super, occ_n_comp)
+    push!(timesteps_super, time_step_list)
+    push!(occ_n_super, hcat(occ_n...)')
+    push!(occ_n_comp_super, hcat(occ_n_comp...)')
     push!(snapshot_comp_super, [snapshot_jl snapshot_py])
-    push!(ranks_super, ranks)
+    push!(ranks_super, hcat(ranks...)')
   end
 
   # Grafici
   # =======
-  plot_size = Int(ceil(sqrt(length(parameter_lists)))) .* (600, 400)
-
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+  plotsize = (600, 400)
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  len = size(hcat(occ_n_super[begin]...), 1)
-  # È la lunghezza delle righe di vari array `occ_n`: per semplicità assumo che
-  # siano tutti della stessa forma, altrimenti dovrei far calcolare alla
-  # funzione `plot_time_series` anche tutto ciò che varia con tale lunghezza,
-  # come `labels` e `linestyles`.
-  #
-  plt = plot_time_series(occ_n_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=string.(1:len),
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\langle n_i\rangle",
-                         plot_title="Numeri di occupazione",
-                         plot_size=plot_size
-                        )
+  N = size(occ_n_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  occ_n_super,
+                  parameter_lists;
+                  labels=hcat(string.(1:N)...),
+                  linestyles=hcat(repeat([:solid], N...)),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione",
+                  plotsize=plotsize)
+                  
   savefig(plt, "occ_n.png")
 
   # Confronto con Python dell'andamento del primo sito
   # --------------------------------------------------
-  display = [1,5,10]
-  plt = plot_time_series(occ_n_comp_super,
-                         parameter_lists;
-                         displayed_sites=display,
-                         labels=string.(display),
-                         linestyles=repeat([:solid], length(display)),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\langle n_i\rangle",
-                         plot_title="Discrepanza tra ITensors e mpnum",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "occ_n_confronto.png")
+  cols = [1, 5, 10]
+  selection = [mat[:, cols] for mat in occ_n_comp_super]
+  plt = groupplot(timesteps_super,
+                  selection,
+                  parameter_lists;
+                  labels=hcat(string.(cols)...),
+                  linestyles=hcat(repeat([:solid], length(cols))...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\langle n_i\rangle",
+                  plottitle="Discrepanza tra ITensors e mpnum",
+                  plotsize=plotsize)
+                  
+  savefig(plt, "discrepanza.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  len = size(hcat(ranks_super[begin]...), 1)
-  plt = plot_time_series(ranks_super,
-                         parameter_lists;
-                         displayed_sites=nothing,
-                         labels=["($j,$(j+1))" for j=1:len],
-                         linestyles=repeat([:solid], len),
-                         x_label=L"\lambda\, t",
-                         y_label=L"\chi_{k,k+1}",
-                         plot_title="Ranghi del MPS",
-                         plot_size=plot_size
-                        )
-  savefig(plt, "ranks.png")
+  N = size(ranks_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  ranks_super,
+                  parameter_lists;
+                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
+                  linestyles=hcat(repeat([:solid], N)...),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\chi_{k,k+1}(t)",
+                  plottitle="Ranghi del MPS",
+                  plotsize=plotsize)
+
+  savefig(plt, "bond_dimensions.png")
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------
-  plt = plot_standalone(snapshot_comp_super,
-                        parameter_lists;
-                        labels=["ITensors", "mpnum"],
-                        linestyles=[:solid, :solid],
-                        x_label="Sito",
-                        y_label="Numero di occupazione",
-                        plot_title="Contronfo tra i numeri di occupazione alla fine",
-                        plot_size=plot_size
-                        )
+  plt = groupplot([1:size(arr, 1) for arr in snapshot_comp_super],
+                  snapshot_comp_super,
+                  parameter_lists;
+                  labels=["ITensors" "mpnum"],
+                  linestyles=[:solid :solid],
+                  commonxlabel="Sito",
+                  commonylabel="Numero di occupazione",
+                  plottitle="Contronfo tra i numeri di occupazione alla fine",
+                  plotsize=plotsize)
+
   savefig(plt, "snapshot_confronto.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
