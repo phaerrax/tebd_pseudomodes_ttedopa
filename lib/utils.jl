@@ -1,11 +1,54 @@
 using JSON
 using Base.Filesystem
 using ITensors
+using LinearAlgebra
 
 #= Questo file contiene un insieme variegato di funzioni che servono bene o
    male per tutti gli script. Le raduno tutte qui in modo da non dover copiare
    il loro codice ad ogni nuovo file.
 =#
+
+# Matrici di Gell-Mann generalizzate
+# ==================================
+# Seguo le formule sul sito mathworld.wolfram.com.
+# Le matrici sono qui indicizzate come segue:
+# · se j > k restituisce le matrici simmetriche con diagonale nulla,
+# · se j < k restituisce le matrici antisimmetriche,
+# · se j = k restituisce le matrici diagonali.
+# Gli interi j e k determinano anche le componenti che non sono nulle.
+# Il totale delle matrici di Gell-Mann generalizzate è dim²-1 come richiesto;
+# aggiungo alla fine (per il caso j = k = dim) la matrice identità, e completo
+# la base per Mat(ℂᵈⁱᵐ).
+function gellmannmatrix(j, k, dim)
+  if j > dim || k > dim || j < 0 || k < 0
+    throw(DomainError)
+  end
+  m = zeros(ComplexF64, dim, dim)
+  if j > k
+    m[j, k] = 1
+    m[k, j] = 1
+  elseif k > j
+    m[j, k] = -im
+    m[k, j] = im
+  elseif j == k && j < dim
+    for i ∈ 1:j
+      m[i, i] = 1
+    end
+    m[j+1, j+1] = -j
+    m .*= sqrt(2 / (j * (j+1)))
+  else
+    for i ∈ 1:dim
+      m[i, i] = 1
+    end
+  end
+  return m
+end
+
+function gellmannbasis(dim)
+  return [gellmannmatrix(j, k, dim) for (j, k) ∈ [Base.product(1:dim, 1:dim)...]]
+  # Devo spacchettare il risultato di `product` in modo che il risultato
+  # sia una lista di matrici (un Vector, per la precisione) e non una Matrix.
+end
 
 # Entropia (di Von Neumann)
 # =========================
