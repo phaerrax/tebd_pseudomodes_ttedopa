@@ -10,7 +10,6 @@ using LinearAlgebra
 
 # Matrici di Gell-Mann generalizzate
 # ==================================
-# Seguo le formule sul sito mathworld.wolfram.com.
 # Le matrici sono qui indicizzate come segue:
 # · se j > k restituisce le matrici simmetriche con diagonale nulla,
 # · se j < k restituisce le matrici antisimmetriche,
@@ -19,26 +18,28 @@ using LinearAlgebra
 # Il totale delle matrici di Gell-Mann generalizzate è dim²-1 come richiesto;
 # aggiungo alla fine (per il caso j = k = dim) la matrice identità, e completo
 # la base per Mat(ℂᵈⁱᵐ).
+# Le matrici sono normalizzate in modo da essere ortonormali rispetto al
+# prodotto interno (A,B) = tr(A†B)
 function gellmannmatrix(j, k, dim)
   if j > dim || k > dim || j < 0 || k < 0
     throw(DomainError)
   end
   m = zeros(ComplexF64, dim, dim)
   if j > k
-    m[j, k] = 1
-    m[k, j] = 1
+    m[j, k] = 1 / sqrt(2)
+    m[k, j] = 1 / sqrt(2)
   elseif k > j
-    m[j, k] = -im
-    m[k, j] = im
+    m[j, k] = -im / sqrt(2)
+    m[k, j] = im / sqrt(2)
   elseif j == k && j < dim
     for i ∈ 1:j
       m[i, i] = 1
     end
     m[j+1, j+1] = -j
-    m .*= sqrt(2 / (j * (j+1)))
+    m .*= sqrt(1 / (j * (j+1)))
   else
     for i ∈ 1:dim
-      m[i, i] = 1
+      m[i, i] = 1/sqrt(dim)
     end
   end
   return m
