@@ -46,9 +46,28 @@ function gellmannmatrix(j, k, dim)
 end
 
 function gellmannbasis(dim)
-  return [gellmannmatrix(j, k, dim) for (j, k) ∈ [Base.product(1:dim, 1:dim)...]]
+  return [gellmannmatrix(j, k, dim)
+          for (j, k) ∈ [Base.product(1:dim, 1:dim)...]]
   # Devo spacchettare il risultato di `product` in modo che il risultato
   # sia una lista di matrici (un Vector, per la precisione) e non una Matrix.
+end
+
+# Inserisco anche una definizione della base canonica di Mat(ℂᵈⁱᵐ): non mi serve
+# tanto perché è una costruzione difficile, ma perché voglio impostare l'ordine
+# in cui appaiono gli elementi della base. Nel modo in cui lo faccio sotto,
+# l'ordine corrisponde a come si fa la vettorizzazione delle matrici, cioè
+# canonicalbasis(dim)[j] = canonicalmatrix((j-1)%dim + 1, (j-1)÷dim + 1, dim)
+# con j ∈ {1,…,dim²}. Di conseguenza, se A ∈ Mat(ℂᵈⁱᵐ), vale
+# vec(A)ᵢ = tr(canonicalbasis(dim)[j]' * A).
+function canonicalmatrix(i, j, dim)
+  m = zeros(ComplexF64, dim, dim)
+  m[i,j] = 1
+  return m
+end
+
+function canonicalbasis(dim)
+  return [canonicalmatrix(i, j, dim)
+          for (i, j) ∈ [Base.product(1:dim, 1:dim)...]]
 end
 
 # Entropia (di Von Neumann)
