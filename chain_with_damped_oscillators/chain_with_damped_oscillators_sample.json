@@ -5,6 +5,7 @@
   "simulation_time_step": 0.01,
   "skip_steps": 10,
   "chain_initial_state": "empty",
+  "left_oscillator_initial_state": "thermal",
   "MP_maximum_bond_dimension": 100,
   "MP_compression_error": 1e-8,
   "TS_expansion_order": 2,
