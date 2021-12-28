@@ -39,7 +39,6 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   occ_n_super = []
-  occ_n_osc_left_super = []
   spin_current_super = []
   bond_dimensions_super = []
   chain_levels_super = []
@@ -259,8 +258,6 @@ let
 
         push!(occ_n,
               [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
-        push!(occ_n_osc_left,
-              real(inner(occ_n_list[begin], current_state)) ./ trace)
 
         push!(spin_current,
               [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
@@ -345,7 +342,6 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, time_step_list[1:skip_steps:end])
     push!(occ_n_super, permutedims(hcat(occ_n...)))
-    push!(occ_n_osc_left_super, occ_n_osc_left)
     push!(spin_current_super, permutedims(hcat(spin_current...)))
     push!(chain_levels_super, permutedims(hcat(chain_levels...)))
     push!(osc_levels_left_super, permutedims(hcat(osc_levels_left...)))
@@ -383,6 +379,8 @@ let
 
   # Grafico dell'occupazione del primo oscillatore (riunito)
   # -------------------------------------------------------
+  # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
+  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_super]
   plt = unifiedplot(timesteps_super[begin],
                     occ_n_osc_left_super,
                     parameter_lists;
