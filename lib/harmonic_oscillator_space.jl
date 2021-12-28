@@ -179,6 +179,91 @@ ITensors.op(::OpName"Id:N", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ num(dim)
 ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc"; dim=2) = transpose(a⁺(dim)) ⊗ a⁻(dim)
 ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; dim=2) = transpose(a⁻(dim)) ⊗ a⁺(dim)
 
+# Spazio degli oscillatori vettorizzato hermitiano
+# ================================================
+function ITensors.space(::SiteType"HvOsc"; dim=2)
+  return dim^2
+end
+
+# Stati
+# -----
+function ITensors.state(sn::StateName, st::SiteType"HvOsc", s::Index; kwargs...)
+  return state(sn, st; dim=isqrt(ITensors.dim(s)), kwargs...)
+  # Uso `isqrt` che prende un Int e restituisce un Int; il fatto che tronchi la
+  # parte decimale non dovrebbe mai essere un problema, dato che dim(s) per
+  # costruzione è il quadrato di un intero.
+end
+
+# Gli stati della base canonica (êₙ:êₙ) ≡ êₙ ⊗ êₙ
+function ITensors.state(::StateName{N}, ::SiteType"HvOsc"; dim=2) where {N}
+  n = parse(Int, String(N))
+  v = zeros(dim)
+  v[n + 1] = 1.0
+  return vec(v ⊗ v', gellmannbasis(dim))
+end
+
+# Lo stato di equilibrio termico Z⁻¹vec(exp(-βH)) = Z⁻¹vec(exp(-ω/T N))
+function ITensors.state(::StateName"ThermEq", st::SiteType"HvOsc"; dim=2, ω, T)
+  if T == 0
+    v = state(StateName("0"), st; dim=dim)
+  else
+    mat = exp(-ω / T * num(dim))
+    mat /= tr(mat)
+    v = vec(mat, gellmannbasis(dim))
+  end
+  return v
+end
+
+# Stati del tipo êⱼ ⊗ êₖ (servono ad esempio per poter calcolare, tramite una
+# proiezione su di essi, la componente j,k di una matrice definita su un sito
+# di tipo "HvOsc").
+function ITensors.state(::StateName"mat_comp", ::SiteType"HvOsc"; dim=2, j::Int, k::Int)
+  êⱼ = zeros(dim)
+  êₖ = zeros(dim)
+  êⱼ[j + 1] = 1.0
+  êₖ[k + 1] = 1.0
+  return vec(êⱼ ⊗ êₖ', gellmannbasis(dim))
+end
+
+# Stati che sono operatori vettorizzati (per costruire le osservabili)
+# --------------------------------------------------------------------
+function ITensors.state(::StateName"veca+", ::SiteType"HvOsc"; dim=2)
+  return vec(a⁺(dim), gellmannbasis(dim))
+end
+function ITensors.state(::StateName"veca-", ::SiteType"HvOsc"; dim=2)
+  return vec(a⁻(dim), gellmannbasis(dim))
+end
+function ITensors.state(::StateName"vecN", ::SiteType"HvOsc"; dim=2)
+  return vec(num(dim), gellmannbasis(dim))
+end
+function ITensors.state(::StateName"vecId", ::SiteType"HvOsc"; dim=2)
+  return vec(id(dim), gellmannbasis(dim))
+end
+
+# Operatori generici per oscillatori vettorizzati
+# -----------------------------------------------
+function ITensors.op(on::OpName, st::SiteType"HvOsc", s::Index; kwargs...)
+  return itensor(op(on, st; dim=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
+end
+
+function ITensors.op(::OpName"Id", ::SiteType"HvOsc"; dim=2)
+  return vec(identity, gellmannbasis(dim))
+end
+
+function ITensors.op(::OpName"⋅asum", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> x*(a⁺(dim)+a⁻(dim)), gellmannbasis(dim))
+end
+function ITensors.op(::OpName"asum⋅", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> (a⁺(dim)+a⁻(dim))*x, gellmannbasis(dim))
+end
+
+function ITensors.op(::OpName"N⋅", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> num(dim)*x, gellmannbasis(dim))
+end
+function ITensors.op(::OpName"⋅N", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> x*num(dim), gellmannbasis(dim))
+end
+
 # Termini nell'equazione di Lindblad per oscillatori vettorizzati
 # ---------------------------------------------------------------
 # Termini di smorzamento
@@ -190,6 +275,16 @@ function ITensors.op(::OpName"Damping", ::SiteType"vecOsc", s::Index; ω::Number
   end
   d = (n + 1) * (op("a+T:a-", s) - 0.5 * (op("N:Id", s) + op("Id:N", s))) +
       n * (op("a-T:a+", s) - 0.5 * (op("N:Id", s) + op("Id:N", s)) - op("Id:Id", s))
+  return d
+end
+function ITensors.op(::OpName"Damping", ::SiteType"HvOsc"; dim=2, ω::Number, T::Number)
+  if T == 0
+    n = 0
+  else
+    n = (ℯ^(ω / T) - 1)^(-1)
+  end
+  d = vec(x -> (n + 1) * (a⁻(dim)*x*a⁺(dim) - 0.5*(num(dim)*x + x*num(dim))) + n * (a⁺(dim)*x*a⁻(dim) - 0.5*(num(dim)*x + x*num(dim)) - x),
+          gellmannbasis(dim))
   return d
 end
 

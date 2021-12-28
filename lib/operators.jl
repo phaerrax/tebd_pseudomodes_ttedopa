@@ -44,8 +44,12 @@ function localop(s::Index)
     t = op("N", s)
   elseif SiteType("vecS=1/2") ∈ sitetypes(s)
     t = 0.5im * (op("σz:Id", s) - op("Id:σz", s))
+  elseif SiteType("HvS=1/2") ∈ sitetypes(s)
+    t = -0.5im * (op("σz⋅", s) - op("⋅σz", s))
   elseif SiteType("vecOsc") ∈ sitetypes(s)
     t = im * (op("N:Id", s) - op("Id:N", s))
+  elseif SiteType("HvOsc") ∈ sitetypes(s)
+    t = -im * (op("N⋅", s) - op("⋅N", s))
   else
     throw(DomainError(s, "SiteType non riconosciuto."))
   end
@@ -64,6 +68,7 @@ function interactionop(s1::Index, s2::Index)
   elseif SiteType("Osc") ∈ sitetypes(s1) && SiteType("Osc") ∈ sitetypes(s2)
     t = (op("a+", s1) * op("a-", s2) +
          op("a-", s1) * op("a+", s2))
+  #
   elseif SiteType("vecS=1/2") ∈ sitetypes(s1) &&
          SiteType("vecS=1/2") ∈ sitetypes(s2)
     t = -0.5im * (op("σ-:Id", s1) * op("σ+:Id", s2) +
@@ -78,6 +83,21 @@ function interactionop(s1::Index, s2::Index)
          SiteType("vecOsc") ∈ sitetypes(s2)
     t = im * (op("σx:Id", s1) * op("asum:Id", s2) -
               op("Id:σx", s1) * op("Id:asum", s2))
+  #
+  elseif SiteType("HvS=1/2") ∈ sitetypes(s1) &&
+         SiteType("HvS=1/2") ∈ sitetypes(s2)
+    t = 0.5im * (op("σ-⋅", s1) * op("σ+⋅", s2) +
+                 op("σ+⋅", s1) * op("σ-⋅", s2) -
+                 op("⋅σ-", s1) * op("⋅σ+", s2) -
+                 op("⋅σ+", s1) * op("⋅σ-", s2))
+  elseif SiteType("HvOsc") ∈ sitetypes(s1) &&
+         SiteType("HvS=1/2") ∈ sitetypes(s2)
+    t = -im * (op("asum⋅", s1) * op("σx⋅", s2) -
+               op("⋅asum", s1) * op("⋅σx", s2))
+  elseif SiteType("HvS=1/2") ∈ sitetypes(s1) &&
+         SiteType("HvOsc") ∈ sitetypes(s2)
+    t = -im * (op("σx⋅", s1) * op("asum⋅", s2) -
+               op("⋅σx", s1) * op("⋅asum", s2))
   else
     throw(DomainError((s1, s2), "SiteType non riconosciuti."))
   end

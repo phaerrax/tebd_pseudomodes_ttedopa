@@ -2,6 +2,8 @@ using LinearAlgebra
 using ITensors
 using Combinatorics
 
+include("utils.jl")
+
 const ⊗ = kron
 
 # Matrici di Pauli e affini
@@ -68,6 +70,87 @@ ITensors.op(::OpName"σx:Id", ::SiteType"vecS=1/2") = σˣ ⊗ I₂
 ITensors.op(::OpName"Id:σx", ::SiteType"vecS=1/2") = I₂ ⊗ σˣ
 ITensors.op(::OpName"Damping", ::SiteType"vecS=1/2") = (σˣ ⊗ σˣ) - (I₂ ⊗ I₂)
 
+# Spazio degli spin vettorizzato (su base di Gell-Mann)
+# =====================================================
+ITensors.space(::SiteType"HvS=1/2") = 4
+#=
+Qui sviluppo matrici ed operatori sulla base {Λᵢ}ᵢ₌₁⁴ delle matrici di
+Gell-Mann generalizzate (più il multiplo dell'identità).
+Il vettore v delle coordinate di una matrice A ∈ Mat(ℂ²) ha come elementi
+vᵢ = tr(Λᵢ * A)
+mentre un operatore lineare L : Mat(ℂ²) → Mat(ℂ²) ha
+ℓᵢⱼ = tr(Λᵢ * L(Λⱼ))
+come matrice rappresentativa.
+=#
+
+# Stati (veri e propri)
+# ---------------------
+# "Up" ≡ ê₊ ⊗ ê₊'
+# "Dn" ≡ ê₋ ⊗ ê₋'
+function ITensors.state(::StateName"Up", ::SiteType"HvS=1/2")
+  return vec(ê₊ ⊗ ê₊', gellmannbasis(2))
+end
+function ITensors.state(::StateName"Dn", ::SiteType"HvS=1/2")
+  return vec(ê₋ ⊗ ê₋', gellmannbasis(2))
+end
+
+# Stati che sono operatori vettorizzati (per costruire le osservabili)
+# --------------------------------------------------------------------
+function ITensors.state(::StateName"vecσx", ::SiteType"HvS=1/2")
+  return vec(σˣ, gellmannbasis(2))
+end
+function ITensors.state(::StateName"vecσy", ::SiteType"HvS=1/2")
+  return vec(σʸ, gellmannbasis(2))
+end
+function ITensors.state(::StateName"vecσz", ::SiteType"HvS=1/2")
+  return vec(σᶻ, gellmannbasis(2))
+end
+function ITensors.state(::StateName"vecId", ::SiteType"HvS=1/2")
+  return vec(I₂, gellmannbasis(2))
+end
+function ITensors.state(::StateName"vec0", ::SiteType"HvS=1/2")
+  return vec(zeros(2, 2), gellmannbasis(2))
+end
+
+# Operatori
+# ---------
+# Gli operatori, anche se agiscono su due siti contemporaneamente, sono
+# sempre fattorizzati (o somme di operatori fattorizzati): se l'operatore
+# L : Mat(ℂ²)⊗Mat(ℂ²) → Mat(ℂ²)⊗Mat(ℂ²)
+# si scrive come L₁⊗L₂ con ciascun Lᵢ : Mat(ℂ²) → Mat(ℂ²) allora
+# ⟨êᵢ₁ ⊗ êᵢ₂, L(êⱼ₁ ⊗ êⱼ₂)⟩ = ⟨êᵢ₁, L₁(êⱼ₁)⟩ ⟨êᵢ₂, L₂(êⱼ₂)⟩.
+function ITensors.op(::OpName"Id", ::SiteType"HvS=1/2")
+  return vec(identity, gellmannbasis(2))
+end
+
+function ITensors.op(s::OpName"σ+⋅", ::SiteType"HvS=1/2")
+  return vec(x -> σ⁺*x, gellmannbasis(2))
+end
+function ITensors.op(::OpName"⋅σ+", ::SiteType"HvS=1/2")
+  return vec(x -> x*σ⁺, gellmannbasis(2))
+end
+
+function ITensors.op(s::OpName"σ-⋅", ::SiteType"HvS=1/2")
+  return vec(x -> σ⁻*x, gellmannbasis(2))
+end
+function ITensors.op(::OpName"⋅σ-", ::SiteType"HvS=1/2")
+  return vec(x -> x*σ⁻, gellmannbasis(2))
+end
+
+function ITensors.op(s::OpName"σx⋅", ::SiteType"HvS=1/2")
+  return vec(x -> σˣ*x, gellmannbasis(2))
+end
+function ITensors.op(::OpName"⋅σx", ::SiteType"HvS=1/2")
+  return vec(x -> x*σˣ, gellmannbasis(2))
+end
+
+function ITensors.op(s::OpName"σz⋅", ::SiteType"HvS=1/2")
+  return vec(x -> σᶻ*x, gellmannbasis(2))
+end
+function ITensors.op(::OpName"⋅σz", ::SiteType"HvS=1/2")
+  return vec(x -> x*σᶻ, gellmannbasis(2))
+end
+
 # Operatori della corrente di spin
 # ================================
 # Jₖ,ₖ₊₁ = -λ/2 (σˣ₍ₖ₎σʸ₍ₖ₊₁₎ - σʸ₍ₖ₎σˣ₍ₖ₊₁₎)
@@ -93,6 +176,9 @@ function J⁺tag(::SiteType"vecS=1/2", left_site::Int, i::Int)
   end
   return str
 end
+function J⁺tag(::SiteType"HvS=1/2", left_site::Int, i::Int)
+  return J⁺tag(SiteType("vecS=1/2"), left_site, i)
+end
 
 function J⁻tag(::SiteType"S=1/2", left_site::Int, i::Int)
   # Come `J⁺tag`, ma per σʸ⊗σˣ
@@ -115,6 +201,9 @@ function J⁻tag(::SiteType"vecS=1/2", left_site::Int, i::Int)
   end
   return str
 end
+function J⁻tag(::SiteType"HvS=1/2", left_site::Int, i::Int)
+  return J⁻tag(SiteType("vecS=1/2"), left_site, i)
+end
 
 function spin_current_op_list(sites::Vector{Index{Int64}})
   N = length(sites)
@@ -124,6 +213,9 @@ function spin_current_op_list(sites::Vector{Index{Int64}})
     MPtype = MPO
   elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
     st = SiteType("vecS=1/2")
+    MPtype = MPS
+  elseif all(x -> SiteType("HvS=1/2") in x, sitetypes.(sites))
+    st = SiteType("HvS=1/2")
     MPtype = MPS
   else
     throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
@@ -170,12 +262,13 @@ function level_subspace_proj(sites::Vector{Index{Int64}}, level::Int)
   if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
     projs = [projector(MPS(sites, names); normalize=false)
              for names in chain_basis_states(N, level)]
-  elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites))
+  elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites)) ||
+         all(x -> SiteType("HvS=1/2") in x, sitetypes.(sites))
     projs = [MPS(sites, names)
              for names in chain_basis_states(N, level)]
   else
     throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
-                        "\"S=1/2\" oppure \"vecS=1/2\"."))
+                        "\"S=1/2\", \"vecS=1/2\" oppure \"HvS=1/2\"."))
   end
   #return sum(projs) non funziona…
   P = projs[1]

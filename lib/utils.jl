@@ -8,6 +8,19 @@ using LinearAlgebra
    il loro codice ad ogni nuovo file.
 =#
 
+# Vettorizzazione di matrici ed operatori
+# =======================================
+# L'uso di tr(x'*y) come prodotto interno tra gli elementi x e y fa sì che
+# queste formule di vettorizzazione abbiano senso solo quando la base scelta
+# è ortonormale rispetto a tale prodotto interno: vanno bene ad esempio la
+# base canonica o quella di Gell-Mann.
+function vec(A::Matrix, basis::Vector)
+  return [tr(b' * A) for b ∈ basis]
+end
+function vec(L::Function, basis::Vector)
+  return [tr(bi' * L(bj)) for (bi, bj) ∈ Base.product(basis, basis)]
+end
+
 # Matrici di Gell-Mann generalizzate
 # ==================================
 # Le matrici sono qui indicizzate come segue:
