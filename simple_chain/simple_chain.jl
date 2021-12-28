@@ -103,11 +103,17 @@ let
 
     # Salvo i risultati nei grandi contenitori.
     # Quando i dati sono salvati come liste di liste (come `occ_n`) devo
-    # prima convertirli in matrici, con X -> hcat(X...)'
+    # prima convertirli in matrici, con X -> permutedims(hcat(X...)).
+    #
+    # Uso `permutedims(X)` e non `X'` perché mentre la prima trasforma
+    # un oggetto `Matrix{T}` in uno dello stesso tipo, la seconda restituisce
+    # un oggetto di tipo `Adjoint{T, Matrix{T}}` che causa dei problemi con
+    # il calcolo dei valori estremi dei dati quando si disegnano i grafici
+    # (apparentemente vengono trattati come numeri complessi).
     push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, hcat(occ_n...)')
-    push!(bond_dimensions_super, hcat(bond_dimensions...)')
-    push!(entropy_super, hcat(S...)')
+    push!(occ_n_super, permutedims(hcat(occ_n...)))
+    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
+    push!(entropy_super, permutedims(hcat(S...)))
   end
 
   #= Grafici

@@ -344,13 +344,13 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, hcat(occ_n...)')
+    push!(occ_n_super, permutedims(hcat(occ_n...)))
     push!(occ_n_osc_left_super, occ_n_osc_left)
-    push!(spin_current_super, hcat(spin_current...)')
-    push!(chain_levels_super, hcat(chain_levels...)')
-    push!(osc_levels_left_super, hcat(osc_levels_left...)')
-    push!(osc_levels_right_super, hcat(osc_levels_right...)')
-    push!(bond_dimensions_super, hcat(bond_dimensions...)')
+    push!(spin_current_super, permutedims(hcat(spin_current...)))
+    push!(chain_levels_super, permutedims(hcat(chain_levels...)))
+    push!(osc_levels_left_super, permutedims(hcat(osc_levels_left...)))
+    push!(osc_levels_right_super, permutedims(hcat(osc_levels_right...)))
+    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
     push!(normalisation_super, normalisation)
     push!(hermiticity_monitor_super, hermiticity_monitor)
   end

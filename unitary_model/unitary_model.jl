@@ -270,13 +270,13 @@ let
     push!(timesteps_super,
           time_step_list[1:skip_steps:end])
     push!(occ_n_super,
-          hcat(occ_n...)')
+          permutedims(hcat(occ_n...)))
     push!(spin_current_super,
-          hcat(spin_current...)')
+          permutedims(hcat(spin_current...)))
     push!(spin_chain_levels_super,
-          hcat(spin_chain_levels...)')
+          permutedims(hcat(spin_chain_levels...)))
     push!(bond_dimensions_super,
-          hcat(bond_dimensions...)')
+          permutedims(hcat(bond_dimensions...)))
     push!(osc_chain_coefficients_left_super,
           osc_chain_coefficients_left)
     push!(osc_chain_coefficients_right_super,
