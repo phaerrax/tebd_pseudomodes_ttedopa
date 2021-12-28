@@ -225,13 +225,17 @@ let
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    occ_n = [[inner(s, current_state) for s in occ_n_list]]
-    bond_dimensions = [linkdims(current_state)]
-    spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
-    chain_levels = [levels(num_eigenspace_projs, current_state)]
-    osc_levels_left = [levels(osc_levels_projs_left, current_state)]
-    osc_levels_right = [levels(osc_levels_projs_right, current_state)]
-    normalisation = [real(inner(full_trace, current_state))]
+    occ_n = Vector{Real}[[inner(s, current_state) for s in occ_n_list]]
+    bond_dimensions = Vector{Int}[linkdims(current_state)]
+    spin_current = Vector{Real}[real.([inner(j, current_state)
+                                       for j in spin_current_ops])]
+    chain_levels = Vector{Real}[real.(levels(num_eigenspace_projs,
+                                             current_state))]
+    osc_levels_left = Vector{Real}[real.(levels(osc_levels_projs_left,
+                                                current_state))]
+    osc_levels_right = Vector{Real}[real.(levels(osc_levels_projs_right,
+                                                 current_state))]
+    normalisation = Real[real(inner(full_trace, current_state))]
     hermiticity_monitor = Real[0]
 
     # Evoluzione temporale
