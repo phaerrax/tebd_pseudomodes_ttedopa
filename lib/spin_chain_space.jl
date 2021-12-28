@@ -273,7 +273,7 @@ function level_subspace_proj(sites::Vector{Index{Int64}}, level::Int)
   #return sum(projs) non funziona…
   P = projs[1]
   for p in projs[2:end]
-    P += p
+    P = +(P, p; cutoff=1e-10)
   end
   return P
 end
