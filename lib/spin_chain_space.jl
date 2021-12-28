@@ -219,7 +219,7 @@ function spin_current_op_list(sites::Vector{Index{Int64}})
     MPtype = MPS
   else
     throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
-                        "\"S=1/2\" oppure \"vecS=1/2\"."))
+                        "\"S=1/2\", \"vecS=1/2\" oppure \"HvS=1/2\"."))
   end
   #
   J⁺ = [MPtype(sites, [J⁺tag(st, k, i) for i = 1:N]) for k = 1:N-1]
