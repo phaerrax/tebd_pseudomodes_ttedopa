@@ -139,9 +139,11 @@ let
                siteinds("vecS=1/2", n_spin_sites);
                siteinds("vecOsc", 1; dim=osc_dim)]
 
-      single_ex_states = [chain(MPS(sites[1:1], "vecId"),
-                                single_ex_state(sites[2:end-1], k),
-                                MPS(sites[end:end], "vecId"))
+      spin_range = 1 .+ (1:n_spin_sites)
+
+      single_ex_states = [embed_slice(sites,
+                                      spin_range,
+                                      single_ex_state(sites[spin_range], k))
                           for k = 1:n_spin_sites]
     end
 

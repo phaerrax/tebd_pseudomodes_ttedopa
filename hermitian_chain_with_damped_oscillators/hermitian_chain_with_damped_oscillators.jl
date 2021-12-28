@@ -135,6 +135,8 @@ let
     # ========================
     if !preload
       n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
+      spin_range = 1 .+ (1:n_spin_sites)
+
       sites = [siteinds("HvOsc", 1; dim=osc_dim);
                siteinds("HvS=1/2", n_spin_sites);
                siteinds("HvOsc", 1; dim=osc_dim)]
