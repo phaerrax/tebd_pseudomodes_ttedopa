@@ -21,6 +21,31 @@ function vec(L::Function, basis::Vector)
   return [tr(bi' * L(bj)) for (bi, bj) ∈ Base.product(basis, basis)]
 end
 
+function partialtrace(sites::Vector{Index{Int64}}, v::MPS, j::Int)
+  # Calcola la traccia parziale della matrice rappresentata (tramite
+  # vettorizzazione) dal MPS `v` nel j° sito.
+  # (Restituisce la matrice ancora nella forma vettorizzata.)
+  # Contraggo tutti i siti in v[2:end] con uno stato vecId per ottenere
+  # un MPS con un solo indice fisico: quello dello stato a sinistra,
+  # che diventa così un vettore.
+  # Definisco una procedura di contrazione personalizzata: parto da v[end]
+  # e lo contraggo per prima cosa con un vecId; il risultato lo contraggo
+  # con v[end-1], poi con un altro vecId ma sul sito end-1, e così via fino
+  # ad arrivare a v[j].
+  # Poi faccio lo stesso partendo da v[1] e contraendo verso destra.
+  x = ITensor(1.)
+  for i ∈ length(sites):-1:j+1
+    x = v[i] * state(sites[i], "vecId") * x
+  end
+  y = ITensor(1.)
+  for i ∈ 1:j-1
+    y = v[i] * state(sites[i], "vecId") * y
+  end
+  z = y * v[j] * x
+  # Ora `vector(z)` è il vettore di coordinate della traccia parziale.
+  return vector(z)
+end
+
 # Matrici di Gell-Mann generalizzate
 # ==================================
 # Le matrici sono qui indicizzate come segue:
