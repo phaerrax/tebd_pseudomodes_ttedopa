@@ -45,7 +45,7 @@ let
   osc_levels_left_super = []
   osc_levels_right_super = []
   normalisation_super = []
-  hermiticity_monitor_super = []
+  hermiticity_super = []
 
   # Precaricamento
   # ==============
@@ -235,8 +235,9 @@ let
                                                 current_state))]
     osc_levels_right = Vector{Real}[real.(levels(osc_levels_projs_right,
                                                  current_state))]
+
     normalisation = Real[real(inner(full_trace, current_state))]
-    hermiticity_monitor = Real[0]
+    hermiticity = Real[0]
 
     # Evoluzione temporale
     # --------------------
@@ -275,32 +276,23 @@ let
         push!(bond_dimensions,
               linkdims(current_state))
 
-        #=
-        Controllo che la matrice densità ridotta dell'oscillatore a sinistra
-        sia una valida matrice densità: hermitiana e semidefinita negativa.
-        Calcolo la traccia parziale su tutti i siti tranne il primo, ricreo
-        la matrice a partire dal vettore, e faccio i dovuti controlli.
-        Non so come creare un MPO misto di matrici e vettori, quindi creo osc_dim²
-        operatori che estraggono tutte le coordinate del vettore.
-        =#
-        mat = Array{Complex}(undef, osc_dim, osc_dim)
-        for j = 0:osc_dim-1, k = 0:osc_dim-1
-          proj = embed_slice(sites,
-                             1:1,
-                             MPS([state(sites[1], "mat_comp"; j, k)]))
-          mat[j+1, k+1] = inner(proj, current_state)
-        end
+        # Controllo che la matrice densità ridotta dell'oscillatore a sinistra
+        # sia una valida matrice densità: hermitiana e semidefinita negativa.
+        reduceddensitymat = partialtrace(sites, current_state, 1)
         # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
         # la positività degli autovalori devo tagliare via la loro parte reale,
         # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
-        for x in real.(eigvals(mat))
+        for x in real.(eigvals(sum(reduceddensitymat .* gellmannbasis(osc_dim))))
           if x < -max_err
             @warn "La matrice densità del primo sito non è semidefinita positiva: trovato $x"
           end
         end
-        diff = sqrt(norm(mat - mat'))
-        push!(hermiticity_monitor,
-              diff)
+        # Siccome la base di Gell-Mann è hermitiana, `reduceddensitymat` sarà
+        # hermitiana se tutti i coefficienti sono reali. Calcolo quindi la
+        # deviazione dal risultato ideale come la somma dei valori assoluti
+        # della parte immaginaria dei coefficienti del vettore.
+        push!(hermiticity,
+              sum(abs.(imag.(reduceddensitymat))))
       end
       next!(progress)
       skip_count += 1
@@ -337,7 +329,7 @@ let
       push!(dict, name => tmp_list[j,:])
     end
     push!(dict, :full_trace => normalisation)
-    push!(dict, :hermiticity => hermiticity_monitor)
+    push!(dict, :hermiticity => hermiticity)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -353,7 +345,7 @@ let
     push!(osc_levels_right_super, permutedims(hcat(osc_levels_right...)))
     push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
     push!(normalisation_super, normalisation)
-    push!(hermiticity_monitor_super, hermiticity_monitor)
+    push!(hermiticity_super, hermiticity)
   end
 
   #= Grafici
@@ -463,7 +455,7 @@ let
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
   plt = unifiedplot(timesteps_super[begin],
-                    hermiticity_monitor_super,
+                    hermiticity_super,
                     parameter_lists;
                     linestyle=:solid,
                     xlabel=L"\lambda\, t",
