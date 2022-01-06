@@ -257,7 +257,10 @@ let
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------
-  plt = unifiedplot([reverse(range_osc_left); range_spins; range_osc_right],
+  plt = unifiedplot(repeat([[reverse(range_osc_left);
+                             range_spins;
+                             range_osc_right]],
+                           length(snapshot_super)),
                     snapshot_super,
                     parameter_lists;
                     linestyle=:solid,

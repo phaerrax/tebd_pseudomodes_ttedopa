@@ -378,7 +378,7 @@ let
   # -------------------------------------------------------
   # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
   occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_super]
-  plt = unifiedplot(timesteps_super[begin],
+  plt = unifiedplot(timesteps_super,
                     occ_n_osc_left_super,
                     parameter_lists;
                     linestyle=:solid,
@@ -440,7 +440,7 @@ let
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super[begin],
+  plt = unifiedplot(timesteps_super,
                     normalisation_super,
                     parameter_lists;
                     linestyle=:solid,
@@ -454,7 +454,7 @@ let
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super[begin],
+  plt = unifiedplot(timesteps_super,
                     hermiticity_super,
                     parameter_lists;
                     linestyle=:solid,

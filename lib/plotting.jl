@@ -320,16 +320,17 @@ function groupplot(x_super, y_super, parameter_super; labels, linestyles, common
   return group
 end
 
-function unifiedplot(x, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
-  #= Crea un grafico dei dati in `y_super`, tutti assieme, con `x` nelle ascisse;
-     in alto viene posto un titolo, grande, che elenca anche i parametri usati
+function unifiedplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
+  #= Crea un grafico delle coppie di serie di dati (X,Y) ∈ x_super × y_super,
+     tutte assieme.
+     In alto viene posto un titolo, grande, che elenca anche i parametri usati
      nelle simulazioni e comuni a tutti i grafici; le etichette di ciascuna
      serie del grafico contengono invece i parametri che differiscono tra una
      simulazione e l'altra.
 
      Argomenti
      ---------
-     · `x`: un array con le ascisse del grafico.
+     · `x_super`: un array ogni elemento del quale è una lista di ascisse.
 
      · `y_super`: un array, ogni elemento del quale è una lista di ordinate
        associate a `x` da rappresentare nel grafico.
@@ -352,15 +353,17 @@ function unifiedplot(x, y_super, parameter_super; linestyle, xlabel, ylabel, plo
   distinct_parameters, _ = categorise_parameters(parameter_super)
   # Imposto la dimensione della figura (con un po' di spazio per il titolo).
   figuresize = (1, 1.25) .* plotsize
-  plt = Plots.plot(x,
-                   hcat(y_super...),
-                   label=hcat([subplot_title(p, distinct_parameters)
-                               for p in parameter_super]...),
-                   linestyle=linestyle,
-                   legend=:outerright,
-                   xlabel=xlabel,
-                   ylabel=ylabel,
-                   title=plottitle,
-                   size=figuresize)
+  plt = Plots.plot()
+  for (X, Y, p) in zip(x_super, y_super, parameter_super)
+    plt = Plots.plot!(X,
+                      Y,
+                      label=subplot_title(p, distinct_parameters),
+                      linestyle=linestyle,
+                      legend=:outerbottom,
+                      xlabel=xlabel,
+                      ylabel=ylabel,
+                      title=plottitle,
+                      size=figuresize)
+  end
   return plt
 end
