@@ -81,10 +81,9 @@ let
     # dell'operatore numero della catena di spin, vale a dire calcolo
     # (ψ,Pₙψ) dove ψ è lo stato corrente e Pₙ è il proiettore ortogonale
     # sull'n-esimo autospazio di N.
-    spin_range = n_osc_left+1:n_osc_left+n_spin_sites
-    projectors = [level_subspace_proj(sites[spin_range], n)
+    projectors = [level_subspace_proj(sites[range_spin], n)
                   for n = 0:n_spin_sites]
-    num_eigenspace_projs = [embed_slice(sites, spin_range, p)
+    num_eigenspace_projs = [embed_slice(sites, range_spin, p)
                             for p in projectors]
   else
     preload = false
@@ -195,7 +194,7 @@ let
     # --------------
     # Gli oscillatori partono tutti dallo stato vuoto
     osc_sx_init_state = MPS(sites[range_osc_left], "0")
-    spin_init_state = parse_init_state(sites[spin_range],
+    spin_init_state = parse_init_state(sites[range_spin],
                                        parameters["chain_initial_state"])
     osc_dx_init_state = MPS(sites[range_osc_right], "0")
     current_state = chain(osc_sx_init_state,
