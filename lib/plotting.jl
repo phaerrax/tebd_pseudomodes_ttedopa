@@ -259,11 +259,9 @@ function groupplot(x_super, y_super, parameter_super; labels, linestyles, common
        parametri che definiscono la simulazione dei dati degli elementi di
        x_super e y_super.
 
-     · `labels`: un array di dimensione M che contiene le etichette da
-       da assegnare alla linea di ciascuna quantità da disegnare. Per
-       semplicità, le etichette sono le stesse per tutti i grafici, quindi è
-       necessario fornire un array lungo almeno maxᵢ{length(Xᵢ)}; eventuali
-       etichette in eccesso dovrebbero venire ignorate.
+     · `labels`::Matrix{String} oppure Vector{Matrix{String}}: un array di
+       che contiene le etichette da assegnare alla linea di ciascuna quantità
+       da disegnare.
 
      · `linestyles`: come `labels`, ma per gli stili delle linee.
 
@@ -284,12 +282,28 @@ function groupplot(x_super, y_super, parameter_super; labels, linestyles, common
   distinct_parameters, _ = categorise_parameters(parameter_super)
   # Calcolo la grandezza totale dell'immagine a partire da quella dei grafici.
   figuresize = (2, Int(ceil(length(x_super)/2))+0.5) .* plotsize
+  # Se `labels` è un vettore di vettori riga di stringhe, significa che
+  # ogni sottografico ha già il suo insieme di etichette: sono a posto.
+  # Se invece `labels` è solo un vettore riga di stringhe, significa che
+  # quelle etichette sono da usare per tutti i grafici: allora creo in
+  # questo momento il vettore di vettori riga di stringhe ripetendo quello
+  # fornito come argomento.
+  if labels isa Matrix{String}
+    newlabels = repeat([labels], length(parameter_super))
+    labels = newlabels
+  end
+  # Ripeto lo stesso trattamento per `linestyles`.
+  if linestyles isa Matrix{Symbol}
+    newlinestyles = repeat([linestyles], length(parameter_super))
+    linestyles = newlinestyles
+  end
+
   # Creo i singoli grafici.
   subplots = [plot(X,
                    Y,
                    ylim=ylimits,
-                   label=labels,
-                   linestyle=linestyles,
+                   label=lab,
+                   linestyle=lst,
                    legend=:outerright,
                    xlabel=commonxlabel,
                    ylabel=commonylabel,
@@ -297,7 +311,11 @@ function groupplot(x_super, y_super, parameter_super; labels, linestyles, common
                    left_margin=5mm,
                    bottom_margin=5mm,
                    size=figuresize)
-              for (X, Y, p) in zip(x_super, y_super, parameter_super)]
+              for (X, Y, lab, lst, p) in zip(x_super,
+                                             y_super,
+                                             labels,
+                                             linestyles,
+                                             parameter_super)]
   # I grafici saranno disposti in una griglia con due colonne; se ho un numero
   # dispari di grafici, ne creo uno vuoto in modo da riempire il buco che
   # si crea (altrimenti mi becco un errore).
