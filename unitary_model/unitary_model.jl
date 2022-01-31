@@ -84,9 +84,9 @@ let
     # dell'operatore numero della catena di spin, vale a dire calcolo
     # (ψ,Pₙψ) dove ψ è lo stato corrente e Pₙ è il proiettore ortogonale
     # sull'n-esimo autospazio di N.
-    projectors = [level_subspace_proj(sites[range_spin], n)
+    projectors = [level_subspace_proj(sites[range_spins], n)
                   for n = 0:n_spin_sites]
-    num_eigenspace_projs = [embed_slice(sites, range_spin, p)
+    num_eigenspace_projs = [embed_slice(sites, range_spins, p)
                             for p in projectors]
   else
     preload = false
