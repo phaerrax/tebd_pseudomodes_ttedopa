@@ -356,3 +356,20 @@ function parse_init_state(sites::Vector{Index{Int64}}, state::String)
   end
   return v
 end
+
+# La seguente funzione è come quella sopra, ma per uno spin solo.
+function parse_spin_state(site::Index{Int64}, state::String)
+  state = lowercase(state)
+  if state == "empty" || state == "dn" || state == "down"
+    v = ITensors.state(site, "Dn")
+  elseif state == "up"
+    v = ITensors.state(site, "Up")
+  elseif state == "x+"
+    v = 1/sqrt(2) * (ITensors.state(site, "Up") + ITensors.state(site, "Dn"))
+  else
+    throw(DomainError(state,
+                      "Stato non riconosciuto; scegliere tra «empty», «up», "*
+                      "«down» oppure «x+»."))
+  end
+  return v
+end
