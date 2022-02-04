@@ -6,7 +6,9 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-using QuantumOptics
+using DifferentialEquations
+
+ENV["GKSwstype"] = "100"
 
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
@@ -43,6 +45,7 @@ let
   normalisation_super = []
   bond_dimensions_super = []
   numeric_occ_n_super = []
+  numeric_tsteps_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -125,14 +128,25 @@ let
     # --------------
     # Lo stato iniziale della catena è "spin_initial_state" per lo spin
     # attaccato all'oscillatore, "empty" per gli altri.
+    if n_spin_sites >= 2
     current_state = chain(parse_init_state_osc(sites[1],
                                  parameters["left_oscillator_initial_state"];
                                  ω=ω, T=T),
-                          parse_init_state(sites[2],
+                          parse_spin_state(sites[2],
                                            parameters["spin_initial_state"]),
                           parse_init_state(sites[3:end-1],
                                            "empty"),
                           parse_init_state_osc(sites[end], "empty"))
+    else
+    current_state = chain(parse_init_state_osc(sites[1],
+                                 parameters["left_oscillator_initial_state"];
+                                 ω=ω, T=T),
+                          parse_spin_state(sites[2],
+                                           parameters["spin_initial_state"]),
+                          parse_init_state_osc(sites[end], "empty"))
+    end
+
+    full_trace = MPS(sites, "vecId")
 
     # Osservabili sullo stato iniziale
     # --------------------------------
@@ -175,49 +189,79 @@ let
     # Parto con il primo spin su, gli altri giù, e gli oscillatori all'equilibrio
     # termico (alle rispettive temperature).
     if T == 0
-      mat = Matrix{Float64}(0, osc_dim, osc_dim)
+      mat = zeros(Float64, osc_dim, osc_dim)
       mat[1, 1] = 1
     else
       mat = exp(-ω / T * num(osc_dim))
       mat /= tr(mat)
+    end
     initstate = mat ⊗ σ⁺
     for j ∈ 2:n_spin_sites
       initstate = initstate ⊗ σ⁻
     end
-    mat = Matrix{Float64}(0, osc_dim, osc_dim)
+    mat = zeros(Float64, osc_dim, osc_dim)
     mat[1, 1] = 1
     initstate = initstate ⊗ mat
 
-    spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites] for j ∈ 1:n_spin_sites]
-    num_ops = [num(osc_dim) ⊗ Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim);
-               [reduce(⊗, list) for list ∈ spin_num_list];
-               Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim) ⊗ num(osc_dim)]
+    # Operatori numero, per calcolare i numeri di occupazione
+    spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites]
+                     for j ∈ 1:n_spin_sites]
+    num_ops = [num(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+                 2^n_spin_sites * osc_dim),
+               [Matrix{Float64}(I, osc_dim, osc_dim) ⊗
+                 reduce(⊗, list; init=[1]) ⊗
+                 Matrix{Float64}(I, osc_dim, osc_dim)
+                 for list ∈ spin_num_list]...,
+               Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+                 2^n_spin_sites * osc_dim) ⊗
+                 num(osc_dim)]
 
-    numeric_occ_n = Real[real(trace(N, initstate)) for N in num_ops]
+    numeric_occ_n = Real[real(tr(N * initstate)) for N ∈ num_ops]
 
-    HoscL = ω * a⁺(osc_dim) * a⁻(osc_dim) ⊗ Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim)
+    HoscL = ω * num(osc_dim) ⊗
+              Matrix{Float64}(I, 2*n_spin_sites * osc_dim,
+              2*n_spin_sites * osc_dim)
 
-    h1list = [[i == j ? σᶻ : I₂ for i ∈ 1:n_spin_sites] for j ∈ 1:n_spin_sites]
-    h1 = [reduce(⊗, list) for list ∈ h1list]
-    h2list = [[i == j ? σ⁺⊗σ⁻+σ⁻⊗σ⁺ : I₂ for i ∈ 1:n_spin_sites-1] for j ∈ 1:n_spin_sites-1]
-    h2 = [reduce(⊗, list) for list ∈ h2list]
-    Hspin = Matrix{Float64}(I, osc_dim, osc_dim) ⊗ (0.5ε * sum(h1) - 0.5 * sum(h2)) ⊗ Matrix{Float64}(I, osc_dim, osc_dim)
+    h1list = [[i == j ? σᶻ : I₂ for i ∈ 1:n_spin_sites]
+              for j ∈ 1:n_spin_sites]
+    h1 = [reduce(⊗, list; init=[1])
+          for list ∈ h1list]
+    h2list = [[i == j ? σ⁺⊗σ⁻+σ⁻⊗σ⁺ : I₂ for i ∈ 1:n_spin_sites-1]
+              for j ∈ 1:n_spin_sites-1]
+    h2 = [reduce(⊗, list; init=[1])
+          for list ∈ h2list]
+    Hspin = 0.5 * Matrix{Float64}(I, osc_dim, osc_dim) ⊗
+              (ε * sum(h1; init=[0 0; 0 0]) - sum(h2; init=[0 0; 0 0])) ⊗
+              Matrix{Float64}(I, osc_dim, osc_dim)
 
-    HoscR = Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim) ⊗ (ω * a⁺(osc_dim) * a⁻(osc_dim))
+    HoscR = Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+                            2^n_spin_sites * osc_dim) ⊗ (ω * num(osc_dim))
 
     X = a⁺(osc_dim) + a⁻(osc_dim)
-    HintL = κ * X ⊗ σˣ ⊗ Matrix{Float64}(I, 2*(n_spin_sites-1) + osc_dim, 2*(n_spin_sites-1) + osc_dim)
-    HintR = κ * Matrix{Float64}(I, 2*(n_spin_sites-1) + osc_dim, 2*(n_spin_sites-1) + osc_dim) ⊗ σˣ ⊗ X
+    HintL = κ * X ⊗ σˣ ⊗ Matrix{Float64}(I, 2^(n_spin_sites-1) * osc_dim,
+                                         2^(n_spin_sites-1) * osc_dim)
+    HintR = κ * Matrix{Float64}(I, 2^(n_spin_sites-1) * osc_dim,
+                                2^(n_spin_sites-1) * osc_dim) ⊗ σˣ ⊗ X
 
     H = HoscL + HintL + Hspin + HintR + HoscR
 
     n = (ℯ^(ω / T) - 1)^(-1)
-    jumpoperators = [sqrt(γ * (n+1)) * a⁻(osc_dim) ⊗ Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim),
-                     sqrt(γ * n) * a⁺(osc_dim) ⊗ Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim),
-                     sqrt(γ) * Matrix{Float64}(I, 2*n_spin_sites + osc_dim, 2*n_spin_sites + osc_dim) ⊗ a⁻(osc_dim)]
+    jumpoperators = [sqrt(γₗ * (n+1)) * a⁻(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
+                     sqrt(γₗ * n) * a⁺(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
+                     sqrt(γᵣ) * Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim) ⊗ a⁻(osc_dim)]
 
-    time_out, ρₜ = timeevolution.master(time_step_list, initstate, H, jumpoperators)
-    push!(numeric_occ_n, [real(trace(N, ρ)) for ρ in ρₜ] )
+    function lindblad!(∂ₜρ, ρ, par, t)
+      # ∂ₜρ = ℒ(ρ) = -i[H,ρ] + ∑ᵢ(JᵢρJᵢ' - ½ Jᵢ'Jᵢρ - ½ ρJᵢ'Jᵢ)
+      ∂ₜρ = -im * (H*ρ - ρ*H) +
+            sum([J*ρ*J' - 0.5J'*J*ρ - 0.5ρ*J'*J for J in jumpoperators])
+    end
+    problem = ODEProblem(lindblad!,
+                         initstate,
+                         (time_step_list[begin], time_step_list[end]))
+    solution = solve(problem)
+
+    numeric_occ_n = [[real(tr(N * ρₜ)) for N ∈ num_ops]
+                     for (ρₜ,_) ∈ tuples(solution)]
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => time_step_list[1:skip_steps:end])
@@ -243,6 +287,8 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, time_step_list[1:skip_steps:end])
     push!(occ_n_super, permutedims(hcat(occ_n...)))
+    push!(numeric_occ_n_super, permutedims(hcat(numeric_occ_n...)))
+    push!(numeric_tsteps_super, [t for (_,t) ∈ tuples(solution)])
     push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
     push!(normalisation_super, normalisation)
   end
@@ -274,7 +320,7 @@ let
   savefig(plt, "occ_n_all.png")
 
   N = size(occ_n_super[begin])[2]
-  plt = groupplot(time_out,
+  plt = groupplot(numeric_tsteps_super,
                   numeric_occ_n_super,
                   parameter_lists;
                   labels=["L" string.(1:N-2)... "R"],

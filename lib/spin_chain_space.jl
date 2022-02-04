@@ -371,5 +371,5 @@ function parse_spin_state(site::Index{Int64}, state::String)
                       "Stato non riconosciuto; scegliere tra «empty», «up», "*
                       "«down» oppure «x+»."))
   end
-  return v
+  return MPS([v])
 end
