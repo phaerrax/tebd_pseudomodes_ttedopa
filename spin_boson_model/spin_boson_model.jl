@@ -8,7 +8,14 @@ using DataFrames
 using CSV
 using DifferentialEquations
 
-ENV["GKSwstype"] = "100"
+# Se lo script viene eseguito su Qtech, devo disabilitare l'output
+# grafico altrimenti il programma si schianta.
+if gethostname() == "qtech.fisica.unimi.it"
+  ENV["GKSwstype"] = "100"
+else
+  delete!(ENV, "GKSwstype")
+  # Se la chiave "GKSwstype" non esiste non succede niente.
+end
 
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"

@@ -171,7 +171,7 @@ let
     osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
 
     localcfs = [reverse(Ωₗ); repeat([ε], n_spin_sites); Ωᵣ]
-    interactioncfs = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1); ηᵣ; κᵣ]
+    interactioncfs = [reverse(κₗ); 0; repeat([1], n_spin_sites-1); 0; κᵣ]
     hlist = twositeoperators(sites, localcfs, interactioncfs)
     #
     function links_odd(τ)
@@ -204,8 +204,14 @@ let
     # ===========
     # Stato iniziale
     # --------------
-    # Gli oscillatori partono tutti dallo stato vuoto
-    osc_sx_init_state = MPS(sites[range_osc_left], "0")
+    # Gli oscillatori partono tutti dallo stato vuoto; mi riservo di decidere
+    # volta per volta come inizializzare l'oscillatore più a destra nella
+    # catena a sinistra, per motivi di diagnostica.
+    osc_sx_init_state = chain(MPS(sites[1:n_osc_left-1], "0"),
+    					          parse_init_state_osc(
+    					          	sites[n_osc_left],
+    					      		parameters["left_oscillator_initial_state"]
+    					      		))
     spin_init_state = parse_init_state(sites[range_spins],
                                        parameters["chain_initial_state"])
     osc_dx_init_state = MPS(sites[range_osc_right], "0")
@@ -398,40 +404,40 @@ let
 
   savefig(plt, "bond_dimensions.png")
 
-  # Grafico della corrente di spin
-  # ------------------------------
-  plt = groupplot(timesteps_super,
-                  spin_current_super,
-                  parameter_lists;
-                  labels=[hcat(["($j,$(j+1))" for j ∈ 1:size(c, 2)]...)
-                          for c in spin_current_super],
-                  linestyles=[hcat(repeat([:solid], size(c, 2))...)
-                              for c in spin_current_super],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"j_{k,k+1}(t)",
-                  plottitle="Corrente di spin",
-                  plotsize=plotsize)
+  ## Grafico della corrente di spin
+  ## ------------------------------
+  #plt = groupplot(timesteps_super,
+  #                spin_current_super,
+  #                parameter_lists;
+  #                labels=[hcat(["($j,$(j+1))" for j ∈ 1:size(c, 2)]...)
+  #                        for c in spin_current_super],
+  #                linestyles=[hcat(repeat([:solid], size(c, 2))...)
+  #                            for c in spin_current_super],
+  #                commonxlabel=L"\lambda\, t",
+  #                commonylabel=L"j_{k,k+1}(t)",
+  #                plottitle="Corrente di spin",
+  #                plotsize=plotsize)
 
-  savefig(plt, "spin_current.png")
+  #savefig(plt, "spin_current.png")
  
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------
   # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
   # restanti valori.
-  plt = groupplot(timesteps_super,
-                  spin_chain_levels_super,
-                  parameter_lists;
-                  labels=[[string.( 0:(size(c,2)-2) )... "total"]
-                          for c ∈ spin_chain_levels_super],
-                  linestyles=[[repeat([:solid], size(c,2)-1)... :dash]
-                              for c ∈ spin_chain_levels_super],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"n(t)",
-                  plottitle="Occupazione degli autospazi "*
-                            "della catena di spin",
-                  plotsize=plotsize)
+  #plt = groupplot(timesteps_super,
+  #                spin_chain_levels_super,
+  #                parameter_lists;
+  #                labels=[[string.( 0:(size(c,2)-2) )... "total"]
+  #                        for c ∈ spin_chain_levels_super],
+  #                linestyles=[[repeat([:solid], size(c,2)-1)... :dash]
+  #                            for c ∈ spin_chain_levels_super],
+  #                commonxlabel=L"\lambda\, t",
+  #                commonylabel=L"n(t)",
+  #                plottitle="Occupazione degli autospazi "*
+  #                          "della catena di spin",
+  #                plotsize=plotsize)
 
-  savefig(plt, "chain_levels.png")
+  #savefig(plt, "chain_levels.png")
 
   # Grafico dei coefficienti della chain map
   # ----------------------------------------
