@@ -204,8 +204,14 @@ let
     # ===========
     # Stato iniziale
     # --------------
-    # Gli oscillatori partono tutti dallo stato vuoto
-    osc_sx_init_state = MPS(sites[range_osc_left], "0")
+    # Gli oscillatori partono tutti dallo stato vuoto; mi riservo di decidere
+    # volta per volta come inizializzare l'oscillatore più a destra nella
+    # catena a sinistra, per motivi di diagnostica.
+    osc_sx_init_state = chain(MPS(sites[1:n_osc_left-1], "0"),
+                              parse_init_state_osc(
+                                    sites[n_osc_left],
+                                    parameters["left_oscillator_initial_state"]
+                                   ))
     spin_init_state = parse_init_state(sites[range_spins],
                                        parameters["chain_initial_state"])
     osc_dx_init_state = MPS(sites[range_osc_right], "0")
