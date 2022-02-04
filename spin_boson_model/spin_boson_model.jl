@@ -265,7 +265,7 @@ let
     problem = ODEProblem(lindblad!,
                          initstate,
                          (time_step_list[begin], time_step_list[end]))
-    solution = solve(problem)
+    solution = solve(problem, saveat=time_step_list)
 
     numeric_occ_n = [[real(tr(N * ρₜ)) for N ∈ num_ops]
                      for (ρₜ,_) ∈ tuples(solution)]
