@@ -193,24 +193,25 @@ let
     end
 
     # Ora calcolo la soluzione esatta, integrando l'equazione di Lindblad.
-    # Parto con il primo spin su, gli altri giù, e gli oscillatori all'equilibrio
-    # termico (alle rispettive temperature).
+    # L'oscillatore di sx parte dallo stato di equilibrio termico.
     if T == 0
-      mat = zeros(Float64, osc_dim, osc_dim)
-      mat[1, 1] = 1
+      matL = zeros(Float64, osc_dim, osc_dim)
+      matL[1, 1] = 1
       n = 0
     else
       n = (ℯ^(ω / T) - 1)^(-1)
-      mat = exp(-ω / T * num(osc_dim))
-      mat /= tr(mat)
+      matL = exp(-ω / T * num(osc_dim))
+      matL /= tr(matL)
     end
-    initstate = mat ⊗ [1 0; 0 0]
+    # Gli spin partono il primo su, gli altri (se ci sono) giù.
+    initspin = matL ⊗ [1 0; 0 0]
     for j ∈ 2:n_spin_sites
-      initstate = initstate ⊗ [0 0; 0 1]
+      initspin = initspin ⊗ [0 0; 0 1]
     end
-    mat = zeros(Float64, osc_dim, osc_dim)
-    mat[1, 1] = 1
-    initstate = initstate ⊗ mat
+    # L'oscillatore a destra parte dal vuoto (è sempre a T=0).
+    matR = zeros(Float64, osc_dim, osc_dim)
+    matR[1, 1] = 1
+    initstate = matL ⊗ initspin ⊗ matR
 
     # Operatori numero, per calcolare i numeri di occupazione
     spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites]
