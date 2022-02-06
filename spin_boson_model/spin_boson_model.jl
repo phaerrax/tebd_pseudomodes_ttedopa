@@ -198,7 +198,9 @@ let
     if T == 0
       mat = zeros(Float64, osc_dim, osc_dim)
       mat[1, 1] = 1
+      n = 0
     else
+      n = (ℯ^(ω / T) - 1)^(-1)
       mat = exp(-ω / T * num(osc_dim))
       mat /= tr(mat)
     end
@@ -252,7 +254,6 @@ let
 
     H = HoscL + HintL + Hspin + HintR + HoscR
 
-    n = (ℯ^(ω / T) - 1)^(-1)
     jumpoperators = [sqrt(γₗ * (n+1)) * a⁻(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
                      sqrt(γₗ * n) * a⁺(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
                      sqrt(γᵣ) * Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim) ⊗ a⁻(osc_dim)]
