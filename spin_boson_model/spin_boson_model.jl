@@ -204,9 +204,9 @@ let
       mat = exp(-ω / T * num(osc_dim))
       mat /= tr(mat)
     end
-    initstate = mat ⊗ σ⁺
+    initstate = mat ⊗ [1 0; 0 0]
     for j ∈ 2:n_spin_sites
-      initstate = initstate ⊗ σ⁻
+      initstate = initstate ⊗ [0 0; 0 1]
     end
     mat = zeros(Float64, osc_dim, osc_dim)
     mat[1, 1] = 1
