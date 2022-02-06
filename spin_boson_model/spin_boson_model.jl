@@ -228,8 +228,8 @@ let
     numeric_occ_n = Real[real(tr(N * initstate)) for N ∈ num_ops]
 
     HoscL = ω * num(osc_dim) ⊗
-              Matrix{Float64}(I, 2*n_spin_sites * osc_dim,
-              2*n_spin_sites * osc_dim)
+              Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+              2^n_spin_sites * osc_dim)
 
     h1list = [[i == j ? σᶻ : I₂ for i ∈ 1:n_spin_sites]
               for j ∈ 1:n_spin_sites]
