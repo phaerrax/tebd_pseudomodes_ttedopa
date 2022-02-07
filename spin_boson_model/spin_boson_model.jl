@@ -211,7 +211,7 @@ let
     # L'oscillatore a destra parte dal vuoto (è sempre a T=0).
     matR = zeros(ComplexF64, osc_dim, osc_dim)
     matR[1, 1] = 1
-    initstate = matL ⊗ initspin ⊗ matR
+    ρ₀ = matL ⊗ initspin ⊗ matR
 
     # Operatori numero, per calcolare i numeri di occupazione
     spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites]
@@ -226,7 +226,7 @@ let
                  2^n_spin_sites * osc_dim) ⊗
                  num(osc_dim)]
 
-    numeric_occ_n = Real[real(tr(N * initstate)) for N ∈ num_ops]
+    numeric_occ_n = Real[real(tr(N * ρ₀)) for N ∈ num_ops]
 
     HoscL = ω * num(osc_dim) ⊗
               Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
@@ -260,15 +260,22 @@ let
                      sqrt(γₗ * n) * a⁺(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
                      sqrt(γᵣ) * Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim) ⊗ a⁻(osc_dim)]
 
-    function lindblad!(∂ₜρ, ρ, par, t)
+    function lindblad(ρ, par, t)
+      H = par[1]
+      Js = par[2:end]
       # ∂ₜρ = ℒ(ρ) = -i[H,ρ] + ∑ᵢ(JᵢρJᵢ' - ½ Jᵢ'Jᵢρ - ½ ρJᵢ'Jᵢ)
       ∂ₜρ = -im * (H*ρ - ρ*H) +
-            sum([J*ρ*J' - 0.5J'*J*ρ - 0.5ρ*J'*J for J in jumpoperators])
+            sum([J*ρ*J' - 0.5J'*J*ρ - 0.5ρ*J'*J for J in Js])
     end
-    problem = ODEProblem(lindblad!,
-                         initstate,
-                         (time_step_list[begin], time_step_list[end]))
-    solution = solve(problem, saveat=time_step_list)
+    problem = ODEProblem(lindblad,
+                         ρ₀,
+                         (time_step_list[begin], time_step_list[end]),
+                         [H, jumpoperators...])
+    solution = solve(problem,
+                     saveat=time_step_list,
+                     dt=parameters["simulation_time_step"],
+                     abstol=1e-9,
+                     reltol=1e-9)
 
     numeric_occ_n = [[real(tr(N * ρₜ)) for N ∈ num_ops]
                      for (ρₜ,_) ∈ tuples(solution)]
