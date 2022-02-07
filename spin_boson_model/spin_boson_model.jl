@@ -204,7 +204,7 @@ let
       matL /= tr(matL)
     end
     # Gli spin partono il primo su, gli altri (se ci sono) giù.
-    initspin = matL ⊗ [1 0; 0 0]
+    initspin = [1 0; 0 0]
     for j ∈ 2:n_spin_sites
       initspin = initspin ⊗ [0 0; 0 1]
     end
@@ -241,8 +241,9 @@ let
     h2 = [reduce(⊗, list; init=[1])
           for list ∈ h2list]
     Hspin = 0.5 * Matrix{Float64}(I, osc_dim, osc_dim) ⊗
-              (ε * sum(h1; init=[0 0; 0 0]) - sum(h2; init=[0 0; 0 0])) ⊗
-              Matrix{Float64}(I, osc_dim, osc_dim)
+            (ε * sum(h1; init=zeros(Float64, 2^n_spin_sites, 2^n_spin_sites)) -
+             sum(h2; init=zeros(Float64, 2^n_spin_sites, 2^n_spin_sites))) ⊗
+            Matrix{Float64}(I, osc_dim, osc_dim)
 
     HoscR = Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
                             2^n_spin_sites * osc_dim) ⊗ (ω * num(osc_dim))
