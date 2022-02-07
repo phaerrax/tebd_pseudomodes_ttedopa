@@ -195,7 +195,7 @@ let
     # Ora calcolo la soluzione esatta, integrando l'equazione di Lindblad.
     # L'oscillatore di sx parte dallo stato di equilibrio termico.
     if T == 0
-      matL = zeros(Float64, osc_dim, osc_dim)
+      matL = zeros(ComplexF64, osc_dim, osc_dim)
       matL[1, 1] = 1
       n = 0
     else
@@ -209,27 +209,27 @@ let
       initspin = initspin ⊗ [0 0; 0 1]
     end
     # L'oscillatore a destra parte dal vuoto (è sempre a T=0).
-    matR = zeros(Float64, osc_dim, osc_dim)
+    matR = zeros(ComplexF64, osc_dim, osc_dim)
     matR[1, 1] = 1
     initstate = matL ⊗ initspin ⊗ matR
 
     # Operatori numero, per calcolare i numeri di occupazione
     spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites]
                      for j ∈ 1:n_spin_sites]
-    num_ops = [num(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+    num_ops = [num(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
                  2^n_spin_sites * osc_dim),
-               [Matrix{Float64}(I, osc_dim, osc_dim) ⊗
+               [Matrix{ComplexF64}(I, osc_dim, osc_dim) ⊗
                  reduce(⊗, list; init=[1]) ⊗
-                 Matrix{Float64}(I, osc_dim, osc_dim)
+                 Matrix{ComplexF64}(I, osc_dim, osc_dim)
                  for list ∈ spin_num_list]...,
-               Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+               Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
                  2^n_spin_sites * osc_dim) ⊗
                  num(osc_dim)]
 
     numeric_occ_n = Real[real(tr(N * initstate)) for N ∈ num_ops]
 
     HoscL = ω * num(osc_dim) ⊗
-              Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+              Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
               2^n_spin_sites * osc_dim)
 
     h1list = [[i == j ? σᶻ : I₂ for i ∈ 1:n_spin_sites]
@@ -240,25 +240,25 @@ let
               for j ∈ 1:n_spin_sites-1]
     h2 = [reduce(⊗, list; init=[1])
           for list ∈ h2list]
-    Hspin = 0.5 * Matrix{Float64}(I, osc_dim, osc_dim) ⊗
-            (ε * sum(h1; init=zeros(Float64, 2^n_spin_sites, 2^n_spin_sites)) -
-             sum(h2; init=zeros(Float64, 2^n_spin_sites, 2^n_spin_sites))) ⊗
-            Matrix{Float64}(I, osc_dim, osc_dim)
+    Hspin = 0.5 * Matrix{ComplexF64}(I, osc_dim, osc_dim) ⊗
+            (ε * sum(h1; init=zeros(ComplexF64, 2^n_spin_sites, 2^n_spin_sites)) -
+             sum(h2; init=zeros(ComplexF64, 2^n_spin_sites, 2^n_spin_sites))) ⊗
+            Matrix{ComplexF64}(I, osc_dim, osc_dim)
 
-    HoscR = Matrix{Float64}(I, 2^n_spin_sites * osc_dim,
+    HoscR = Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
                             2^n_spin_sites * osc_dim) ⊗ (ω * num(osc_dim))
 
     X = a⁺(osc_dim) + a⁻(osc_dim)
-    HintL = κ * X ⊗ σˣ ⊗ Matrix{Float64}(I, 2^(n_spin_sites-1) * osc_dim,
+    HintL = κ * X ⊗ σˣ ⊗ Matrix{ComplexF64}(I, 2^(n_spin_sites-1) * osc_dim,
                                          2^(n_spin_sites-1) * osc_dim)
-    HintR = κ * Matrix{Float64}(I, 2^(n_spin_sites-1) * osc_dim,
+    HintR = κ * Matrix{ComplexF64}(I, 2^(n_spin_sites-1) * osc_dim,
                                 2^(n_spin_sites-1) * osc_dim) ⊗ σˣ ⊗ X
 
     H = HoscL + HintL + Hspin + HintR + HoscR
 
-    jumpoperators = [sqrt(γₗ * (n+1)) * a⁻(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
-                     sqrt(γₗ * n) * a⁺(osc_dim) ⊗ Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
-                     sqrt(γᵣ) * Matrix{Float64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim) ⊗ a⁻(osc_dim)]
+    jumpoperators = [sqrt(γₗ * (n+1)) * a⁻(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
+                     sqrt(γₗ * n) * a⁺(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
+                     sqrt(γᵣ) * Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim) ⊗ a⁻(osc_dim)]
 
     function lindblad!(∂ₜρ, ρ, par, t)
       # ∂ₜρ = ℒ(ρ) = -i[H,ρ] + ∑ᵢ(JᵢρJᵢ' - ½ Jᵢ'Jᵢρ - ½ ρJᵢ'Jᵢ)
