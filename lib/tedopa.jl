@@ -21,26 +21,8 @@ function thermalisedJ(J::Function,
   return f * J(ω)
 end
 
-function unitweightfunction(J::Function, support::Tuple{Real,Real}, g::Real)
-  # Costruisce la misura su [0,1] per calcolare i polinomi ortogonali
-  # a partire dalla # funzione spettrale, imitando il codice di py-tedopa.
-  rescaledsupport = 1/g .* support
-
-  function w(x)
-    if x < first(rescaledsupport) || x > last(rescaledsupport)
-      println("$x ∉ $rescaledsupport")
-      throw(DomainError)
-    else
-      return g/π * J(g * x)
-    end
-  end
-
-  return w, rescaledsupport
-end
-
 function chainmapcoefficients(J::Function,
-                              support::Tuple{Real,Real},
-                              g::Real,
+                              support,
                               L::Int;
                               kwargs...)
   #=
@@ -52,9 +34,15 @@ function chainmapcoefficients(J::Function,
   · `J::Function`: una funzione dall'intervallo specificato in `support` a 
     valori non negativi.
 
-  · `support::Tuple{Real,Real}`: determina il supporto della funzione
-
-  · `g::Real`: fattore di riscalamento per J
+  · `support`: il supporto della funzione; al minimo è una coppia di numeri
+    reali, ma può anche essere una lista di numeri reali (in ordine
+    crescente), in tal caso il supporto è interpretato come l'unione degli
+    intervalli con estremi i numeri dati. Ad esempio (0,2,3,4) individua il
+    supporto (0,2)∪(2,3)∪(3,4). Questa suddivisione del supporto è del
+    tutto ignorata per calcolare i coefficienti di ricorsione, ma può
+    tornare utile per calcolare l'integrale di J, dato che a volte
+    l'algoritmo di integrazione ha bisogno di questi punti intermedi per
+    funzionare.
 
   · `L::Int`: la lunghezza della serie di oscillatori che si desidera
     costruire, nel senso del numero di oscillatori presenti.
@@ -76,14 +64,18 @@ function chainmapcoefficients(J::Function,
   tra gli oscillatori (i,i+1) sono date da
   Ωᵢ = αᵢ            per i∈{1,…,L},
   κᵢ = sqrt(βᵢ₊₁)    per i∈{1,…,L-1}.
+  Il coefficiente β₀ rimane inutilizzato (onestamente, siccome a livello
+  teorico è arbitrario, il suo valore dipende dall'implementazione di
+  PolyChaos, quindi non so neanche quanto vale).
+  Rimane il coefficiente η di interazione tra oscillatore e spin, che calcolo
+  come l'integrale di J sul supporto dato.
   =#
-  w, rescaledsupport = unitweightfunction(J, support, g)
-  measure = PolyChaos.Measure("measure", w, rescaledsupport, false, Dict())
+  measure = PolyChaos.Measure("measure", J, (support[begin], support[end]), false, Dict())
   poly = PolyChaos.OrthoPoly("poly", L, measure; kwargs...)
   α = coeffs(poly)[:,1]
   β = coeffs(poly)[:,2]
-  Ω = g .* α
-  κ = g .* sqrt.(β[2:end])
-  η = sqrt(β[1])
+  Ω = α
+  κ = sqrt.(β[2:end])
+  η = sqrt(quadgk(J, support...)[begin])
   return Ω, κ, η
 end
