@@ -13,7 +13,8 @@
   "MP_compression_error": 1e-8,
   "TS_expansion_order": 2,
   "PolyChaos_nquad": 1e5,
-  "spectral_density_peak": 150,
   "temperature": 150,
-  "spectral_density_half_width": 1
+  "spectral_density_peak": 150,
+  "spectral_density_half_width": 1,
+  "spectral_density_overall_factor": 1
 }

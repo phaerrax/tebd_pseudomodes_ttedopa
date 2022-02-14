@@ -18,6 +18,7 @@
   "oscillator_frequency": "ω",
   "temperature": "T",
   "spectral_density_prop_constant": "λ",
+  "spectral_density_overall_factor": "κ",
   "spectral_density_peak": "Ω",
   "spectral_density_half_width": "γ",
   "frequency_cutoff": "g",
