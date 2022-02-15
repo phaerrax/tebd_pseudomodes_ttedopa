@@ -6,8 +6,10 @@ using ProgressMeter
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
-if gethostname() == "qtech.fisica.unimi.it"
+if gethostname() == "qtech.fisica.unimi.it" ||
+   gethostname() == "qtech2.fisica.unimi.it"
   ENV["GKSwstype"] = "100"
+  @info "Esecuzione su server remoto. Output grafico disattivato."
 else
   delete!(ENV, "GKSwstype")
   # Se la chiave "GKSwstype" non esiste non succede niente.
