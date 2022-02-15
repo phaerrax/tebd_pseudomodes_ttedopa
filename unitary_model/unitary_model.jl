@@ -58,6 +58,7 @@ let
   osc_chain_coefficients_left_super = []
   osc_chain_coefficients_right_super = []
   snapshot_super = []
+  normalisation_super = []
 
   # Precaricamento
   # ==============
@@ -228,6 +229,7 @@ let
                      for j in spin_current_ops]]
     spin_chain_levels = [levels(num_eigenspace_projs,
                                 current_state)]
+    state_norm = Real[norm(current_state)]
 
     # Evoluzione temporale
     # --------------------
@@ -249,6 +251,8 @@ let
               levels(num_eigenspace_projs, current_state))
         push!(bond_dimensions,
               linkdims(current_state))
+        push!(state_norm,
+              norm(current_state))
       end
       next!(progress)
       skip_count += 1
@@ -278,6 +282,7 @@ let
     for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 1:len-1])
       push!(dict, name => tmp_list[j,:])
     end
+    push!(dict, :norm => state_norm)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -306,6 +311,8 @@ let
     push!(osc_chain_coefficients_right_super,
           osc_chain_coefficients_right)
     push!(snapshot_super, snapshot)
+    push!(normalisation_super,
+          state_norm)
   end
 
   #= Grafici
@@ -488,6 +495,20 @@ let
                     plotsize=plotsize)
 
   savefig(plt, "snapshot.png")
+
+  # Grafico della norma dello stato
+  # -------------------------------
+  # Questo serve per controllare che rimanga sempre pari a 1.
+  plt = unifiedplot(timesteps_super,
+                    normalisation_super,
+                    parameter_lists;
+                    linestyle=:solid,
+                    xlabel=L"\lambda\, t",
+                    ylabel=L"\Vert\psi(t)\Vert",
+                    plottitle="Norma dello stato",
+                    plotsize=plotsize)
+
+  savefig(plt, "normalisation.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
