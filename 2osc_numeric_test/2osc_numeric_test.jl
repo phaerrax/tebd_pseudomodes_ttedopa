@@ -106,10 +106,10 @@ let
     # =============================================
     # Calcolo dei coefficienti dalla densità spettrale
     J(ω) = κ * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
-    Jtherm = ω -> thermalisedJ(J, ω, T, (-ωc, ωc))
-    Jzero  = ω -> thermalisedJ(J, ω, 0, (0, ωc))
+    Jtherm = ω -> thermalisedJ(J, ω, T)
+    Jzero  = ω -> thermalisedJ(J, ω, 0)
     (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
-                                        (-ωc, ωc),
+                                        (-ωc, 0, ωc),
                                         5;
                                         Nquad=nquad,
                                         discretization=lanczos)

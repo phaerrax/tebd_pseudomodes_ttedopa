@@ -3,8 +3,7 @@ using QuadGK
 
 function thermalisedJ(J::Function,
                       ω::Real,
-                      T::Real,
-                      support::Tuple{Real, Real})
+                      T::Real)
   # Questa funzione restituisce la densità spettrale termalizzata, a partire da
   # una J(ω) già antisimmetrica attorno a ω=0 (se non lo è, è necessario farlo
   # prima di chiamare questa funzione).
@@ -12,7 +11,7 @@ function thermalisedJ(J::Function,
   # Calcolo il "fattore termico" con cui moltiplicare J; se T=0, per evitare
   # divisioni per zero, scrivo a parte il fattore: lim T->0 coth(x/T)=Θ(x).
   # Si potrebbe anche scrivere f=1 e basta, assumendo che chi chiama la funzione
-  # abbia usato un `support` che escluda già (-∞,0), ma così almeno sto sicuro. 
+  # abbia usato un supporto che escluda già (-∞,0), ma così almeno sto sicuro.
   if T == 0
     f = 0.5(1 + sign(ω))
   else
