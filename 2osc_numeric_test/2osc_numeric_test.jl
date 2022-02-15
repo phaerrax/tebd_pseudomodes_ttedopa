@@ -325,7 +325,7 @@ let
   savefig(plt, "occ_n_numeric.png")
 
   plt = unifiedplot(timesteps_super,
-                    norm_super
+                    norm_super,
                     parameter_lists;
                     linestyle=:solid,
                     xlabel=L"\lambda\, t",
