@@ -6,7 +6,7 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-using DifferentialEquations
+using QuantumOptics
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -193,94 +193,79 @@ let
       next!(progress)
       skip_count += 1
     end
+    occ_n_MPS = permutedims(hcat(occ_n...))
 
     # Ora calcolo la soluzione esatta, integrando l'equazione di Lindblad.
-    # L'oscillatore di sx parte dallo stato di equilibrio termico.
+    bosc = FockBasis(osc_dim)
+    bspin = SpinBasis(1//2)
+    bcoll = tensor(bosc, repeat([bspin], n_spin_sites)..., bosc)
+
+    function numop(i::Int)
+      if i == 1 || i == n_spin_sites+2
+        op = embed(bcoll, i, number(bosc))
+      elseif i ∈ 1 .+ (1:n_spin_sites)
+        op = embed(bcoll, i, 0.5*(sigmaz(bspin) + one(bspin)))
+      else
+        throw(DomainError)
+      end
+      return op
+    end
+    hspinloc(i) = embed(bcoll, 1+i, sigmaz(bspin))
+    hspinint(i) = tensor(one(bosc),
+                         repeat([one(bspin)], i-1)...,
+                         sigmap(bspin)⊗sigmam(bspin)+sigmam(bspin)⊗sigmap(bspin),
+                         repeat([one(bspin)], n_spin_sites-i-1)...,
+                         one(bosc))
+
+    # Gli operatori Hamiltoniani
+    Hoscsx = ω * numop(1)
+    Hintsx = κ * tensor(create(bosc)+destroy(bosc),
+                        sigmax(bspin),
+                        repeat([one(bspin)], n_spin_sites-1)...,
+                        one(bosc))
+    Hspin = 0.5ε*sum(hspinloc.(1:n_spin_sites)) -
+            0.5*sum(hspinint.(1:n_spin_sites-1))
+    Hintdx = κ * tensor(one(bosc),
+                        repeat([one(bspin)], n_spin_sites-1)...,
+                        sigmax(bspin),
+                        create(bosc)+destroy(bosc))
+    Hoscdx = ω * numop(2+n_spin_sites)
+
+    H = Hoscsx + Hintsx + Hspin + Hintdx + Hoscdx
+
+    # Lo stato iniziale
     if T == 0
-      matL = zeros(ComplexF64, osc_dim, osc_dim)
-      matL[1, 1] = 1
+      matL = projector(fockstate(bosc, 0))
       n = 0
     else
+      matL = thermalstate(ω*number(bosc), T)
       n = (ℯ^(ω / T) - 1)^(-1)
-      matL = exp(-ω / T * num(osc_dim))
-      matL /= tr(matL)
     end
     # Gli spin partono il primo su, gli altri (se ci sono) giù.
-    initspin = [1 0; 0 0]
-    for j ∈ 2:n_spin_sites
-      initspin = initspin ⊗ [0 0; 0 1]
+    ρ₀ = tensor(matL,
+                0.5*(one(bspin)+sigmaz(bspin)),
+                repeat([0.5*(one(bspin)-sigmaz(bspin))], n_spin_sites-1)...,
+                projector(fockstate(bosc, 0)))
+
+    rates = [sqrt(γₗ * (n+1)), sqrt(γₗ * n), sqrt(γᵣ)]
+    jump = [embed(bcoll, 1, destroy(bosc)),
+            embed(bcoll, 1, create(bosc)),
+            embed(bcoll, 2+n_spin_sites, destroy(bosc))]
+
+    function fout(t, rho)
+      occ_n = [real(QuantumOptics.expect(N, psi))
+               for N in numop.(1:(2+n_spin_sites))]
+      return [occ_n..., QuantumOptics.tr(rho)]
     end
-    # L'oscillatore a destra parte dal vuoto (è sempre a T=0).
-    matR = zeros(ComplexF64, osc_dim, osc_dim)
-    matR[1, 1] = 1
-    ρ₀ = matL ⊗ initspin ⊗ matR
 
-    # Operatori numero, per calcolare i numeri di occupazione
-    spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites]
-                     for j ∈ 1:n_spin_sites]
-    num_ops = [num(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
-                 2^n_spin_sites * osc_dim),
-               [Matrix{ComplexF64}(I, osc_dim, osc_dim) ⊗
-                 reduce(⊗, list; init=[1]) ⊗
-                 Matrix{ComplexF64}(I, osc_dim, osc_dim)
-                 for list ∈ spin_num_list]...,
-               Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
-                 2^n_spin_sites * osc_dim) ⊗
-                 num(osc_dim)]
+    tout, output = timeevolution.master(time_step_list[1:skip_steps:end],
+                                        ρ₀, H, jump;
+                                        rates=rates, fout=fout)
+    output = permutedims(hcat(output...))
+    numeric_occ_n = output[:,1:end-1]
+    state_norm = output[:,end]
 
-    numeric_occ_n = Real[real(tr(N * ρ₀)) for N ∈ num_ops]
-
-    HoscL = ω * num(osc_dim) ⊗
-              Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
-              2^n_spin_sites * osc_dim)
-
-    h1list = [[i == j ? σᶻ : I₂ for i ∈ 1:n_spin_sites]
-              for j ∈ 1:n_spin_sites]
-    h1 = [reduce(⊗, list; init=[1])
-          for list ∈ h1list]
-    h2list = [[i == j ? σ⁺⊗σ⁻+σ⁻⊗σ⁺ : I₂ for i ∈ 1:n_spin_sites-1]
-              for j ∈ 1:n_spin_sites-1]
-    h2 = [reduce(⊗, list; init=[1])
-          for list ∈ h2list]
-    Hspin = 0.5 * Matrix{ComplexF64}(I, osc_dim, osc_dim) ⊗
-            (ε * sum(h1; init=zeros(ComplexF64, 2^n_spin_sites, 2^n_spin_sites)) -
-             sum(h2; init=zeros(ComplexF64, 2^n_spin_sites, 2^n_spin_sites))) ⊗
-            Matrix{ComplexF64}(I, osc_dim, osc_dim)
-
-    HoscR = Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim,
-                            2^n_spin_sites * osc_dim) ⊗ (ω * num(osc_dim))
-
-    X = a⁺(osc_dim) + a⁻(osc_dim)
-    HintL = κ * X ⊗ σˣ ⊗ Matrix{ComplexF64}(I, 2^(n_spin_sites-1) * osc_dim,
-                                         2^(n_spin_sites-1) * osc_dim)
-    HintR = κ * Matrix{ComplexF64}(I, 2^(n_spin_sites-1) * osc_dim,
-                                2^(n_spin_sites-1) * osc_dim) ⊗ σˣ ⊗ X
-
-    H = HoscL + HintL + Hspin + HintR + HoscR
-
-    jumpoperators = [sqrt(γₗ * (n+1)) * a⁻(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
-                     sqrt(γₗ * n) * a⁺(osc_dim) ⊗ Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim),
-                     sqrt(γᵣ) * Matrix{ComplexF64}(I, 2^n_spin_sites * osc_dim, 2^n_spin_sites * osc_dim) ⊗ a⁻(osc_dim)]
-
-    function lindblad(ρ, par, t)
-      H = par[1]
-      Js = par[2:end]
-      # ∂ₜρ = ℒ(ρ) = -i[H,ρ] + ∑ᵢ(JᵢρJᵢ' - ½ Jᵢ'Jᵢρ - ½ ρJᵢ'Jᵢ)
-      ∂ₜρ = -im * (H*ρ - ρ*H) +
-            sum([J*ρ*J' - 0.5J'*J*ρ - 0.5ρ*J'*J for J in Js])
-    end
-    problem = ODEProblem(lindblad,
-                         ρ₀,
-                         (time_step_list[begin], time_step_list[end]),
-                         [H, jumpoperators...])
-    solution = solve(problem,
-                     saveat=time_step_list,
-                     dt=parameters["simulation_time_step"],
-                     abstol=1e-9,
-                     reltol=1e-9)
-
-    numeric_occ_n = [[real(tr(N * ρₜ)) for N ∈ num_ops]
-                     for (ρₜ,_) ∈ tuples(solution)]
+    diff_occ_n = numeric_occ_n .- occ_n_MPS
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => time_step_list[1:skip_steps:end])
@@ -305,11 +290,11 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, permutedims(hcat(occ_n...)))
-    push!(numeric_occ_n_super, permutedims(hcat(numeric_occ_n...)))
-    push!(numeric_tsteps_super, [t for (_,t) ∈ tuples(solution)])
+    push!(occ_n_super, occ_n_MPS)
+    push!(numeric_occ_n_super, numeric_occ_n)
+    push!(diff_occ_n_super, diff_occ_n)
     push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
-    push!(normalisation_super, normalisation)
+    #push!(normalisation_super, state_norm)
   end
 
   #= Grafici
@@ -336,10 +321,10 @@ let
                   plottitle="Numeri di occupazione",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_all.png")
+  savefig(plt, "occ_n_MPS.png")
 
   N = size(occ_n_super[begin])[2]
-  plt = groupplot(numeric_tsteps_super,
+  plt = groupplot(timesteps_super,
                   numeric_occ_n_super,
                   parameter_lists;
                   labels=["L" string.(1:N-2)... "R"],
@@ -350,6 +335,19 @@ let
                   plotsize=plotsize)
 
   savefig(plt, "occ_n_numeric.png")
+
+  N = size(diff_occ_n_super[begin])[2]
+  plt = groupplot(timesteps_super,
+                  diff_occ_n_super,
+                  parameter_lists;
+                  labels=["L" string.(1:N-2)... "R"],
+                  linestyles=[:dash repeat([:solid], N-2)... :dash],
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione (diff. MPS vs numerica)",
+                  plotsize=plotsize)
+
+  savefig(plt, "diff_occ_n.png")
 
   # Grafico dell'occupazione del primo oscillatore (riunito)
   # -------------------------------------------------------
