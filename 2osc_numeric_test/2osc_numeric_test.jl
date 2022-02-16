@@ -1,12 +1,12 @@
 #!/usr/bin/julia
 
-using ITensors
+#using ITensors
 using LaTeXStrings
 using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-using DifferentialEquations
+using QuantumOptics
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -24,10 +24,7 @@ lib_path = root_path * "/lib"
 # Sali di due cartelle. root_path è la cartella principale del progetto.
 include(lib_path * "/utils.jl")
 include(lib_path * "/plotting.jl")
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/harmonic_oscillator_space.jl")
 include(lib_path * "/tedopa.jl")
-include(lib_path * "/operators.jl")
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -96,13 +93,6 @@ let
     n_spin_sites = parameters["number_of_spin_sites"]
     n_osc_left = 2
     n_osc_right = 1
-    sites = [siteinds("Osc", n_osc_left; dim=osc_dim);
-             siteinds("S=1/2", n_spin_sites);
-             siteinds("Osc", n_osc_right; dim=osc_dim)]
-
-    range_osc_left = 1:n_osc_left
-    range_spins = n_osc_left .+ (1:n_spin_sites)
-    range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
     # Definizione degli operatori nell'Hamiltoniana
     # =============================================
@@ -110,86 +100,92 @@ let
     J(ω) = κ * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
     Jtherm = ω -> thermalisedJ(J, ω, T)
     Jzero  = ω -> thermalisedJ(J, ω, 0)
-    (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
-                                        (-ωc, 0, ωc),
-                                        5;
-                                        Nquad=nquad,
-                                        discretization=lanczos)
-    (Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(Jzero,
-                                        (0, ωc),
-                                        5;
-                                        Nquad=nquad,
-                                        discretization=lanczos)
+    #(Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
+    #                                    (-ωc, 0, ωc),
+    #                                    5;
+    #                                    Nquad=nquad,
+    #                                    discretization=lanczos)
+    #(Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(Jzero,
+    #                                    (0, ωc),
+    #                                    5;
+    #                                    Nquad=nquad,
+    #                                    discretization=lanczos)
+    (Ωₗ, κₗ, ηₗ) = ([2.455, -2.186],
+                    [9.717],
+                    sqrt(quadgk(Jtherm, -ωc, 0, ωc)[1]))
+    (Ωᵣ, κᵣ, ηᵣ) = ([10.051],
+                    [1.375],
+                    sqrt(quadgk(Jzero, 0, ωc)[1]))
 
-    function imat(n::Int)
-      return Matrix{ComplexF64}(I, n, n)
+    bosc = FockBasis(osc_dim)
+    bspin = SpinBasis(1//2)
+    bcoll = tensor([bosc for i ∈ 1:2]...,
+                   [bspin for i ∈ 1:n_spin_sites]...,
+                   bosc)
+    # Costruisco i vari operatori per l'Hamiltoniano
+    function num(i::Int)
+      if i ∈ 1:2
+        op = embed(bcoll, i, number(bosc))
+      elseif i ∈ 2 .+ (1:n_spin_sites)
+        op = embed(bcoll, i, 0.5*(sigmaz(bspin) + one(bspin)))
+      elseif i == 2 + n_spin_sites + 1
+        op = embed(bcoll, i, number(bosc))
+      else
+        throw(DomainError)
+      end
+      return op
     end
-    # Costruisco i vari operatori hamiltoniani:
+    hspinloc(i) = embed(bcoll, 2+i, sigmaz(bspin))
+    hspinint(i) = tensor(one(bosc),
+                         one(bosc),
+                         [one(bspin) for i ∈ 1:i-1]...,
+                         sigmap(bspin)⊗sigmam(bspin)+sigmam(bspin)⊗sigmap(bspin),
+                         [one(bspin) for i ∈ 1:n_spin_sites-i-1]...,
+                         one(bosc))
+
+    # Gli operatori Hamiltoniani
     # · oscillatori a sinistra
-    Hoscsx = Ωₗ[1] * num(osc_dim) ⊗ imat(osc_dim) +
-             Ωₗ[2] * imat(osc_dim) ⊗ num(osc_dim) +
-             κₗ[1] * (a⁺(osc_dim) ⊗ a⁻(osc_dim) + a⁻(osc_dim) ⊗ a⁺(osc_dim))
-    Hoscsx = Hoscsx ⊗ imat(2^n_spin_sites * osc_dim)
-    # · interazione tra oscillatore a sinistra e spin
-    Hintsx = ηₗ * (a⁺(osc_dim) + a⁻(osc_dim)) ⊗ σˣ
-    Hintsx = imat(osc_dim) ⊗ Hintsx ⊗ imat(2^(n_spin_sites-1) * osc_dim)
-    # · catena di spin
-    h1list = [[i == j ? σᶻ : I₂ for i ∈ 1:n_spin_sites]
-              for j ∈ 1:n_spin_sites]
-    h1 = [reduce(⊗, list; init=[1])
-          for list ∈ h1list]
-    h2list = [[i == j ? σ⁺⊗σ⁻+σ⁻⊗σ⁺ : I₂ for i ∈ 1:n_spin_sites-1]
-              for j ∈ 1:n_spin_sites-1]
-    h2 = [reduce(⊗, list; init=[1])
-          for list ∈ h2list]
-    Hspin = 0.5 * Matrix{ComplexF64}(I, osc_dim^2, osc_dim^2) ⊗
-            (ε * sum(h1; init=zeros(ComplexF64, 2^n_spin_sites, 2^n_spin_sites)) -
-             sum(h2; init=zeros(ComplexF64, 2^n_spin_sites, 2^n_spin_sites))) ⊗
-            Matrix{ComplexF64}(I, osc_dim, osc_dim)
-    # · interazione tra oscillatore a destra e spin
-    Hintdx = ηᵣ * σˣ ⊗ (a⁺(osc_dim) + a⁻(osc_dim))
-    Hintdx = imat(2^(n_spin_sites-1) * osc_dim) ⊗ Hintdx
-    # · oscillatore a destra
-    Hoscdx = Ωᵣ[1] * num(osc_dim)
-    Hoscdx = imat(2^n_spin_sites * osc_dim) ⊗ Hoscdx
+    Hoscsx = Ωₗ[1] * num(2) + Ωₗ[2] * num(1) +
+             κₗ[1] * tensor(create(bosc)⊗destroy(bosc)+destroy(bosc)⊗create(bosc),
+                            [one(bspin) for i ∈ 1:n_spin_sites]...,
+                            one(bosc))
 
-    init_osc = zeros(ComplexF64, osc_dim)
-    init_osc[1] = 1
-    init_spin = [0, 1]
-    for j ∈ 2:n_spin_sites
-      initspin = initspin ⊗ [0, 1]
-    end
+    # · interazione tra oscillatore a sinistra e spin
+    Hintsx = ηₗ * tensor(one(bosc),
+                         create(bosc)+destroy(bosc),
+                         sigmax(bspin),
+                         [one(bspin) for i ∈ 1:n_spin_sites-1]...,
+                         one(bosc))
+
+    # · catena di spin
+    Hspin = 0.5ε*sum(hspinloc.(1:n_spin_sites)) -
+            0.5*sum(hspinint.(1:n_spin_sites-1))
+    # · interazione tra oscillatore a destra e spin
+    Hintdx = ηᵣ * tensor(one(bosc),
+                         one(bosc),
+                         [one(bspin) for i ∈ 1:n_spin_sites-1]...,
+                         sigmax(bspin),
+                         create(bosc)+destroy(bosc))
+    # · oscillatore a destra
+    Hoscdx = Ωᵣ[1] * num(2+n_spin_sites+1)
 
     H = Hoscsx + Hintsx + Hspin + Hintdx + Hoscdx
-    ψ₀ = init_osc ⊗ init_osc ⊗ init_spin ⊗ init_osc # (stato vuoto)
 
-    schrödinger!(∂ₜψ, ψ, par, t) = mul!(∂ₜψ, -im * H, ψ)
-    problem = ODEProblem(schrödinger!,
-                         ψ₀,
-                         (time_step_list[begin], time_step_list[end]))
-    solution = solve(problem,
-                     saveat=time_step_list,
-                     dt=parameters["simulation_time_step"],
-                     abstol=1e-9,
-                     reltol=1e-9)
+    # Stato iniziale (vuoto)
+    ψ₀ = tensor(fockstate(bosc, 0),
+                fockstate(bosc, 0),
+                [spindown(bspin) for i ∈ 1:n_spin_sites]...,
+                fockstate(bosc, 0))
 
-    # Operatori numero, per calcolare i numeri di occupazione
-    spin_num_list = [[i == j ? [1 0; 0 0] : I₂ for i ∈ 1:n_spin_sites]
-                     for j ∈ 1:n_spin_sites]
-    num_ops = [num(osc_dim) ⊗ imat(osc_dim) ⊗
-               imat(2^n_spin_sites * osc_dim),
-               imat(osc_dim) ⊗ num(osc_dim) ⊗
-               imat(2^n_spin_sites * osc_dim),
-               [imat(osc_dim^2) ⊗
-                reduce(⊗, list; init=[1]) ⊗
-                imat(osc_dim)
-                for list ∈ spin_num_list]...,
-               imat(2^n_spin_sites * osc_dim^2) ⊗
-               num(osc_dim)]
-
-    numeric_occ_n = [[dot(ψ, N, ψ) for N ∈ num_ops]
-                     for (ψ,_) ∈ tuples(solution)]
-    state_norm = [norm(ψ) for (ψ,_) ∈ tuples(solution)]
+    function fout(t, psi)
+      occ_n = [real(QuantumOptics.expect(N, psi))
+               for N in num.(1:(2+n_spin_sites+1))]
+      return [occ_n..., QuantumOptics.norm(psi)]
+    end
+    tout, output = timeevolution.schroedinger(time_step_list, ψ₀, H; fout=fout)
+    output = permutedims(hcat(output...))
+    numeric_occ_n = output[:,1:end-1]
+    state_norm = output[:,end]
 #=
     # Simulazione
     # ===========
@@ -276,10 +272,8 @@ let
     =#
 
     # Salvo i risultati nei grandi contenitori
-    push!(timesteps_super,
-          time_step_list[1:skip_steps:end])
-    push!(numeric_occ_n_super, permutedims(hcat(numeric_occ_n...)))
-    push!(numeric_tsteps_super, [t for (_,t) ∈ tuples(solution)])
+    push!(timesteps_super, tout)
+    push!(numeric_occ_n_super, numeric_occ_n)
     push!(norm_super, state_norm)
     #push!(occ_n_super,
     #      permutedims(hcat(occ_n...)))
@@ -312,7 +306,7 @@ let
   plotsize = (600, 400)
 
   N = size(numeric_occ_n_super[begin], 2)
-  plt = groupplot(numeric_tsteps_super,
+  plt = groupplot(timesteps_super,
                   numeric_occ_n_super,
                   parameter_lists;
                   labels=["L1" "L0" string.(1:N-3)... "R"],
