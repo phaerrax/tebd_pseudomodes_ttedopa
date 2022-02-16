@@ -33,6 +33,7 @@ include(lib_path * "/tedopa.jl")
 # di Lindblad.
 
 let
+  @info "Caricamento dei parametri delle simulazioni."
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
 
@@ -97,26 +98,28 @@ let
     # Definizione degli operatori nell'Hamiltoniana
     # =============================================
     # Calcolo dei coefficienti dalla densità spettrale
+    @info "Simulazione $current_sim_n di $tot_sim_n: calcolo dei coefficienti TEDOPA."
     J(ω) = κ * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
     Jtherm = ω -> thermalisedJ(J, ω, T)
     Jzero  = ω -> thermalisedJ(J, ω, 0)
-    #(Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
-    #                                    (-ωc, 0, ωc),
-    #                                    5;
-    #                                    Nquad=nquad,
-    #                                    discretization=lanczos)
-    #(Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(Jzero,
-    #                                    (0, ωc),
-    #                                    5;
-    #                                    Nquad=nquad,
-    #                                    discretization=lanczos)
-    (Ωₗ, κₗ, ηₗ) = ([2.455, -2.186],
-                    [9.717],
-                    sqrt(quadgk(Jtherm, -ωc, 0, ωc)[1]))
-    (Ωᵣ, κᵣ, ηᵣ) = ([10.051],
-                    [1.375],
-                    sqrt(quadgk(Jzero, 0, ωc)[1]))
+    (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
+                                        (-ωc, 0, ωc),
+                                        2;
+                                        Nquad=nquad,
+                                        discretization=lanczos)
+    (Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(Jzero,
+                                        (0, ωc),
+                                        2;
+                                        Nquad=nquad,
+                                        discretization=lanczos)
+    #(Ωₗ, κₗ, ηₗ) = ([2.455, -2.186],
+    #                [9.717],
+    #                sqrt(quadgk(Jtherm, -ωc, 0, ωc)[1]))
+    #(Ωᵣ, κᵣ, ηᵣ) = ([10.051],
+    #                [1.375],
+    #                sqrt(quadgk(Jzero, 0, ωc)[1]))
 
+    @info "Simulazione $current_sim_n di $tot_sim_n: calcolo della soluzione dell'equazione di Schrödinger."
     bosc = FockBasis(osc_dim)
     bspin = SpinBasis(1//2)
     bcoll = tensor([bosc for i ∈ 1:2]...,
@@ -296,6 +299,7 @@ let
     #push!(snapshot_super, snapshot)
   end
 
+  @info "Creazione dei grafici con i risultati."
   #= Grafici
      =======
      Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
