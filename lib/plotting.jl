@@ -213,3 +213,48 @@ function unifiedplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabe
   end
   return plt
 end
+
+function unifiedlogplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
+  #= Crea un grafico delle coppie di serie di dati (X,Y) ∈ x_super × y_super,
+     tutte assieme, con asse y logaritmico
+     In alto viene posto un titolo, grande, che elenca anche i parametri usati
+     nelle simulazioni e comuni a tutti i grafici; le etichette di ciascuna
+     serie del grafico contengono invece i parametri che differiscono tra una
+     simulazione e l'altra.
+     In pratica, la funzione applica il logaritmo ai dati sull'asse delle
+     ordinate e poi passa tutto a `unifiedplot`, in modo da non duplicare
+     il codice.
+     Non controllo che le ordinate siano positive: lascio l'onere di
+     controllare che il grafico logaritmico si possa effettivamente fare
+     a chi chiama la funzione.
+
+     Argomenti
+     ---------
+     · `x_super`: un array ogni elemento del quale è una lista di ascisse.
+
+     · `y_super`: un array, ogni elemento del quale è una lista di ordinate
+       associate a `x` da rappresentare nel grafico.
+
+     · `parameter_lists`: un array di dizionari, ciascuno contenente i
+       parametri che definiscono la simulazione dei dati degli elementi di
+       ciascun elemento di y_super.
+
+     · `linestyles`: come `labels`, ma per gli stili delle linee.
+
+     · `xlabel`: etichetta delle ascisse
+
+     · `ylabel`: etichetta delle ordinate
+
+     · `plottitle`: titolo del grafico
+
+     · `plotsize`: una Pair che indica la dimensione del grafico
+  =#
+  return unifiedplot(x_super,
+                     [log.(Y) for Y ∈ y_super],
+                     parameter_super;
+                     linestyle=linestyle,
+                     xlabel=xlabel,
+                     ylabel=ylabel,
+                     plottitle=plottitle,
+                     plotsize=plotsize)
+end
