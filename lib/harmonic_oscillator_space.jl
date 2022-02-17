@@ -17,15 +17,9 @@ creazione del sito.
 
 # Matrici base 
 # ------------
-function a⁻(dim::Int)
-  return diagm(1 => [sqrt(j) for j = 1:dim-1])
-end
-function a⁺(dim::Int)
-  m = diagm(-1 => [sqrt(j) for j = 1:dim-1])
-  m[end,end] = 1
-  return m
-end
-num(dim::Int) = diagm(0 => 0:dim-1)
+a⁻(dim::Int) = diagm(1 => [sqrt(j) for j = 1:dim-1])
+a⁺(dim::Int) = a⁻(dim)'
+num(dim::Int) = a⁺(dim) * a⁻(dim)
 id(dim::Int) = Matrix{Int}(I, dim, dim)
 
 # Spazio degli oscillatori (normale)
@@ -176,6 +170,8 @@ ITensors.op(::OpName"asum:Id", ::SiteType"vecOsc"; dim=2) = (a⁺(dim)+a⁻(dim)
 ITensors.op(::OpName"N:Id", ::SiteType"vecOsc"; dim=2) = num(dim) ⊗ id(dim)
 ITensors.op(::OpName"Id:N", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ num(dim)
 # - termini di dissipazione
+ITensors.op(::OpName"a-a+:Id", ::SiteType"vecOsc"; dim=2) = (a⁻(dim)*a⁺(dim)) ⊗ id(dim)
+ITensors.op(::OpName"Id:a-a+", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ (a⁻(dim)*a⁺(dim))
 ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc"; dim=2) = transpose(a⁺(dim)) ⊗ a⁻(dim)
 ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; dim=2) = transpose(a⁻(dim)) ⊗ a⁺(dim)
 
@@ -274,7 +270,7 @@ function ITensors.op(::OpName"Damping", ::SiteType"vecOsc", s::Index; ω::Number
     n = (ℯ^(ω / T) - 1)^(-1)
   end
   d = (n + 1) * (op("a+T:a-", s) - 0.5 * (op("N:Id", s) + op("Id:N", s))) +
-      n * (op("a-T:a+", s) - 0.5 * (op("N:Id", s) + op("Id:N", s)) - op("Id:Id", s))
+      n * (op("a-T:a+", s) - 0.5 * (op("a-a+:Id", s) + op("Id:a-a+", s)))
   return d
 end
 function ITensors.op(::OpName"Damping", ::SiteType"HvOsc"; dim=2, ω::Number, T::Number)
@@ -283,7 +279,10 @@ function ITensors.op(::OpName"Damping", ::SiteType"HvOsc"; dim=2, ω::Number, T:
   else
     n = (ℯ^(ω / T) - 1)^(-1)
   end
-  d = vec(x -> (n + 1) * (a⁻(dim)*x*a⁺(dim) - 0.5*(num(dim)*x + x*num(dim))) + n * (a⁺(dim)*x*a⁻(dim) - 0.5*(num(dim)*x + x*num(dim)) - x),
+  A = a⁻(dim)
+  A⁺ = a⁺(dim)
+  d = vec(x -> (n + 1) * (A*x*A⁺ - 0.5*(A⁺*A*x + x*A⁺*A)) +
+               n * (A⁺*x*A - 0.5*(A*A⁺*x + x*A*A⁺)),
           gellmannbasis(dim))
   return d
 end
