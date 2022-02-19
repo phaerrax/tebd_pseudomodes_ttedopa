@@ -6,7 +6,6 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-using DelimitedFiles
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -50,75 +49,10 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   timesteps_super = []
-  occ_n_super = []
-  spin_current_super = []
+  occ_n_mps_super = []
   bond_dimensions_super = []
-  chain_levels_super = []
-  osc_levels_left_super = []
-  osc_levels_right_super = []
   normalisation_super = []
   hermiticity_super = []
-
-  # Precaricamento
-  # ==============
-  # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
-  # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  n_spin_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
-  if allequal(n_spin_sites_list) && allequal(osc_dim_list)
-    preload = true
-    n_spin_sites = first(n_spin_sites_list)
-    osc_dim = first(osc_dim_list)
-
-    spin_range = 1 .+ (1:n_spin_sites)
-
-    sites = [siteinds("HvOsc", 1; dim=osc_dim);
-             siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
-
-    single_ex_states = [embed_slice(sites,
-                                    spin_range,
-                                    single_ex_state(sites[spin_range], k))
-                        for k = 1:n_spin_sites]
-    # - i numeri di occupazione: per gli spin della catena si prende il prodotto
-    #   interno con gli elementi di single_ex_states già definiti; per gli
-    #   oscillatori, invece, uso
-    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
-    osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
-
-    occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
-
-    # - la corrente di spin
-    # Prima costruisco gli operatori sulla catena di spin, poi li
-    # estendo con l'identità sui restanti siti.
-    spin_current_ops = [embed_slice(sites, spin_range, j)
-                        for j in spin_current_op_list(sites[spin_range])]
-
-    # - l'occupazione degli autospazi dell'operatore numero
-    # Ad ogni istante proietto lo stato corrente sugli autostati
-    # dell'operatore numero della catena di spin, vale a dire calcolo
-    # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
-    # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [embed_slice(sites,
-                                        spin_range,
-                                        level_subspace_proj(sites[spin_range], n))
-                            for n=0:n_spin_sites]
-
-    # - l'occupazione dei livelli degli oscillatori
-    osc_levels_projs_left = [embed_slice(sites,
-                                         1:1,
-                                         osc_levels_proj(sites[1], n))
-                             for n=0:osc_dim-1]
-    osc_levels_projs_right = [embed_slice(sites,
-                                          n_spin_sites+2:n_spin_sites+2,
-                                          osc_levels_proj(sites[end], n))
-                              for n=0:osc_dim-1]
-
-    # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecId")
-  else
-    preload = false
-  end
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -132,11 +66,12 @@ let
     ε = parameters["spin_excitation_energy"]
     # λ = 1
     κ = parameters["oscillator_spin_interaction_coefficient"]
-    γₗ = parameters["oscillator_damping_coefficient_left"]
-    γᵣ = parameters["oscillator_damping_coefficient_right"]
+    γ = parameters["oscillator_damping_coefficient"]
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
-    osc_dim = parameters["oscillator_space_dimension"]
+    oscdimL = parameters["left_oscillator_space_dimension"]
+    oscdimR = parameters["right_oscillator_space_dimension"]
+    n_spin_sites = 1
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -145,77 +80,62 @@ let
 
     # Costruzione della catena
     # ========================
-    if !preload
-      n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
-      spin_range = 1 .+ (1:n_spin_sites)
+    sites = [siteinds("HvOsc", 1; dim=oscdimL);
+             siteinds("HvS=1/2", n_spin_sites);
+             siteinds("HvOsc", 1; dim=oscdimR)]
 
-      sites = [siteinds("HvOsc", 1; dim=osc_dim);
-               siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 1; dim=osc_dim)]
-
-      single_ex_states = [chain(MPS(sites[1:1], "vecId"),
-                                single_ex_state(sites[2:end-1], k),
-                                MPS(sites[end:end], "vecId"))
-                          for k = 1:n_spin_sites]
-    end
-
-    #= Definizione degli operatori nell'equazione di Lindblad
-       ======================================================
-       I siti del sistema sono numerati come segue:
-       | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
-         ↑   │                        │          ↑
-         │   └───────────┬────────────┘          │
-         │               │                       │
-         │        catena di spin                 │
-       oscillatore sx                    oscillatore dx
-    =#
-    localcfs = [ω; repeat([ε], n_spin_sites); ω]
-    interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
+    localcfs = [ω, ε, ω]
+    interactioncfs = [κ, κ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
-                         op("Id", sites[begin+1])
-    ℓlist[end] += γᵣ * op("Id", sites[end-1]) *
-                       op("Damping", sites[end]; ω=ω, T=0)
+    ℓlist[begin] += (γ * op("Damping", sites[begin]; ω=ω, T=T) *
+                     op("Id", sites[begin+1]))
+    ℓlist[end] += (γ * op("Id", sites[end-1]) *
+                   op("Damping", sites[end]; ω=ω, T=0))
 
-    println("--------------------------- test ---------------------------")
+    filename = parameters["filename"]
+    println("-------------------- test ($filename) --------------------")
     # Definisco la parte unitaria dell'equazione di Lindblad
-    # L0(ρ) = -i[H,ρ]
-    A = a⁻(osc_dim)
-    A⁺ = a⁺(osc_dim)
-    H12 = ω * num(osc_dim) ⊗ id(2) + ε/4 * id(osc_dim) ⊗ σᶻ + κ * (A⁺+A) ⊗ σˣ
-    L0(ρ) = -im * (H12 * ρ - ρ * H12)
+    # L₀(ρ) = -i[H,ρ]
+    H12 = (ω * num(oscdimL) ⊗ id(2) ⊗ id(oscdimR) +
+           κ * (a⁺(oscdimL)+a⁻(oscdimL)) ⊗ σˣ ⊗ id(oscdimR) +
+           ε/2 * id(oscdimL) ⊗ σᶻ ⊗ id(oscdimR) +
+           κ * id(oscdimL) ⊗ σˣ ⊗ (a⁺(oscdimR)+a⁻(oscdimR)) +
+           ω * id(oscdimL) ⊗ id(2) ⊗ num(oscdimR))
+    L₀(ρ) = -im * (H12 * ρ - ρ * H12)
     # e la parte D(ρ) di interazione con l'ambiente
     n = T != 0 ? (ℯ^(ω/T)-1)^(-1) : 0
-    A = a⁻(osc_dim) ⊗ id(2)
-    A⁺ = a⁺(osc_dim) ⊗ id(2)
-    D(ρ) = γₗ * (1+n) * (A*ρ*A⁺ - 0.5A⁺*A*ρ - 0.5ρ*A⁺*A) + γₗ * n * (A⁺*ρ*A - 0.5A*A⁺*ρ - 0.5*ρ*A*A⁺)
+    AL  = a⁻(oscdimL) ⊗ id(2) ⊗ id(oscdimR)
+    AL⁺ = a⁺(oscdimL) ⊗ id(2) ⊗ id(oscdimR)
+    AR  = id(oscdimL) ⊗ id(2) ⊗ a⁻(oscdimR)
+    AR⁺ = id(oscdimL) ⊗ id(2) ⊗ a⁺(oscdimR)
+    D(ρ) = (γ * (1+n) * (AL*ρ*AL⁺ - 0.5AL⁺*AL*ρ - 0.5ρ*AL⁺*AL) +
+            γ * n * (AL⁺*ρ*AL - 0.5AL*AL⁺*ρ - 0.5*ρ*AL*AL⁺) +
+            γ * (AR*ρ*AR⁺ - 0.5AR⁺*AR*ρ - 0.5ρ*AR⁺*AR))
     # Le unisco e calcolo la matrice rappresentativa nella base hermitiana.
-    f(x) = L0(x) + D(x)
-    basis = [i⊗j for (i,j) in [Base.product(gellmannbasis(osc_dim), gellmannbasis(2))...]]
-    Ma = vec(f, basis)
-    # Calcolo qui invece la stessa matrice, ma costruita con gli oggetti
-    # di ITensors (che è quella che verrà usata nella simulazione.
-    C = combiner(sites[begin], sites[begin+1])
-    Cdag = combiner(sites[begin]', sites[begin+1]')
-    Mb = matrix(ℓlist[1] * Cdag * C)
-    # Stampo la matrice usata da ITensors per vedere se ha le giuste
-    # caratteristiche. Arrotondo un po' i numeri per salvare spazio.
-    println("matrice rapp. dell'operatore L(ρ) nella base hermitiana, "*
-            "costruita con ITensors:")
-    writedlm(stdout, round.(Mb; digits=3))
-    println("------------------------------------------------------------")
-    println("differenza tra la matrice di ITensors e quella costruita "*
-            "a mano:")
-    # Stampo la differenza tra le due matrici (troncando i numeri
-    # piccolissimi)
-    writedlm(stdout, chop.(Ma .- Mb))
-    println("------------------------------------------------------------")
-    # e anche la norma della differenza, così per matrici enormi si vede
-    # meglio quanto differiscono
-    diff = norm(Ma .- Mb, 2)
-    println("differenza in norma (p=2): $diff")
-    println("------------------------------------------------------------")
+    L(x) = L₀(x) + D(x)
+    basis = [i⊗j⊗k for (i,j,k) in [Base.product(gellmannbasis(oscdimL), gellmannbasis(2), gellmannbasis(oscdimR))...]]
+    manualL = vec(L, basis)
+    maxothers = norm(vec(L₀, basis)[end,:], Inf)
+    println("Nell'ultima riga della matrice che rappresenta la parte "*
+            "unitaria dell'equazione di Lindblad, costruita manualmente, "*
+            "le componenti sono tutte ≤ $maxothers in valore assoluto.")
+    maxothers = norm(vec(D, basis)[end,:], Inf)
+    println("Nell'ultima riga della matrice che rappresenta la parte "*
+            "dissipativa dell'equazione di Lindblad, costruita manualmente, "*
+            "le componenti sono tutte ≤ $maxothers in valore assoluto.")
+    # Calcolo il suo esponenziale, che uso per calcolare la soluzione
+    # esatta (numerica). Poi la confronto con l'operatore di evoluzione
+    # ottenuto con ITensors.
+    expL_manual = exp(time_step * manualL)
+    # La matrice è troppo grossa per essere stampata: controllo perlomeno
+    # che l'ultima riga sia tutta nulla.
+    last = expL_manual[end,end]
+    maxothers = norm(expL_manual[end,1:end-1], Inf)
+    println("Nell'ultima riga della matrice di evoluzione temporale, "*
+            "costruita manualmente:\n"*
+            "· l'ultima componente è $last;\n"*
+            "· gli altri elementi sono tutti ≤ $maxothers in valore assoluto.")
 
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -227,39 +147,41 @@ let
     evo = evolution_operator(links_odd,
                              links_even,
                              time_step,
-                             parameters["TS_expansion_order"])
+                             2)
+    # Ora cerco di combinare tutti i pezzi in `evo` in un unico tensore.
+    # Assumo che ce ne siano 3, cioè di stare usando la decomposizione
+    # di Trotter-Suzuki al 2° ordine.
+    u1 = prime(evo[2]; tags="HvS=1/2")
+    u2 = u1 * evo[1]
+    setprime!(u2, 1; tags="HvS=1/2", plev=2)
+    u3 = prime(evo[3]) * u2
+    setprime!(u3, 1; plev=2)
+
+    C = combiner(sites...)
+    Cdag = combiner(prime.(sites)...)
+    expL_mpo = matrix(u3 * Cdag * C)
+    last = expL_mpo[end,end]
+    maxothers = norm(expL_mpo[end,1:end-1], Inf)
+    println("Nell'ultima riga della matrice di evoluzione temporale, "*
+            "calcolata con ITensors:\n"*
+            "· l'ultima componente è $last;\n"*
+            "· gli altri elementi sono tutti ≤ $maxothers in valore assoluto.")
+
+    diff = norm(expL_manual .- expL_mpo, 2)
+    println("Differenza, in norma, tra la matrice di evoluzione temporale "*
+            "calcolata manualmente e quella calcolata con ITensors: $diff")
 
     # Osservabili da misurare
     # =======================
-    if !preload
-      # - i numeri di occupazione
-      osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
-      osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
-      occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
+    occ_n_list_mpo = [MPS(sites, ["vecN", "vecId", "vecId"]),
+                      MPS(sites, ["vecId", "vecN", "vecId"]),
+                      MPS(sites, ["vecId", "vecId", "vecN"])]
+    #Nlist = [num(oscdimL) ⊗ id(2) ⊗ id(oscdimR),
+    #         id(oscdimL) ⊗ [1 0; 0 0] ⊗ id(oscdimR),
+    #         id(oscdimL) ⊗ id(2) ⊗ num(oscdimR),
 
-      # - la corrente di spin
-      spin_current_ops = [embed_slice(sites, spin_range, j)
-                          for j in spin_current_op_list(sites[spin_range])]
-
-      # - l'occupazione degli autospazi dell'operatore numero
-      num_eigenspace_projs = [embed_slice(sites,
-                                          spin_range,
-                                          level_subspace_proj(sites[spin_range], n))
-                              for n=0:n_spin_sites]
-
-      # - l'occupazione dei livelli degli oscillatori
-      osc_levels_projs_left = [embed_slice(sites,
-                                           1:1,
-                                           osc_levels_proj(sites[1], n))
-                               for n=0:osc_dim-1]
-      osc_levels_projs_right = [embed_slice(sites,
-                                            n_spin_sites+2:n_spin_sites+2,
-                                            osc_levels_proj(sites[end], n))
-                                for n=0:osc_dim-1]
-
-      # - la normalizzazione (cioè la traccia) della matrice densità
-      full_trace = MPS(sites, "vecId")
-    end
+    # - la normalizzazione (cioè la traccia) della matrice densità
+    full_trace = MPS(sites, "vecId")
 
     # Simulazione
     # ===========
@@ -267,27 +189,20 @@ let
     # --------------
     # L'oscillatore sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
-    current_state = chain(parse_init_state_osc(sites[1],
-                                 parameters["left_oscillator_initial_state"];
-                                 ω=ω, T=T),
-                          parse_init_state(sites[2:end-1],
-                                           parameters["chain_initial_state"]),
-                          parse_init_state_osc(sites[end], "empty"))
+    ρ_mps = chain(parse_init_state_osc(sites[1],
+                    parameters["left_oscillator_initial_state"];
+                    ω=ω, T=T),
+                  MPS([state(sites[2], "Dn")]), 
+                  MPS([state(sites[end], "0")]))
+
+    #ρ_manual = vec(vector(currentstate * C), basis)
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    occ_n = Vector{Real}[chop.([inner(s, current_state) for s in occ_n_list])]
-    bond_dimensions = Vector{Int}[linkdims(current_state)]
-    spin_current = Vector{Real}[real.([inner(j, current_state)
-                                       for j in spin_current_ops])]
-    chain_levels = Vector{Real}[real.(levels(num_eigenspace_projs,
-                                             current_state))]
-    osc_levels_left = Vector{Real}[real.(levels(osc_levels_projs_left,
-                                                current_state))]
-    osc_levels_right = Vector{Real}[real.(levels(osc_levels_projs_right,
-                                                 current_state))]
+    occ_n_mps = Vector{Real}[chop.([inner(s, ρ_mps) for s in occ_n_list_mpo])]
+    bond_dimensions = Vector{Int}[linkdims(ρ_mps)]
 
-    normalisation = Real[real(inner(full_trace, current_state))]
+    normalisation = Real[real(inner(full_trace, ρ_mps))]
     hermiticity = Real[0]
 
     # Evoluzione temporale
@@ -296,10 +211,11 @@ let
     progress = Progress(length(time_step_list), 1, message, 30)
     skip_count = 1
     for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state,
-                            cutoff=max_err,
-                            maxdim=max_dim)
+      ρ_mps = apply(evo,
+                    ρ_mps,
+                    cutoff=max_err,
+                    maxdim=max_dim)
+      #ρ_manual = expL_manual * ρ_manual
       if skip_count % skip_steps == 0
         #=
         Calcolo dapprima la traccia della matrice densità. Se non devia
@@ -308,32 +224,24 @@ let
         stesso fattore, e devono essere quindi corrette di un fattore pari
         al reciproco della traccia.
         =#
-        trace = real(inner(full_trace, current_state))
+        trace = real(inner(full_trace, ρ_mps))
 
         push!(normalisation,
               trace)
 
-        push!(occ_n,
-              [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
+        push!(occ_n_mps,
+              [real(inner(s, ρ_mps)) for s in occ_n_list_mpo] ./ trace)
 
-        push!(spin_current,
-              [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
-        push!(chain_levels,
-              levels(num_eigenspace_projs, current_state) ./ trace)
-        push!(osc_levels_left,
-              levels(osc_levels_projs_left, current_state) ./ trace)
-        push!(osc_levels_right,
-              levels(osc_levels_projs_right, current_state) ./ trace)
         push!(bond_dimensions,
-              linkdims(current_state))
+              linkdims(ρ_mps))
 
         # Controllo che la matrice densità ridotta dell'oscillatore a sinistra
         # sia una valida matrice densità: hermitiana e semidefinita negativa.
-        reduceddensitymat = partialtrace(sites, current_state, 1)
+        reduceddensitymat = partialtrace(sites, ρ_mps, 1)
         # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
         # la positività degli autovalori devo tagliare via la loro parte reale,
         # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
-        for x in real.(eigvals(sum(reduceddensitymat .* gellmannbasis(osc_dim))))
+        for x in real.(eigvals(sum(reduceddensitymat .* gellmannbasis(oscdimL))))
           if x < -max_err
             @warn "La matrice densità del primo sito non è semidefinita positiva: trovato $x"
           end
@@ -351,26 +259,10 @@ let
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => time_step_list[1:skip_steps:end])
-    tmp_list = hcat(occ_n...)
+    tmp_list = hcat(occ_n_mps...)
     for (j, name) in enumerate([:occ_n_left;
                               [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
                               :occ_n_right])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(spin_current...)
-    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_spin_sites-1])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(osc_levels_left...)
-    for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(osc_levels_right...)
-    for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
       push!(dict, name => tmp_list[j,:])
     end
     tmp_list = hcat(bond_dimensions...)
@@ -389,11 +281,7 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, permutedims(hcat(occ_n...)))
-    push!(spin_current_super, permutedims(hcat(spin_current...)))
-    push!(chain_levels_super, permutedims(hcat(chain_levels...)))
-    push!(osc_levels_left_super, permutedims(hcat(osc_levels_left...)))
-    push!(osc_levels_right_super, permutedims(hcat(osc_levels_right...)))
+    push!(occ_n_mps_super, permutedims(hcat(occ_n_mps...)))
     push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
     push!(normalisation_super, normalisation)
     push!(hermiticity_super, hermiticity)
@@ -412,9 +300,9 @@ let
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
+  N = size(occ_n_mps_super[begin])[2]
   plt = groupplot(timesteps_super,
-                  occ_n_super,
+                  occ_n_mps_super,
                   parameter_lists;
                   labels=["L" string.(1:N-2)... "R"],
                   linestyles=[:dash repeat([:solid], N-2)... :dash],
@@ -428,7 +316,7 @@ let
   # Grafico dell'occupazione del primo oscillatore (riunito)
   # -------------------------------------------------------
   # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
-  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_super]
+  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_mps_super]
   plt = unifiedplot(timesteps_super,
                     occ_n_osc_left_super,
                     parameter_lists;
@@ -440,6 +328,7 @@ let
 
   savefig(plt, "occ_n_osc_left.png")
 
+  #=
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
   spinsonly = [mat[:, 2:end-1] for mat in occ_n_super]
@@ -472,6 +361,7 @@ let
                   plotsize=plotsize)
 
   savefig(plt, "occ_n_sums.png")
+  =#
 
   # Grafico dei ranghi del MPS
   # --------------------------
@@ -502,9 +392,6 @@ let
 
   savefig(plt, "dm_normalisation.png")
 
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
   plt = unifiedplot(timesteps_super,
                     hermiticity_super,
                     parameter_lists;
@@ -516,6 +403,7 @@ let
 
   savefig(plt, "hermiticity_monitor.png")
 
+  #=
   # Grafico della corrente di spin
   # ------------------------------
   N = size(spin_current_super[begin])[2]
@@ -567,6 +455,7 @@ let
 
     savefig(plt, "osc_levels_$pos.png")
   end
+  =#
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
