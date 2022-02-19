@@ -1,6 +1,5 @@
 #!/usr/bin/julia
 
-using ITensors
 using LaTeXStrings
 using ProgressMeter
 using Base.Filesystem
@@ -50,19 +49,15 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   timesteps_super = []
-  occ_n_super = []
+  occ_n_MPS_super = []
   normalisation_super = []
   bond_dimensions_super = []
-  numeric_occ_n_super = []
-  numeric_tsteps_super = []
+  occ_n_numeric_super = []
+  diff_occ_n_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
     # ==========================
-
-    # - parametri per ITensors
-    max_err = parameters["MP_compression_error"]
-    max_dim = parameters["MP_maximum_bond_dimension"]
 
     # - parametri fisici
     ε = parameters["spin_excitation_energy"]
@@ -76,126 +71,26 @@ let
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
-    time_step_list = construct_step_list(parameters)
-    skip_steps = parameters["skip_steps"]
 
     # Costruzione della catena
     # ========================
-    n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
-    spin_range = 1 .+ (1:n_spin_sites)
+    n_spin_sites = parameters["number_of_spin_sites"]
 
-    sites = [siteinds("HvOsc", 1; dim=osc_dim);
-             siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
+    # Leggo dal file temporaneo i dati prodotti dall'altro script.
+    tmpfilename = replace(parameters["filename"], ".json" => ".dat.tmp")
+    outfilename = replace(parameters["filename"], ".json" => ".dat")
+    MPSdata = DataFrame(CSV.File(tmpfilename))
 
-    #= Definizione degli operatori nell'equazione di Lindblad
-       ======================================================
-       I siti del sistema sono numerati come segue:
-       | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
-         ↑   │                        │          ↑
-         │   └───────────┬────────────┘          │
-         │               │                       │
-         │        catena di spin                 │
-       oscillatore sx                    oscillatore dx
-    =#
-    localcfs = [ω; repeat([ε], n_spin_sites); ω]
-    interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
-    ℓlist = twositeoperators(sites, localcfs, interactioncfs)
-    # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
-                         op("Id", sites[begin+1])
-    ℓlist[end] += γᵣ * op("Id", sites[end-1]) *
-                       op("Damping", sites[end]; ω=ω, T=0)
-    #
-    function links_odd(τ)
-      return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
-    end
-    function links_even(τ)
-      return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
-    end
-    #
-    evo = evolution_operator(links_odd,
-                             links_even,
-                             time_step,
-                             parameters["TS_expansion_order"])
+    time_step_list = MPSdata[:, :time]
+    occ_n_MPS = hcat(MPSdata[:, :occ_n_left],
+                     [MPSdata[:, Symbol("occ_n_spin$n")]
+                      for n ∈ 1:n_spin_sites]...,
+                     MPSdata[:, :occ_n_right])
+    bond_dimensions = hcat([MPSdata[:, Symbol("bond_dim$n")]
+                            for n ∈ 1:(n_spin_sites+1)]...)
 
-    # Osservabili da misurare
-    # =======================
-    # - i numeri di occupazione
-    single_ex_states = [chain(MPS(sites[1:1], "vecId"),
-                              single_ex_state(sites[2:end-1], k),
-                              MPS(sites[end:end], "vecId"))
-                        for k = 1:n_spin_sites]
-    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
-    osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
-
-    occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
-
-    # Simulazione
-    # ===========
-    # Stato iniziale
-    # --------------
-    # Lo stato iniziale della catena è "spin_initial_state" per lo spin
-    # attaccato all'oscillatore, "empty" per gli altri.
-    if n_spin_sites >= 2
-    current_state = chain(parse_init_state_osc(sites[1],
-                                 parameters["left_oscillator_initial_state"];
-                                 ω=ω, T=T),
-                          parse_spin_state(sites[2],
-                                           parameters["spin_initial_state"]),
-                          parse_init_state(sites[3:end-1],
-                                           "empty"),
-                          parse_init_state_osc(sites[end], "empty"))
-    else
-    current_state = chain(parse_init_state_osc(sites[1],
-                                 parameters["left_oscillator_initial_state"];
-                                 ω=ω, T=T),
-                          parse_spin_state(sites[2],
-                                           parameters["spin_initial_state"]),
-                          parse_init_state_osc(sites[end], "empty"))
-    end
-
-    full_trace = MPS(sites, "vecId")
-
-    # Osservabili sullo stato iniziale
-    # --------------------------------
-    occ_n = Vector{Real}[chop.([inner(s, current_state) for s in occ_n_list])]
-    bond_dimensions = Vector{Int}[linkdims(current_state)]
-    normalisation = Real[real(inner(full_trace, current_state))]
-
-    # Evoluzione temporale
-    # --------------------
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state,
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        #=
-        Calcolo dapprima la traccia della matrice densità. Se non devia
-        eccessivamente da 1, in ogni caso influisce sul valore delle
-        osservabili che calcolo successivamente, che si modificano dello
-        stesso fattore, e devono essere quindi corrette di un fattore pari
-        al reciproco della traccia.
-        =#
-        trace = real(inner(full_trace, current_state))
-
-        push!(normalisation,
-              trace)
-        push!(occ_n,
-              [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
-        push!(bond_dimensions,
-              linkdims(current_state))
-      end
-      next!(progress)
-      skip_count += 1
-    end
-    occ_n_MPS = permutedims(hcat(occ_n...))
-
-    # Ora calcolo la soluzione esatta, integrando l'equazione di Lindblad.
+    @info "Costruzione dell'equazione di Lindblad."
+    # Calcolo la soluzione esatta, integrando l'equazione di Lindblad.
     bosc = FockBasis(osc_dim)
     bspin = SpinBasis(1//2)
     bcoll = tensor(bosc, repeat([bspin], n_spin_sites)..., bosc)
@@ -213,7 +108,8 @@ let
     hspinloc(i) = embed(bcoll, 1+i, sigmaz(bspin))
     hspinint(i) = tensor(one(bosc),
                          repeat([one(bspin)], i-1)...,
-                         sigmap(bspin)⊗sigmam(bspin)+sigmam(bspin)⊗sigmap(bspin),
+                         tensor(sigmap(bspin), sigmam(bspin)) +
+                           tensor(sigmam(bspin), sigmap(bspin)),
                          repeat([one(bspin)], n_spin_sites-i-1)...,
                          one(bosc))
 
@@ -245,7 +141,7 @@ let
     ρ₀ = tensor(matL,
                 0.5*(one(bspin)+sigmaz(bspin)),
                 repeat([0.5*(one(bspin)-sigmaz(bspin))], n_spin_sites-1)...,
-                projector(fockstate(bosc, 0)))
+                QuantumOptics.projector(fockstate(bosc, 0)))
 
     rates = [sqrt(γₗ * (n+1)), sqrt(γₗ * n), sqrt(γᵣ)]
     jump = [embed(bcoll, 1, destroy(bosc)),
@@ -253,48 +149,61 @@ let
             embed(bcoll, 2+n_spin_sites, destroy(bosc))]
 
     function fout(t, rho)
-      occ_n = [real(QuantumOptics.expect(N, psi))
+      occ_n = [real(QuantumOptics.expect(N, rho))
                for N in numop.(1:(2+n_spin_sites))]
       return [occ_n..., QuantumOptics.tr(rho)]
     end
 
-    tout, output = timeevolution.master(time_step_list[1:skip_steps:end],
+    @info "Integrazione dell'equazione di Lindblad in corso."
+    tout, output = timeevolution.master(time_step_list,
                                         ρ₀, H, jump;
                                         rates=rates, fout=fout)
     output = permutedims(hcat(output...))
-    numeric_occ_n = output[:,1:end-1]
-    state_norm = output[:,end]
+    occ_n_numeric = real.(output[:,1:end-1])
+    norm_numeric = real.(output[:,end])
 
-    diff_occ_n = numeric_occ_n .- occ_n_MPS
+    @info "Scrittura dei risultati su file."
+    dict = Dict(:time => time_step_list)
+    for (col, name) ∈ enumerate([:occ_n_left_MPS;
+                                 [Symbol("occ_n_spin$(n)_MPS")
+                                  for n ∈ 1:n_spin_sites];
+                                 :occ_n_right_MPS])
+      push!(dict, name => occ_n_MPS[:,col])
+    end
 
-    # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => time_step_list[1:skip_steps:end])
-    tmp_list = hcat(occ_n...)
-    for (j, name) in enumerate([:occ_n_left;
-                              [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
-                              :occ_n_right])
-      push!(dict, name => tmp_list[j,:])
+    for (col, name) ∈ enumerate([:occ_n_left_numeric;
+                                 [Symbol("occ_n_spin$(n)_numeric")
+                                  for n ∈ 1:n_spin_sites];
+                                 :occ_n_right_numeric])
+      push!(dict, name => occ_n_numeric[:,col])
     end
-    tmp_list = hcat(bond_dimensions...)
-    len = n_spin_sites + 2
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:len-1])
-      push!(dict, name => tmp_list[j,:])
+
+    diff_occ_n = occ_n_numeric .- occ_n_MPS
+    for (col, name) ∈ enumerate([:diff_occ_n_left;
+                                  [Symbol("diff_occ_n_spin$n")
+                                   for n ∈ 1:n_spin_sites];
+                                  :diff_occ_n_right])
+      push!(dict, name => diff_occ_n[:,col])
     end
-    push!(dict, :full_trace => normalisation)
-    table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
-    # Scrive la tabella su un file che ha la stessa estensione del file dei
-    # parametri, con estensione modificata.
-    CSV.write(filename, table)
+
+    for (col, name) ∈ enumerate([Symbol("bond_dim$n")
+                                  for n ∈ 1:n_spin_sites+1])
+      push!(dict, name => bond_dimensions[:,col])
+    end
+
+    norm_MPS = MPSdata[:, :full_trace]
+    push!(dict, :trace_MPS => norm_MPS)
+    push!(dict, :trace_numeric => norm_numeric)
+
+    CSV.write(outfilename, DataFrame(dict))
 
     # Salvo i risultati nei grandi contenitori
-    push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, occ_n_MPS)
-    push!(numeric_occ_n_super, numeric_occ_n)
+    push!(timesteps_super, time_step_list)
+    push!(occ_n_MPS_super, occ_n_MPS)
+    push!(occ_n_numeric_super, occ_n_numeric)
     push!(diff_occ_n_super, diff_occ_n)
-    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
-    #push!(normalisation_super, state_norm)
+    push!(bond_dimensions_super, bond_dimensions)
+    push!(normalisation_super, norm_MPS)
   end
 
   #= Grafici
@@ -308,24 +217,25 @@ let
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
 
+  @info "Creazione dei grafici."
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
+  N = size(occ_n_MPS_super[begin], 2)
   plt = groupplot(timesteps_super,
-                  occ_n_super,
+                  occ_n_MPS_super,
                   parameter_lists;
                   labels=["L" string.(1:N-2)... "R"],
                   linestyles=[:dash repeat([:solid], N-2)... :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
+                  plottitle="Numeri di occupazione (sol. MPS)",
                   plotsize=plotsize)
 
   savefig(plt, "occ_n_MPS.png")
 
-  N = size(occ_n_super[begin])[2]
+  N = size(occ_n_numeric_super[begin], 2)
   plt = groupplot(timesteps_super,
-                  numeric_occ_n_super,
+                  occ_n_numeric_super,
                   parameter_lists;
                   labels=["L" string.(1:N-2)... "R"],
                   linestyles=[:dash repeat([:solid], N-2)... :dash],
@@ -336,7 +246,7 @@ let
 
   savefig(plt, "occ_n_numeric.png")
 
-  N = size(diff_occ_n_super[begin])[2]
+  N = size(diff_occ_n_super[begin], 2)
   plt = groupplot(timesteps_super,
                   diff_occ_n_super,
                   parameter_lists;
@@ -349,10 +259,11 @@ let
 
   savefig(plt, "diff_occ_n.png")
 
+  #=
   # Grafico dell'occupazione del primo oscillatore (riunito)
   # -------------------------------------------------------
   # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
-  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_super]
+  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_MPS_super]
   plt = unifiedplot(timesteps_super,
                     occ_n_osc_left_super,
                     parameter_lists;
@@ -366,7 +277,7 @@ let
 
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
-  spinsonly = [mat[:, 2:end-1] for mat in occ_n_super]
+  spinsonly = [mat[:, 2:end-1] for mat in occ_n_MPS_super]
   plt = groupplot(timesteps_super,
                   spinsonly,
                   parameter_lists;
@@ -396,6 +307,7 @@ let
                   plotsize=plotsize)
 
   savefig(plt, "occ_n_sums.png")
+  =#
 
   # Grafico dei ranghi del MPS
   # --------------------------
@@ -415,14 +327,14 @@ let
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super,
-                    normalisation_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\operatorname{tr}\,\rho(t)",
-                    plottitle="Normalizzazione della matrice densità",
-                    plotsize=plotsize)
+  plt = unifiedlogplot(timesteps_super,
+                       normalisation_super,
+                       parameter_lists;
+                       linestyle=:solid,
+                       xlabel=L"\lambda\, t",
+                       ylabel=L"\log\operatorname{tr}\,\rho(t)",
+                       plottitle="Normalizzazione della matrice densità",
+                       plotsize=plotsize)
 
   savefig(plt, "dm_normalisation.png")
 
