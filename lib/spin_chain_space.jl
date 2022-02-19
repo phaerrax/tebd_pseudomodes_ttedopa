@@ -108,6 +108,9 @@ end
 function ITensors.state(::StateName"vecId", ::SiteType"HvS=1/2")
   return vec(I₂, gellmannbasis(2))
 end
+function ITensors.state(::StateName"vecN", ::SiteType"HvS=1/2")
+  return vec([1 0; 0 0], gellmannbasis(2))
+end
 function ITensors.state(::StateName"vec0", ::SiteType"HvS=1/2")
   return vec(zeros(2, 2), gellmannbasis(2))
 end
