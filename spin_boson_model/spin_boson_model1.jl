@@ -46,13 +46,6 @@ let
     cd(ARGS[1])
   end
 
-  # Le seguenti liste conterranno i risultati della simulazione per ciascuna
-  # lista di parametri fornita.
-  timesteps_super = []
-  occ_n_super = []
-  normalisation_super = []
-  bond_dimensions_super = []
-
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
     # ==========================
@@ -205,13 +198,8 @@ let
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
-
-    # Salvo i risultati nei grandi contenitori
-    push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, occ_n_MPS)
-    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
   end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
-
+end
