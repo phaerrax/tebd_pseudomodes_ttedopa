@@ -147,19 +147,37 @@ let
     evo = evolution_operator(links_odd,
                              links_even,
                              time_step,
-                             2)
+                             parameters["TS_expansion_order"])
     # Ora cerco di combinare tutti i pezzi in `evo` in un unico tensore.
     # Assumo che ce ne siano 3, cioè di stare usando la decomposizione
     # di Trotter-Suzuki al 2° ordine.
-    u1 = prime(evo[2]; tags="HvS=1/2")
-    u2 = u1 * evo[1]
-    setprime!(u2, 1; tags="HvS=1/2", plev=2)
-    u3 = prime(evo[3]) * u2
-    setprime!(u3, 1; plev=2)
+    # Ogni u ∈ evo è un oggetto ITensor con due indici iₖ₁, iₖ₂ (che si
+    # contrarrebbero con quelli dello stato MPS) e due indici iₖ₁', iₖ₂'.
+    # Per moltiplicare tra loro questi tensori, devo lavorare un po' sugli
+    # indici in modo da fare le giuste contrazioni.
+    # Per calcolare u1 e u2, se non hanno siti in comune allora basta
+    # fare u2*u1 e ottengo semplicemente il prodotto di Kronecker; se
+    # invece hanno un sito k in comune, allora la moltiplicazione corretta
+    # include la contrazione di iₖ' di u1 con iₖ di u2: devo quindi "primare"
+    # la coppia (iₖ,iₖ') di u2 in modo che la contrazione sia giusta.
+    # Dopo la moltiplicazione mi ritroverò con degli indici due volte primati,
+    # che dovrò riportare allo stato iniziale.
+    U = evo[1]
+    for u ∈ evo[2:end]
+      # Ottengo i tag degli indici in comune tra U e u.
+      # Con questi tag individuo quali sono gli indici in u da "primare".
+      primetaglist = unique(tags.(commoninds(U, u)))
+      w = deepcopy(u)
+      for t ∈ primetaglist
+        prime!(w; tags=t)
+      end
+      U = w * U
+      setprime!(U, 1; plev=2)
+    end
 
     C = combiner(sites...)
     Cdag = combiner(prime.(sites)...)
-    expL_mpo = matrix(u3 * Cdag * C)
+    expL_mpo = matrix(U * Cdag * C)
     last = expL_mpo[end,end]
     maxothers = norm(expL_mpo[end,1:end-1], Inf)
     println("Nell'ultima riga della matrice di evoluzione temporale, "*
