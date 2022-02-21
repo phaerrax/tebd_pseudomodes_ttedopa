@@ -76,7 +76,9 @@ let
     sites = siteinds("vecS=1/2", n_spin_sites)
 
     # Stati di singola eccitazione
-    single_ex_states = [single_ex_state(sites, j) for j = 1:n_spin_sites]
+    num_op_list = [MPS(sites,
+                       [i == n ? "vecN" : "vecId" for i ∈ 1:n_spin_sites])
+                   for n ∈ 1:n_spin_sites]
 
     # Costruzione dell'operatore di evoluzione
     # ========================================
@@ -119,7 +121,7 @@ let
     current_state = parse_init_state(sites, parameters["chain_initial_state"])
 
     # Misuro le osservabili sullo stato iniziale
-    occ_n = [[inner(s, current_state) for s in single_ex_states]]
+    occ_n = [[inner(N, current_state) for N in num_op_list]]
     bond_dimensions = [linkdims(current_state)]
     spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
     chain_levels = [levels(num_eigenspace_projs, current_state)]
@@ -136,7 +138,7 @@ let
       #
       if skip_count % skip_steps == 0
         push!(occ_n,
-              [real(inner(s, current_state)) for s in single_ex_states])
+              [real(inner(N, current_state)) for N in num_op_list])
         push!(spin_current,
               [real(inner(j, current_state)) for j in spin_current_ops])
         push!(chain_levels,

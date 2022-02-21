@@ -191,9 +191,9 @@ let
 
     # Osservabili da misurare
     # =======================
-    occ_n_list_mpo = [MPS(sites, ["vecN", "vecId", "vecId"]),
-                      MPS(sites, ["vecId", "vecN", "vecId"]),
-                      MPS(sites, ["vecId", "vecId", "vecN"])]
+    occ_n_list_mpo = [MPS(sites,
+                          [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                      for n ∈ 1:length(sites)]
     #Nlist = [num(oscdimL) ⊗ id(2) ⊗ id(oscdimR),
     #         id(oscdimL) ⊗ [1 0; 0 0] ⊗ id(oscdimR),
     #         id(oscdimL) ⊗ id(2) ⊗ num(oscdimR),

@@ -75,17 +75,10 @@ let
              siteinds("vecS=1/2", n_spin_sites);
              siteinds("vecOsc", 1; dim=osc_dim)]
 
-    single_ex_states = [embed_slice(sites,
-                                    spin_range,
-                                    single_ex_state(sites[spin_range], k))
-                        for k = 1:n_spin_sites]
-    # - i numeri di occupazione: per gli spin della catena si prende il prodotto
-    #   interno con gli elementi di single_ex_states già definiti; per gli
-    #   oscillatori, invece, uso
-    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
-    osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
-
-    occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
+    # - i numeri di occupazione
+    num_op_list = [MPS(sites,
+                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                   for n ∈ 1:length(sites)]
 
     # - la corrente di spin
     # Prima costruisco gli operatori sulla catena di spin, poi li
@@ -151,11 +144,6 @@ let
                siteinds("vecOsc", 1; dim=osc_dim)]
 
       spin_range = 1 .+ (1:n_spin_sites)
-
-      single_ex_states = [embed_slice(sites,
-                                      spin_range,
-                                      single_ex_state(sites[spin_range], k))
-                          for k = 1:n_spin_sites]
     end
 
     #= Definizione degli operatori nell'equazione di Lindblad
@@ -193,9 +181,9 @@ let
     # =======================
     if !preload
       # - i numeri di occupazione
-      osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
-      osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
-      occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
+      num_op_list = [MPS(sites,
+                         [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                     for n ∈ 1:length(sites)]
 
       # - la corrente di spin
       spin_current_ops = [embed_slice(sites, spin_range, j)
@@ -236,7 +224,7 @@ let
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    occ_n = Vector{Real}[[inner(s, current_state) for s in occ_n_list]]
+    occ_n = Vector{Real}[[inner(N, current_state) for N in num_op_list]]
     bond_dimensions = Vector{Int}[linkdims(current_state)]
     spin_current = Vector{Real}[real.([inner(j, current_state)
                                        for j in spin_current_ops])]
@@ -273,7 +261,7 @@ let
               trace)
 
         push!(occ_n,
-              [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
+              [real(inner(N, current_state)) for N in num_op_list] ./ trace)
 
         push!(spin_current,
               [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)

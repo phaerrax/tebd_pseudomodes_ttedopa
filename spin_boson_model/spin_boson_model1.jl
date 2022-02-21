@@ -119,14 +119,9 @@ let
     # Osservabili da misurare
     # =======================
     # - i numeri di occupazione
-    single_ex_states = [chain(MPS(sites[1:1], "vecId"),
-                              single_ex_state(sites[2:end-1], k),
-                              MPS(sites[end:end], "vecId"))
-                        for k = 1:n_spin_sites]
-    osc_num_sx = MPS(sites, ["vecN"; repeat(["vecId"], n_spin_sites+1)])
-    osc_num_dx = MPS(sites, [repeat(["vecId"], n_spin_sites+1); "vecN"])
-
-    occ_n_list = [osc_num_sx; single_ex_states; osc_num_dx]
+    num_op_list = [MPS(sites,
+                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                   for n ∈ 1:length(sites)]
 
     # Simulazione
     # ===========
@@ -156,7 +151,7 @@ let
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    occ_n = Vector{Real}[chop.([inner(s, current_state) for s in occ_n_list])]
+    occ_n = Vector{Real}[[inner(N, current_state) for N in num_op_list]]
     bond_dimensions = Vector{Int}[linkdims(current_state)]
     normalisation = Real[real(inner(full_trace, current_state))]
 
@@ -183,7 +178,7 @@ let
         push!(normalisation,
               trace)
         push!(occ_n,
-              [real(inner(s, current_state)) for s in occ_n_list] ./ trace)
+              [real(inner(N, current_state)) for N in num_op_list] ./ trace)
         push!(bond_dimensions,
               linkdims(current_state))
       end

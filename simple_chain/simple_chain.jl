@@ -90,6 +90,7 @@ let
     current_state = parse_init_state(sites,
                                      parameters["chain_initial_state"])
 
+    single_ex_states = [single_ex_state(sites, j) for j = 1:n_sites]
     # Misuro le osservabili sullo stato iniziale
     occ_n = [expect(current_state, "N")]
     bond_dimensions = [linkdims(current_state)]
