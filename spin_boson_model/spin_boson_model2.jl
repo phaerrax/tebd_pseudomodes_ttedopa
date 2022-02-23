@@ -137,9 +137,22 @@ let
       matL = thermalstate(ω*number(bosc), T)
       n = (ℯ^(ω / T) - 1)^(-1)
     end
-    # Gli spin partono il primo su, gli altri (se ci sono) giù.
+    # La posizione di partenza del primo spin è determinata dai
+    # parametri nel file JSON.
+    name = lowercase(parameters["spin_initial_state"])
+    if name == "up"
+      firstspin = QuantumOptics.projector(spinup(bspin))
+    elseif name == "down" || name == "dn" || name == "empty"
+      firstspin = QuantumOptics.projector(spindown(bspin))
+    elseif name == "x" || name == "sigmax"
+      firstspin = sigmax(bspin)
+    else
+      throw(DomainError(state,
+                        "Stato non riconosciuto; scegliere tra «up», "*
+                        "«down», oppure «x»."))
+    end
     ρ₀ = tensor(matL,
-                QuantumOptics.projector(spindown(bspin)),
+                firstspin,
                 repeat([QuantumOptics.projector(spindown(bspin))],
                        n_spin_sites-1)...,
                 QuantumOptics.projector(fockstate(bosc, 0)))
