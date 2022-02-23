@@ -156,9 +156,12 @@ let
     end
 
     @info "Integrazione dell'equazione di Lindblad in corso."
+    τ = time_step_list[begin+1] - time_step_list[begin]
     tout, output = timeevolution.master(time_step_list,
                                         ρ₀, H, jump;
-                                        rates=rates, fout=fout)
+                                        rates=rates,
+                                        fout=fout,
+                                        dt=0.1τ)
     output = permutedims(hcat(output...))
     occ_n_numeric = real.(output[:,1:end-1])
     norm_numeric = real.(output[:,end])
