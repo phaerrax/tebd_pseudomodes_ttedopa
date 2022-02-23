@@ -99,7 +99,7 @@ let
       if i == 1 || i == n_spin_sites+2
         op = embed(bcoll, i, number(bosc))
       elseif i ∈ 1 .+ (1:n_spin_sites)
-        op = embed(bcoll, i, 0.5*(sigmaz(bspin) + one(bspin)))
+        op = embed(bcoll, i, QuantumOptics.projector(spinup(bspin)))
       else
         throw(DomainError)
       end
@@ -139,8 +139,9 @@ let
     end
     # Gli spin partono il primo su, gli altri (se ci sono) giù.
     ρ₀ = tensor(matL,
-                0.5*(one(bspin)+sigmaz(bspin)),
-                repeat([0.5*(one(bspin)-sigmaz(bspin))], n_spin_sites-1)...,
+                QuantumOptics.projector(spindown(bspin)),
+                repeat([QuantumOptics.projector(spindown(bspin))],
+                       n_spin_sites-1)...,
                 QuantumOptics.projector(fockstate(bosc, 0)))
 
     rates = [sqrt(γₗ * (n+1)), sqrt(γₗ * n), sqrt(γᵣ)]
