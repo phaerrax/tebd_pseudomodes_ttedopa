@@ -144,7 +144,7 @@ let
                        n_spin_sites-1)...,
                 QuantumOptics.projector(fockstate(bosc, 0)))
 
-    rates = [sqrt(γₗ * (n+1)), sqrt(γₗ * n), sqrt(γᵣ)]
+    rates = [γₗ * (n+1), γₗ * n, γᵣ]
     jump = [embed(bcoll, 1, destroy(bosc)),
             embed(bcoll, 1, create(bosc)),
             embed(bcoll, 2+n_spin_sites, destroy(bosc))]
