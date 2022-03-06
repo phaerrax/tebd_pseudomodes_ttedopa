@@ -56,7 +56,6 @@ let
   osc_levels_left_super = []
   osc_levels_right_super = []
   normalisation_super = []
-  hermiticity_monitor_super = []
 
   # Precaricamento
   # ==============
@@ -171,11 +170,6 @@ let
     function links_even(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
     end
-    #
-    evo = evolution_operator(links_odd,
-                             links_even,
-                             time_step,
-                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
@@ -224,119 +218,74 @@ let
 
     # Osservabili sullo stato iniziale
     # --------------------------------
-    occ_n = Vector{Real}[[inner(N, current_state) for N in num_op_list]]
-    bond_dimensions = Vector{Int}[linkdims(current_state)]
-    spin_current = Vector{Real}[real.([inner(j, current_state)
-                                       for j in spin_current_ops])]
-    chain_levels = Vector{Real}[real.(levels(num_eigenspace_projs,
-                                             current_state))]
-    osc_levels_left = Vector{Real}[real.(levels(osc_levels_projs_left,
-                                                current_state))]
-    osc_levels_right = Vector{Real}[real.(levels(osc_levels_projs_right,
-                                                 current_state))]
-    normalisation = Real[real(inner(full_trace, current_state))]
-    hermiticity_monitor = Real[0]
+    trace(ρ) = real(inner(full_trace, ρ))
+    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
+    spincurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in spin_current_ops])
+    chain_levels(ρ) = real.(levels(num_eigenspace_projs, trace(ρ)^(-1)*ρ))
+    osc_levels_left(ρ) = real.(levels(osc_levels_projs_left, trace(ρ)^(-1)*ρ))
+    osc_levels_right(ρ) = real.(levels(osc_levels_projs_right, trace(ρ)^(-1)*ρ))
 
     # Evoluzione temporale
     # --------------------
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state,
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        #=
-        Calcolo dapprima la traccia della matrice densità. Se non devia
-        eccessivamente da 1, in ogni caso influisce sul valore delle
-        osservabili che calcolo successivamente, che si modificano dello
-        stesso fattore, e devono essere quindi corrette di un fattore pari
-        al reciproco della traccia.
-        =#
-        trace = real(inner(full_trace, current_state))
+    @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-        push!(normalisation,
-              trace)
+    tout,
+    normalisation,
+    occnlist,
+    spincurrentlist,
+    ranks,
+    osclevelsLlist,
+    osclevelsRlist,
+    chainlevelslist = evolve(ρ₀,
+                             time_step_list,
+                             parameters["skip_steps"],
+                             parameters["TS_expansion_order"],
+                             links_odd,
+                             links_even,
+                             parameters["MP_compression_error"],
+                             parameters["MP_maximum_bond_dimension"];
+                             fout=[trace,
+                                   occn,
+                                   spincurrent,
+                                   linkdims,
+                                   osclevelsL,
+                                   osclevelsR,
+                                   chainlevels])
 
-        push!(occ_n,
-              [real(inner(N, current_state)) for N in num_op_list] ./ trace)
-
-        push!(spin_current,
-              [real(inner(j, current_state)) for j in spin_current_ops] ./ trace)
-        push!(chain_levels,
-              levels(num_eigenspace_projs, current_state) ./ trace)
-        push!(osc_levels_left,
-              levels(osc_levels_projs_left, current_state) ./ trace)
-        push!(osc_levels_right,
-              levels(osc_levels_projs_right, current_state) ./ trace)
-        push!(bond_dimensions,
-              linkdims(current_state))
-
-        #=
-        Controllo che la matrice densità ridotta dell'oscillatore a sinistra
-        sia una valida matrice densità: hermitiana e semidefinita negativa.
-        Calcolo la traccia parziale su tutti i siti tranne il primo, ricreo
-        la matrice a partire dal vettore, e faccio i dovuti controlli.
-        Non so come creare un MPO misto di matrici e vettori, quindi creo osc_dim²
-        operatori che estraggono tutte le coordinate del vettore.
-        =#
-        mat = Array{Complex}(undef, osc_dim, osc_dim)
-        for j = 0:osc_dim-1, k = 0:osc_dim-1
-          proj = embed_slice(sites,
-                             1:1,
-                             MPS([state(sites[1], "mat_comp"; j, k)]))
-          mat[j+1, k+1] = inner(proj, current_state)
-        end
-        # Avverti solo se la matrice non è semidefinita positiva. Per calcolare
-        # la positività degli autovalori devo tagliare via la loro parte reale,
-        # praticamente assumendo che siano reali (cioè che mat sia hermitiana).
-        for x in real.(eigvals(mat))
-          if x < -max_err
-            @warn "La matrice densità del primo sito non è semidefinita positiva: trovato $x"
-          end
-        end
-        diff = sqrt(norm(mat - mat'))
-        push!(hermiticity_monitor,
-              diff)
-      end
-      next!(progress)
-      skip_count += 1
-    end
+    # A partire dai risultati costruisco delle matrici da dare poi in pasto
+    # alle funzioni per i grafici e le tabelle di output
+    occnlist = mapreduce(permutedims, vcat, occnlist)
+    spincurrentlist = mapreduce(permutedims, vcat, spincurrentlist)
+    ranks = mapreduce(permutedims, vcat, ranks)
+    chainlevelslist = mapreduce(permutedims, vcat, chainlevelslist)
+    osclevelsLlist = mapreduce(permutedims, vcat, osclevelsLlist)
+    osclevelsRlist = mapreduce(permutedims, vcat, osclevelsRlist)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => time_step_list[1:skip_steps:end])
-    tmp_list = hcat(occ_n...)
+    dict = Dict(:time => tout)
     for (j, name) in enumerate([:occ_n_left;
                               [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
                               :occ_n_right])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => occnlist[:,j])
     end
-    tmp_list = hcat(spin_current...)
     for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_spin_sites-1])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => spincurrentlist[:,j])
     end
-    tmp_list = hcat(osc_levels_left...)
     for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => osclevelsLlist[:,j])
     end
-    tmp_list = hcat(chain_levels...)
     for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => chainlevelslist[:,j])
     end
-    tmp_list = hcat(osc_levels_right...)
     for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => osclevelsRlist[:,j])
     end
-    tmp_list = hcat(bond_dimensions...)
     len = n_spin_sites + 2
     for (j, name) in enumerate([Symbol("bond_dim$n")
                                 for n ∈ 1:len-1])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => ranks[:,j])
     end
     push!(dict, :full_trace => normalisation)
-    push!(dict, :hermiticity => hermiticity_monitor)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -344,15 +293,14 @@ let
     CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
-    push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, permutedims(hcat(occ_n...)))
-    push!(spin_current_super, permutedims(hcat(spin_current...)))
-    push!(chain_levels_super, permutedims(hcat(chain_levels...)))
-    push!(osc_levels_left_super, permutedims(hcat(osc_levels_left...)))
-    push!(osc_levels_right_super, permutedims(hcat(osc_levels_right...)))
-    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
+    push!(timesteps_super, tout)
+    push!(occ_n_super, occnlist)
+    push!(spin_current_super, spincurrentlist)
+    push!(chain_levels_super, chainlevelslist)
+    push!(osc_levels_left_super, osclevelsLlist)
+    push!(osc_levels_right_super, osclevelsRlist)
+    push!(bond_dimensions_super, ranks)
     push!(normalisation_super, normalisation)
-    push!(hermiticity_monitor_super, hermiticity_monitor)
   end
 
   #= Grafici
@@ -457,20 +405,6 @@ let
                     plotsize=plotsize)
 
   savefig(plt, "dm_normalisation.png")
-
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super,
-                    hermiticity_monitor_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
-                    plottitle="Controllo hermitianità della matrice densità",
-                    plotsize=plotsize)
-
-  savefig(plt, "hermiticity_monitor.png")
 
   # Grafico della corrente di spin
   # ------------------------------

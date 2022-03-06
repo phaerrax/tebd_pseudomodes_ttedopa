@@ -182,11 +182,6 @@ let
     function links_even(τ)
       return [(exp(-im * τ * h)) for h in hlist[2:2:end]]
     end
-    #
-    evo = evolution_operator(links_odd,
-                             links_even,
-                             τ,
-                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
@@ -217,68 +212,49 @@ let
     spin_init_state = parse_init_state(sites[range_spins],
                                        parameters["chain_initial_state"])
     osc_dx_init_state = MPS(sites[range_osc_right], "0")
-    current_state = chain(osc_sx_init_state,
-                          spin_init_state,
-                          osc_dx_init_state)
+    ψ₀ = chain(osc_sx_init_state, spin_init_state, osc_dx_init_state)
 
-    # Osservabili sullo stato iniziale
-    # --------------------------------
-    occ_n = [expect(current_state, "N")]
-    bond_dimensions = [linkdims(current_state)]
-    spin_current = [[real(inner(current_state, j * current_state))
-                     for j in spin_current_ops]]
-    spin_chain_levels = [levels(num_eigenspace_projs,
-                                current_state)]
+    # Osservabili
+    # -----------
+    occn(ψ) = real.(expect(ψ, "N"))
+    spincurrent(ψ) = real.([inner(ψ, j * ψ) for j in spin_current_ops])
 
     # Evoluzione temporale
     # --------------------
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state;
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        push!(occ_n,
-              expect(current_state, "N"))
-        push!(spin_current,
-              [real(inner(current_state, j * current_state))
-               for j in spin_current_ops])
-        push!(spin_chain_levels,
-              levels(num_eigenspace_projs, current_state))
-        push!(bond_dimensions,
-              linkdims(current_state))
-      end
-      next!(progress)
-      skip_count += 1
-    end
+    @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    snapshot = occ_n[end]
+    tout, normalisation, occnlist, spincurrentlist, ranks = evolve(ψ₀,
+                             time_step_list,
+                             parameters["skip_steps"],
+                             parameters["TS_expansion_order"],
+                             links_odd,
+                             links_even,
+                             parameters["MP_compression_error"],
+                             parameters["MP_maximum_bond_dimension"];
+                             fout=[norm, occn, spincurrent, linkdims])
+
+    # A partire dai risultati costruisco delle matrici da dare poi in pasto
+    # alle funzioni per i grafici e le tabelle di output
+    occnlist = mapreduce(permutedims, vcat, occnlist)
+    spincurrentlist = mapreduce(permutedims, vcat, spincurrentlist)
+    ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => time_step_list[1:skip_steps:end])
-    tmp_list = hcat(occ_n...)
+    dict = Dict(:time => tout)
     for (j, name) in enumerate([[Symbol("occ_n_left$n") for n∈n_osc_left:-1:1];
                                 [Symbol("occ_n_spin$n") for n∈1:n_spin_sites];
                                 [Symbol("occ_n_right$n") for n∈1:n_osc_right]])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => occnlist[:,j])
     end
-    tmp_list = hcat(spin_current...)
     for (j, name) in enumerate([Symbol("spin_current$n")
                                 for n = 1:n_spin_sites-1])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => spincurrentlist[:,j])
     end
-    tmp_list = hcat(spin_chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(bond_dimensions...)
     len = n_osc_left + n_spin_sites + n_osc_right
     for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 1:len-1])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => ranks[:,j])
     end
+    push!(dict, :norm => normalisation)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -286,27 +262,17 @@ let
     CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
-    push!(timesteps_super,
-          time_step_list[1:skip_steps:end])
-    push!(occ_n_super,
-          permutedims(hcat(occ_n...)))
-    push!(spin_current_super,
-          permutedims(hcat(spin_current...)))
-    push!(spin_chain_levels_super,
-          permutedims(hcat(spin_chain_levels...)))
-    push!(bond_dimensions_super,
-          permutedims(hcat(bond_dimensions...)))
-    push!(range_osc_left_super,
-          range_osc_left)
-    push!(range_spins_super,
-          range_spins)
-    push!(range_osc_right_super,
-          range_osc_right)
-    push!(osc_chain_coefficients_left_super,
-          osc_chain_coefficients_left)
-    push!(osc_chain_coefficients_right_super,
-          osc_chain_coefficients_right)
-    push!(snapshot_super, snapshot)
+    push!(timesteps_super, tout)
+    push!(occ_n_super, occnlist)
+    push!(spin_current_super, spincurrentlist)
+    push!(bond_dimensions_super, ranks)
+    push!(range_osc_left_super, range_osc_left)
+    push!(range_spins_super, range_spins)
+    push!(range_osc_right_super, range_osc_right)
+    push!(osc_chain_coefficients_left_super, osc_chain_coefficients_left)
+    push!(osc_chain_coefficients_right_super, osc_chain_coefficients_right)
+    push!(snapshot_super, occnlist[end,:])
+    push!(normalisation_super, normalisation)
   end
 
   #= Grafici
@@ -405,41 +371,6 @@ let
                   plotsize=plotsize)
 
   savefig(plt, "bond_dimensions.png")
-
-  ## Grafico della corrente di spin
-  ## ------------------------------
-  #plt = groupplot(timesteps_super,
-  #                spin_current_super,
-  #                parameter_lists;
-  #                labels=[hcat(["($j,$(j+1))" for j ∈ 1:size(c, 2)]...)
-  #                        for c in spin_current_super],
-  #                linestyles=[hcat(repeat([:solid], size(c, 2))...)
-  #                            for c in spin_current_super],
-  #                commonxlabel=L"\lambda\, t",
-  #                commonylabel=L"j_{k,k+1}(t)",
-  #                plottitle="Corrente di spin",
-  #                plotsize=plotsize)
-
-  #savefig(plt, "spin_current.png")
- 
-  # Grafico dell'occupazione degli autospazi di N della catena di spin
-  # ------------------------------------------------------------------
-  # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
-  # restanti valori.
-  #plt = groupplot(timesteps_super,
-  #                spin_chain_levels_super,
-  #                parameter_lists;
-  #                labels=[[string.( 0:(size(c,2)-2) )... "total"]
-  #                        for c ∈ spin_chain_levels_super],
-  #                linestyles=[[repeat([:solid], size(c,2)-1)... :dash]
-  #                            for c ∈ spin_chain_levels_super],
-  #                commonxlabel=L"\lambda\, t",
-  #                commonylabel=L"n(t)",
-  #                plottitle="Occupazione degli autospazi "*
-  #                          "della catena di spin",
-  #                plotsize=plotsize)
-
-  #savefig(plt, "chain_levels.png")
 
   # Grafico dei coefficienti della chain map
   # ----------------------------------------

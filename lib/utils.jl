@@ -110,7 +110,7 @@ end
 
 # Entropia (di Von Neumann)
 # =========================
-function entropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
+function vonneumannentropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
   # Calcola l'entropia di entanglement della bipartizione (1,…,n)|(n+1,…,N)
   # del sistema nello stato ψ usando la decomposizione di Schmidt.
   orthogonalize!(ψ, n)
@@ -370,35 +370,4 @@ function embed_slice(sites::Array{Index{Int64}},
                 MPS(sites[range[end]+1 : end], "vecId"))
   end
   return mpo
-end
-
-# Costruzione dell'operatore di evoluzione temporale
-# ==================================================
-# Richiede l'esistenza di due FUNZIONI links_odd e links_even che abbiano
-# come argomento un singolo numero reale, che rappresenta il passo di
-# evoluzione temporale.
-function evolution_operator(links_odd, links_even, τ, order)
-  if order == 1
-    list = [links_odd(τ);
-            links_even(τ)]
-  elseif order == 2
-    list = [links_odd(0.5τ);
-            links_even(τ);
-            links_odd(0.5τ)]
-  elseif order == 4
-    c = (2 - 2^(1/3))^(-1)
-    list = [links_even(0.5c * τ);
-            links_odd(c * τ);
-            links_even(0.5 * (1-c) * τ);
-            links_odd((1 - 2c) * τ);
-            links_even(0.5 * (1-c) * τ);
-            links_odd(c * τ);
-            links_even(0.5c * τ)]
-  else
-    throw(DomainError(order,
-                      "L'espansione di Trotter-Suzuki all'ordine $order "*
-                      "non è supportata. Attualmente sono disponibili "*
-                      "solo le espansioni con ordine 1, 2 o 4."))
-  end
-  return list
 end

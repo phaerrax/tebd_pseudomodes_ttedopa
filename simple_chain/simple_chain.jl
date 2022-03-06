@@ -78,54 +78,38 @@ let
     function links_even(τ)
       return [(exp(-im * τ * h)) for h in hlist[2:2:end]]
     end
-    #
-    evo = evolution_operator(links_odd,
-                             links_even,
-                             time_step,
-                             parameters["TS_expansion_order"])
 
     # Simulazione
     # ===========
     # Determina lo stato iniziale a partire dalla stringa data nei parametri
-    current_state = parse_init_state(sites,
-                                     parameters["chain_initial_state"])
+    ψ₀ = parse_init_state(sites, parameters["chain_initial_state"])
 
-    single_ex_states = [single_ex_state(sites, j) for j = 1:n_sites]
     # Misuro le osservabili sullo stato iniziale
-    occ_n = [expect(current_state, "N")]
-    bond_dimensions = [linkdims(current_state)]
-    S = [[entropy(current_state, sites, j) for j ∈ 2:n_sites-1]]
+    occn(ψ) = real.(expect(ψ, "N"))
+    entropy(ψ) = real.([vonneumannentropy(ψ, sites, j) for j ∈ 2:n_sites-1])
 
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state;
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        push!(occ_n, expect(current_state, "N"))
-        push!(bond_dimensions, linkdims(current_state))
-        push!(S, [entropy(current_state, sites, j) for j ∈ 2:n_sites-1])
-      end
-      next!(progress)
-      skip_count += 1
-    end
+    @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    # Salvo i risultati nei grandi contenitori.
-    # Quando i dati sono salvati come liste di liste (come `occ_n`) devo
-    # prima convertirli in matrici, con X -> permutedims(hcat(X...)).
-    #
-    # Uso `permutedims(X)` e non `X'` perché mentre la prima trasforma
-    # un oggetto `Matrix{T}` in uno dello stesso tipo, la seconda restituisce
-    # un oggetto di tipo `Adjoint{T, Matrix{T}}` che causa dei problemi con
-    # il calcolo dei valori estremi dei dati quando si disegnano i grafici
-    # (apparentemente vengono trattati come numeri complessi).
-    push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, permutedims(hcat(occ_n...)))
-    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
-    push!(entropy_super, permutedims(hcat(S...)))
+    tout, normalisation, occnlist, entropylist, ranks = evolve(ψ₀,
+                           time_step_list,
+                           parameters["skip_steps"],
+                           parameters["TS_expansion_order"],
+                           links_odd,
+                           links_even,
+                           parameters["MP_compression_error"],
+                           parameters["MP_maximum_bond_dimension"];
+                           fout=[norm, occn, entropy, linkdims])
+
+    # A partire dai risultati costruisco delle matrici da dare poi in pasto
+    # alle funzioni per i grafici e le tabelle di output
+    occnlist = mapreduce(permutedims, vcat, occnlist)
+    entropylist = mapreduce(permutedims, vcat, entropylist)
+    ranks = mapreduce(permutedims, vcat, ranks)
+
+    push!(timesteps_super, tout)
+    push!(occ_n_super, occnlist)
+    push!(bond_dimensions_super, ranks)
+    push!(entropy_super, entropylist)
   end
 
   #= Grafici

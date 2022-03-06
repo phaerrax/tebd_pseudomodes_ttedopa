@@ -103,3 +103,67 @@ function interactionop(s1::Index, s2::Index)
   end
   return t
 end
+
+function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
+    linkseven, maxerr, maxrank; fout)
+  τ = timesteplist[2] - timesteplist[1]
+  if STorder == 1
+    # Se l'ordine di espansione è 1, non ci sono semplificazioni da fare.
+    list = repeat([linksodd(τ), linkseven(τ)], nskip)
+  elseif STorder == 2
+    # Al secondo ordine, posso raggruppare gli operatori con t/2 in modo
+    # da risparmiare un po' di calcoli (e di errori numerici...): anziché
+    # avere 3*nskip serie di operatori da applicare allo stato tra una
+    # misurazione e la successiva, ne ho solo 2*nskip+1.
+    list = [linksodd(0.5τ),
+            repeat([linkseven(τ), linksodd(τ)], nskip-1)...,
+            linkseven(τ),
+            linksodd(0.5τ)]
+  elseif STorder == 4
+    # Anche qui si potrebbe applicare qualche ottimizzazione componendo
+    # qualche operatore, ma non ho trovato niente che faccia grandi
+    # differenze.
+    c = (4 - 4^(1/3))^(-1)
+    ops = [linksodd(c * τ),
+           linkseven(2c * τ),
+           linksodd((0.5 - c) * τ),
+           linkseven((1 - 4c) * τ),
+           linksodd((0.5 - c) * τ),
+           linkseven(2c * τ),
+           linksodd(c * τ)]
+    list = repeat(ops, nskip)
+  else
+    throw(DomainError(order,
+                      "L'espansione di Trotter-Suzuki all'ordine $STorder "*
+                      "non è supportata. Attualmente sono disponibili "*
+                      "solo le espansioni con ordine 1, 2 o 4."))
+  end
+
+  # Ora comincia l'evoluzione temporale.
+  # Applicare `list` allo stato significa farlo evolvere per nskip*τ, dove
+  # τ è il passo di integrazione.
+  state = initialstate
+  returnvalues = [[f(state) for f in fout]]
+
+  tout = timesteplist[1:nskip:end]
+  progress = Progress(length(tout), 1, "Simulazione in corso", 30)
+  for _ in timesteplist[1+nskip:nskip:end]
+    for sweep in list
+      state = apply(sweep, state, cutoff=maxerr, maxdim=maxrank)
+    end
+    push!(returnvalues, [f(state) for f in fout])
+    next!(progress)
+  end
+
+  # La lista `returnvalues` contiene N ≡ length(timesteplist[1:nskip:end])
+  # sottoliste, ciascuna delle quali ha come j° elemento il risultato
+  # di fout[j] applicato allo stato a un istante di tempo.
+  # Voglio riorganizzare l'output in modo che la funzione restituisca
+  # una lista `tout` degli istanti di tempo, e insieme ad essa tante liste
+  # quante sono le `fout` fornite come argomento: la jᵃ lista dovrà
+  # contenere il risultato di fout[j] applicato allo stato all'istante t
+  # per ogni t in tout.
+  outresults = [[returnvalues[k][j] for k in eachindex(tout)]
+                for j in eachindex(fout)]
+  return tout, outresults...
+end

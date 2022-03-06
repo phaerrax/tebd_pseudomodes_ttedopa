@@ -103,18 +103,16 @@ let
     function links_even(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
     end
-    #
-    evo = evolution_operator(links_odd,
-                             links_even,
-                             time_step,
-                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
-    # - i numeri di occupazione
     num_op_list = [MPS(sites,
                        [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
                    for n ∈ 1:length(sites)]
+    full_trace = MPS(sites, "vecId")
+
+    trace(ρ) = real(inner(full_trace, ρ))
+    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
 
     # Simulazione
     # ===========
@@ -123,74 +121,51 @@ let
     # Lo stato iniziale della catena è "spin_initial_state" per lo spin
     # attaccato all'oscillatore, "empty" per gli altri.
     if n_spin_sites >= 2
-    current_state = chain(parse_init_state_osc(sites[1],
-                                 parameters["left_oscillator_initial_state"];
-                                 ω=ω, T=T),
-                          parse_spin_state(sites[2],
-                                           parameters["spin_initial_state"]),
-                          parse_init_state(sites[3:end-1],
-                                           "empty"),
-                          parse_init_state_osc(sites[end], "empty"))
+      ρ₀ = chain(parse_init_state_osc(sites[1],
+                                      parameters["left_oscillator_initial_state"];
+                                      ω=ω, T=T),
+                 parse_spin_state(sites[2],
+                                  parameters["spin_initial_state"]),
+                 parse_init_state(sites[3:end-1],
+                                  "empty"),
+                 parse_init_state_osc(sites[end], "empty"))
     else
-    current_state = chain(parse_init_state_osc(sites[1],
-                                 parameters["left_oscillator_initial_state"];
-                                 ω=ω, T=T),
-                          parse_spin_state(sites[2],
-                                           parameters["spin_initial_state"]),
-                          parse_init_state_osc(sites[end], "empty"))
+      ρ₀ = chain(parse_init_state_osc(sites[1],
+                                      parameters["left_oscillator_initial_state"];
+                                      ω=ω, T=T),
+                 parse_spin_state(sites[2],
+                                  parameters["spin_initial_state"]),
+                 parse_init_state_osc(sites[end], "empty"))
     end
-
-    full_trace = MPS(sites, "vecId")
-
-    # Osservabili sullo stato iniziale
-    # --------------------------------
-    occ_n = Vector{Real}[[inner(N, current_state) for N in num_op_list]]
-    bond_dimensions = Vector{Int}[linkdims(current_state)]
-    normalisation = Real[real(inner(full_trace, current_state))]
 
     # Evoluzione temporale
     # --------------------
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state,
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        #=
-        Calcolo dapprima la traccia della matrice densità. Se non devia
-        eccessivamente da 1, in ogni caso influisce sul valore delle
-        osservabili che calcolo successivamente, che si modificano dello
-        stesso fattore, e devono essere quindi corrette di un fattore pari
-        al reciproco della traccia.
-        =#
-        trace = real(inner(full_trace, current_state))
+    tout, normalisation, occnlist, ranks = evolve(ρ₀,
+                      time_step_list,
+                      parameters["skip_steps"],
+                      parameters["TS_expansion_order"],
+                      links_odd,
+                      links_even,
+                      parameters["MP_compression_error"],
+                      parameters["MP_maximum_bond_dimension"];
+                      fout=[trace, occn, linkdims])
 
-        push!(normalisation,
-              trace)
-        push!(occ_n,
-              [real(inner(N, current_state)) for N in num_op_list] ./ trace)
-        push!(bond_dimensions,
-              linkdims(current_state))
-      end
-      next!(progress)
-      skip_count += 1
-    end
-    occ_n_MPS = permutedims(hcat(occ_n...))
+    # A partire dai risultati costruisco delle matrici da dare poi in pasto
+    # alle funzioni per i grafici e le tabelle di output
+    occnlist = mapreduce(permutedims, vcat, occnlist)
+    ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output,
     # e la stampo su un file temporaneo che verrà letto dall'altro script.
-    dict = Dict(:time => time_step_list[1:skip_steps:end])
+    dict = Dict(:time => tout)
     for (j, name) in enumerate([:occ_n_left;
-                              [Symbol("occ_n_spin$n") for n ∈ 1:n_spin_sites];
+                              [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
                               :occ_n_right])
-      push!(dict, name => occ_n_MPS[:,j])
+      push!(dict, name => occnlist[:,j])
     end
     for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:n_spin_sites+1])
-      push!(dict, name => hcat(bond_dimensions...)[j,:])
+                                for n ∈ 1:len-1])
+      push!(dict, name => ranks[:,j])
     end
     push!(dict, :full_trace => normalisation)
     table = DataFrame(dict)
