@@ -18,7 +18,7 @@ creazione del sito.
 # Matrici base 
 # ------------
 a⁻(dim::Int) = diagm(1 => [sqrt(j) for j = 1:dim-1])
-a⁺(dim::Int) = a⁻(dim)'
+a⁺(dim::Int) = diagm(-1 => [sqrt(j) for j = 1:dim-1])
 num(dim::Int) = a⁺(dim) * a⁻(dim)
 id(dim::Int) = Matrix{Int}(I, dim, dim)
 
