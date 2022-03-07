@@ -134,16 +134,25 @@ let
 
     H = Hoscsx + Hintsx + Hspin + Hintdx + Hoscdx
 
-    # Lo stato iniziale
-    if T == 0
-      matL = projector(fockstate(bosc, 0))
-      n = 0
-    else
-      matL = thermalstate(ω*number(bosc), T)
-      n = (ℯ^(ω / T) - 1)^(-1)
-    end
-    # La posizione di partenza del primo spin è determinata dai
+    # La posizione di partenza del sistema è determinata da alcuni
     # parametri nel file JSON.
+    name = lowercase(parameters["left_oscillator_initial_state"])
+    if name == "thermal"
+      if T == 0
+        matL = QuantumOptics.projector(fockstate(bosc, 0))
+      else
+        matL = thermalstate(ω*number(bosc), T)
+      end
+    elseif name == "empty"
+      matL = QuantumOptics.projector(fockstate(bosc, 0))
+    elseif occursin(r"^fock", name)
+      j = parse(Int, replace(name, "fock" => ""))
+      matL = QuantumOptics.projector(fockstate(bosc, j))
+    else
+      throw(DomainError(statename,
+                        "Stato non riconosciuto; scegliere tra «empty», «fockN» "*
+                        "oppure «thermal»."))
+    end
     name = lowercase(parameters["spin_initial_state"])
     if name == "up"
       firstspin = QuantumOptics.projector(spinup(bspin))
@@ -162,6 +171,11 @@ let
                        n_spin_sites-1)...,
                 QuantumOptics.projector(fockstate(bosc, 0)))
 
+    if T == 0
+      n = 0
+    else
+      n = (ℯ^(ω / T) - 1)^(-1)
+    end
     rates = [γₗ * (n+1), γₗ * n, γᵣ]
     jump = [embed(bcoll, 1, destroy(bosc)),
             embed(bcoll, 1, create(bosc)),
