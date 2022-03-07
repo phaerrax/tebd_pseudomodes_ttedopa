@@ -113,14 +113,19 @@ let
                          repeat([one(bspin)], n_spin_sites-i-1)...,
                          one(bosc))
 
+    # Mi serve una matrice nulla per poter dare un elemento neutro
+    # alle funzioni `sum(...)` qui sotto. Il modo più veloce per
+    # calcolarla mi sembra il seguente.
+    zeroop = 0. * hspinloc(1)
+
     # Gli operatori Hamiltoniani
     Hoscsx = ω * numop(1)
     Hintsx = κ * tensor(create(bosc)+destroy(bosc),
                         sigmax(bspin),
                         repeat([one(bspin)], n_spin_sites-1)...,
                         one(bosc))
-    Hspin = 0.5ε*sum(hspinloc.(1:n_spin_sites)) -
-            0.5*sum(hspinint.(1:n_spin_sites-1))
+    Hspin = 0.5ε*sum(hspinloc.(1:n_spin_sites); init=zeroop) -
+            0.5*sum(hspinint.(1:n_spin_sites-1); init=zeroop)
     Hintdx = κ * tensor(one(bosc),
                         repeat([one(bspin)], n_spin_sites-1)...,
                         sigmax(bspin),
