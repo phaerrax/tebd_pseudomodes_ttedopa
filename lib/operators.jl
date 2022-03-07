@@ -167,3 +167,20 @@ function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
                 for j in eachindex(fout)]
   return tout, outresults...
 end
+
+# Corrente tra due oscillatori
+# ----------------------------
+function current(sites::Vector{Index{Int64}},
+    leftsite::Int,
+    rightsite::Int)
+  # Copio la formula della corrente di spin, ma con dei generici X ed Y al
+  # posto di σˣ e σʸ: in questo modo può funzionare per tipi di sito diversi,
+  # ciascuno dei quali avrà la propria definizione di X e Y.
+  tags1 = repeat(["vecId"], length(sites))
+  tags2 = repeat(["vecId"], length(sites))
+  tags1[leftsite] = "vecX"
+  tags1[rightsite] = "vecY"
+  tags2[leftsite] = "vecY"
+  tags2[rightsite] = "vecX"
+  return MPS(sites, tags1) - MPS(sites, tags2)
+end

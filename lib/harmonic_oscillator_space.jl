@@ -63,7 +63,8 @@ ITensors.op(::OpName"a+", ::SiteType"Osc"; dim=2) = a⁺(dim)
 ITensors.op(::OpName"a-", ::SiteType"Osc"; dim=2) = a⁻(dim)
 ITensors.op(::OpName"Id", ::SiteType"Osc"; dim=2) = id(dim)
 ITensors.op(::OpName"N", ::SiteType"Osc"; dim=2) = num(dim)
-ITensors.op(::OpName"X", ::SiteType"Osc"; dim=2) = a⁺(dim) + a⁻(dim)
+ITensors.op(::OpName"X", ::SiteType"Osc"; dim=2) = a⁻(dim) + a⁺(dim)
+ITensors.op(::OpName"Y", ::SiteType"Osc"; dim=2) = im*(a⁻(dim) - a⁺(dim))
 
 # Spazio degli oscillatori vettorizzato
 # =====================================
@@ -234,6 +235,12 @@ function ITensors.state(::StateName"vecN", ::SiteType"HvOsc"; dim=2)
 end
 function ITensors.state(::StateName"vecId", ::SiteType"HvOsc"; dim=2)
   return vec(id(dim), gellmannbasis(dim))
+end
+function ITensors.state(::StateName"vecX", ::SiteType"HvOsc"; dim=2)
+  return vec(a⁻(dim) + a⁺(dim), gellmannbasis(dim))
+end
+function ITensors.state(::StateName"vecY", ::SiteType"HvOsc"; dim=2)
+  return vec(im*(a⁻(dim) - a⁺(dim)), gellmannbasis(dim))
 end
 
 # Operatori generici per oscillatori vettorizzati
