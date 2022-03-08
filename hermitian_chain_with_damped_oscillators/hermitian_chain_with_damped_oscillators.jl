@@ -63,12 +63,19 @@ let
   # ==============
   # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  n_spin_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
-  if allequal(n_spin_sites_list) && allequal(osc_dim_list)
+  n_spin_sites_list = [p["number_of_spin_sites"]
+                       for p ∈ parameter_lists]
+  osc_dim_list = [p["oscillator_space_dimension"]
+                  for p ∈ parameter_lists]
+  kappa_list = [p["oscillator_spin_interaction_coefficient"]
+                for p ∈ parameter_lists]
+  if allequal(n_spin_sites_list) &&
+     allequal(osc_dim_list) &&
+     allequal(kappa_list)
     preload = true
     n_spin_sites = first(n_spin_sites_list)
     osc_dim = first(osc_dim_list)
+    κ = first(kappa_list)
 
     spin_range = 1 .+ (1:n_spin_sites)
 
@@ -82,7 +89,10 @@ let
                   for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    nearcurrentops = [current(sites, j, j+1) for j ∈ spin_range[1:end-1]]
+    nearcurrentops = [κ*current(sites, 1, 2);
+                      [-0.5*current(sites, j, j+1)
+                       for j ∈ spin_range[1:end-1]];
+                      κ*current(sites, spin_range[end], spin_range[end]+1)]
     farcurrentops = [current(sites, 2, j) for j ∈ spin_range[2:end]]
     osccurrentop = current(sites, 1, eachindex(sites)[end])
 
@@ -181,8 +191,12 @@ let
                     for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      nearcurrentops = [current(sites, j, j+1) for j ∈ spin_range[1:end-1]]
-      farcurrentops = [current(sites, 2, j) for j ∈ spin_range[2:end]]
+      nearcurrentops = [κ*current(sites, 1, 2);
+                        [-0.5*current(sites, j, j+1)
+                        for j ∈ spin_range[1:end-1]];
+                        κ*current(sites, spin_range[end], spin_range[end]+1)]
+      farcurrentops = [-0.5*current(sites, 2, j)
+                       for j ∈ spin_range[2:end]]
       osccurrentop = current(sites, 1, eachindex(sites)[end])
 
       # - l'occupazione degli autospazi dell'operatore numero
@@ -222,8 +236,8 @@ let
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    nearcurrent(ρ) = real.([-0.5inner(j, ρ) / trace(ρ) for j in nearcurrentops])
-    farcurrent(ρ) = real.([-0.5inner(j, ρ) / trace(ρ) for j in farcurrentops])
+    nearcurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in nearcurrentops])
+    farcurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in farcurrentops])
     osccurrent(ρ) = real(inner(osccurrentop, ρ) / trace(ρ))
     chainlevels(ρ) = real.(levels(num_eigenspace_projs, trace(ρ)^(-1) * ρ))
     osclevelsL(ρ) = real.(levels(osc_levels_projs_left, trace(ρ)^(-1) * ρ))
@@ -426,17 +440,20 @@ let
   # Grafico della corrente di spin
   # ------------------------------
   N = size(nearcurrent_super[begin], 2)
+  sitelabels = ["L"; string.(1:N+1); "R"]
   plt = groupplot(timesteps_super,
                   nearcurrent_super,
                   parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
+                  labels=reduce(hcat,
+                                ["($(sitelabels[j]),$(sitelabels[j+1]))"
+                                 for j ∈ eachindex(sitelabels)[1:end-1]]),
+                  linestyles=reduce(hcat, [:solid for _ ∈ sitelabels]),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle j_{k,k+1}\rangle",
-                  plottitle="Corrente di spin (tra spin adiacenti)",
+                  plottitle="Corrente (tra siti adiacenti)",
                   plotsize=plotsize)
 
-  savefig(plt, "current_btw_adjacent_spins.png")
+  savefig(plt, "current_btw_adjacent_sites.png")
 
   N = size(farcurrent_super[begin], 2)
   plt = groupplot(timesteps_super,
