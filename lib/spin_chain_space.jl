@@ -45,11 +45,34 @@ ITensors.state(::StateName"Dn", ::SiteType"vecS=1/2") = ê₋ ⊗ ê₋
 
 # Stati che sono operatori vettorizzati (per costruire le osservabili)
 # --------------------------------------------------------------------
-ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2") = vcat(σˣ[:])
-ITensors.state(::StateName"vecσy", ::SiteType"vecS=1/2") = vcat(σʸ[:])
-ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2") = vcat(σᶻ[:])
-ITensors.state(::StateName"vecId", ::SiteType"vecS=1/2") = vcat(I₂[:])
-ITensors.state(::StateName"vec0", ::SiteType"vecS=1/2") = [0; 0; 0; 0]
+function ITensors.state(::StateName"vecσx", ::SiteType"vecS=1/2")
+  return vec(σˣ, canonicalbasis(2))
+end
+function ITensors.state(::StateName"vecσy", ::SiteType"vecS=1/2")
+  return vec(σʸ, canonicalbasis(2))
+end
+function ITensors.state(::StateName"vecσz", ::SiteType"vecS=1/2")
+  return vec(σᶻ, canonicalbasis(2))
+end
+function ITensors.state(::StateName"vecId", ::SiteType"vecS=1/2")
+  return vec(I₂, canonicalbasis(2))
+end
+function ITensors.state(::StateName"vecN", ::SiteType"vecS=1/2")
+  return vec([1 0; 0 0], canonicalbasis(2))
+end
+function ITensors.state(::StateName"vec0", ::SiteType"vecS=1/2")
+  return vec([0 0; 0 0], canonicalbasis(2))
+end
+
+function ITensors.state(::StateName"vecX", st::SiteType"vecS=1/2")
+  return ITensors.state(StateName("vecσx"), st)
+end
+function ITensors.state(::StateName"vecY", st::SiteType"vecS=1/2")
+  return ITensors.state(StateName("vecσy"), st)
+end
+function ITensors.state(::StateName"vecZ", st::SiteType"vecS=1/2")
+  return ITensors.state(StateName("vecσz"), st)
+end
 
 # Operatori
 # ---------

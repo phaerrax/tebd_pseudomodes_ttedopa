@@ -49,9 +49,10 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   occ_n_super = []
-  spin_current_super = []
+  nearcurrent_super = []
   bond_dimensions_super = []
   chain_levels_super = []
+  normalisation_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # - parametri per ITensors
@@ -86,7 +87,7 @@ let
     interactioncfs = repeat([1], n_spin_sites-1)
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ξL = T==0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
+    ξL = T == 0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
     ξR = κ
     ℓlist[begin] += ξL * op("Damping", sites[begin]) * op("Id", sites[begin+1])
     ℓlist[end] += ξR * op("Id", sites[end-1]) * op("Damping", sites[end])
@@ -97,77 +98,66 @@ let
     function links_even(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
     end
-    #
-    evo = evolution_operator(links_odd,
-                             links_even,
-                             time_step,
-                             parameters["TS_expansion_order"])
 
     # Osservabili da misurare
     # =======================
     # - la corrente di spin
-    spin_current_ops = spin_current_op_list(sites)
+    nearcurrentops = [-0.5*current(sites, j, j+1)
+                      for j ∈ eachindex(sites)[1:end-1]]
+                    
+    # - la traccia di ρ
+    full_trace = MPS(sites, "vecId")
 
-    # - l'occupazione degli autospazi dell'operatore numero
-    # Ad ogni istante proietto lo stato corrente sugli autostati
-    # dell'operatore numero della catena di spin, vale a dire calcolo
-    # tr(ρₛ Pₙ) dove ρₛ è la matrice densità ridotta della catena di spin
-    # e Pₙ è il proiettore ortogonale sull'n-esimo autospazio di N
-    num_eigenspace_projs = [level_subspace_proj(sites, n) for n=0:n_spin_sites]
+    trace(ρ) = real(inner(full_trace, ρ))
+    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
+    nearcurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in nearcurrentops])
 
     # Simulazione
     # ===========
     # Lo stato iniziale della catena è dato da "chain_initial_state".
-    current_state = parse_init_state(sites, parameters["chain_initial_state"])
+    ρ₀ = parse_init_state(sites, parameters["chain_initial_state"])
 
-    # Misuro le osservabili sullo stato iniziale
-    occ_n = [[inner(N, current_state) for N in num_op_list]]
-    bond_dimensions = [linkdims(current_state)]
-    spin_current = [[real(inner(j, current_state)) for j in spin_current_ops]]
-    chain_levels = [levels(num_eigenspace_projs, current_state)]
+    # Evoluzione temporale
+    # --------------------
+    @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    # ...e si parte!
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state,
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      #
-      if skip_count % skip_steps == 0
-        push!(occ_n,
-              [real(inner(N, current_state)) for N in num_op_list])
-        push!(spin_current,
-              [real(inner(j, current_state)) for j in spin_current_ops])
-        push!(chain_levels,
-              levels(num_eigenspace_projs, current_state))
-        push!(bond_dimensions,
-              linkdims(current_state))
-      end
-      next!(progress)
-      skip_count += 1
-    end
+    tout,
+    normalisation,
+    occnlist,
+    nearcurrentlist,
+    ranks = evolve(ρ₀,
+                   time_step_list,
+                   parameters["skip_steps"],
+                   parameters["TS_expansion_order"],
+                   links_odd,
+                   links_even,
+                   parameters["MP_compression_error"],
+                   parameters["MP_maximum_bond_dimension"];
+                   fout=[trace,
+                         occn,
+                         nearcurrent,
+                         linkdims])
+
+    # A partire dai risultati costruisco delle matrici da dare poi in pasto
+    # alle funzioni per i grafici e le tabelle di output
+    occnlist = mapreduce(permutedims, vcat, occnlist)
+    nearcurrentlist = mapreduce(permutedims, vcat, nearcurrentlist)
+    ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => time_step_list[1:skip_steps:end])
-    tmp_list = hcat(occ_n...)
+    dict = Dict(:time => tout)
     for (j, name) in enumerate([Symbol("occ_n_spin$n") for n = 1:n_spin_sites])
-      push!(dict, name => tmp_list[j,:])
+      push!(dict, name => occnlist[:,j])
     end
-    tmp_list = hcat(spin_current...)
-    for (j, name) in enumerate([Symbol("spin_current$n") for n = 1:n_spin_sites-1])
-      push!(dict, name => tmp_list[j,:])
+    for (j, name) in enumerate([Symbol("near_current$n")
+                                for n ∈ 1:size(nearcurrentlist, 2)])
+      push!(dict, name => nearcurrentlist[:,j])
     end
-    tmp_list = hcat(chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
-      push!(dict, name => tmp_list[j,:])
+    for (j, name) in enumerate([Symbol("bond_dim$n")
+                                for n ∈ 1:n_spin_sites-1])
+      push!(dict, name => ranks[:,j])
     end
-    tmp_list = hcat(bond_dimensions...)
-    for (j, name) in enumerate([Symbol("bond_dim$n") for n = 1:n_spin_sites-1])
-      push!(dict, name => tmp_list[j,:])
-    end
+    push!(dict, :full_trace => normalisation)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => "") * ".dat"
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -175,11 +165,11 @@ let
     CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
-    push!(timesteps_super, time_step_list[1:skip_steps:end])
-    push!(occ_n_super, permutedims(hcat(occ_n...)))
-    push!(spin_current_super, permutedims(hcat(spin_current...)))
-    push!(chain_levels_super, permutedims(hcat(chain_levels...)))
-    push!(bond_dimensions_super, permutedims(hcat(bond_dimensions...)))
+    push!(timesteps_super, tout)
+    push!(occ_n_super, occnlist)
+    push!(nearcurrent_super, nearcurrentlist)
+    push!(bond_dimensions_super, ranks)
+    push!(normalisation_super, normalisation)
   end
 
   # Grafici
@@ -189,12 +179,12 @@ let
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
+  N = size(occ_n_super[begin], 2)
   plt = groupplot(timesteps_super,
                   occ_n_super,
                   parameter_lists;
-                  labels=["L" string.(1:N-2)... "R"],
-                  linestyles=[:dash repeat([:solid], N-2)... :dash],
+                  labels=reduce(hcat, string.(1:N)),
+                  linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione",
@@ -204,12 +194,12 @@ let
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  N = size(bond_dimensions_super[begin])[2]
+  N = size(bond_dimensions_super[begin], 2)
   plt = groupplot(timesteps_super,
                   bond_dimensions_super,
                   parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
+                  labels=reduce(hcat, ["($j,$(j+1))" for j ∈ 1:N]),
+                  linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",
@@ -217,38 +207,34 @@ let
 
   savefig(plt, "bond_dimensions.png")
 
+  # Grafico della traccia della matrice densità
+  # -------------------------------------------
+  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
+  plt = unifiedplot(timesteps_super,
+                    normalisation_super,
+                    parameter_lists;
+                    linestyle=:solid,
+                    xlabel=L"\lambda\, t",
+                    ylabel=L"\operatorname{tr}\,\rho(t)",
+                    plottitle="Normalizzazione della matrice densità",
+                    plotsize=plotsize)
+
+  savefig(plt, "dm_normalisation.png")
+
   # Grafico della corrente di spin
   # ------------------------------
-  N = size(spin_current_super[begin])[2]
+  N = size(nearcurrent_super[begin], 2)
   plt = groupplot(timesteps_super,
-                  spin_current_super,
+                  nearcurrent_super,
                   parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
+                  labels=reduce(hcat, ["($j,$(j+1))" for j ∈ 1:N]),
+                  linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"j_{k,k+1}(t)",
                   plottitle="Corrente di spin",
                   plotsize=plotsize)
 
   savefig(plt, "spin_current.png")
-
-  # Grafico dell'occupazione degli autospazi di N della catena di spin
-  # ------------------------------------------------------------------
-  # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
-  # restanti valori.
-  N = size(chain_levels_super[begin])[2] - 1
-  plt = groupplot(timesteps_super,
-                  chain_levels_super,
-                  parameter_lists;
-                  labels=[string.(0:N-1)... "total"],
-                  linestyles=[repeat([:solid], N)... :dash],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"n(",
-                  plottitle="Occupazione degli autospazi "
-                  * "della catena di spin",
-                  plotsize=plotsize)
-
-  savefig(plt, "chain_levels.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
