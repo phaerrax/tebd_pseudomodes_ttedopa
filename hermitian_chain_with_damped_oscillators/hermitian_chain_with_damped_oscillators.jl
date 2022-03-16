@@ -50,9 +50,8 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   occ_n_super = []
-  nearcurrent_super = []
-  farcurrent_super = []
-  osccurrent_super = []
+  current_adjsites_super = []
+  current_fromNth_super = []
   bond_dimensions_super = []
   chain_levels_super = []
   osc_levels_left_super = []
@@ -89,12 +88,12 @@ let
                   for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    nearcurrentops = [κ*current(sites, 1, 2);
+    current_adjsites_ops = [κ*current(sites, 1, 2);
                       [-0.5*current(sites, j, j+1)
                        for j ∈ spin_range[1:end-1]];
                       κ*current(sites, spin_range[end], spin_range[end]+1)]
-    farcurrentops = [current(sites, 2, j) for j ∈ spin_range[2:end]]
-    osccurrentop = current(sites, 1, eachindex(sites)[end])
+    current_fromNth_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
+                           for N in spin_range]
 
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
@@ -191,13 +190,12 @@ let
                     for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      nearcurrentops = [κ*current(sites, 1, 2);
+      current_adjsites_ops = [κ*current(sites, 1, 2);
                         [-0.5*current(sites, j, j+1)
                         for j ∈ spin_range[1:end-1]];
                         κ*current(sites, spin_range[end], spin_range[end]+1)]
-      farcurrentops = [-0.5*current(sites, 2, j)
-                       for j ∈ spin_range[2:end]]
-      osccurrentop = current(sites, 1, eachindex(sites)[end])
+      current_fromNth_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
+                             for N in spin_range]
 
       # - l'occupazione degli autospazi dell'operatore numero
       num_eigenspace_projs = [embed_slice(sites,
@@ -236,9 +234,10 @@ let
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    nearcurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in nearcurrentops])
-    farcurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in farcurrentops])
-    osccurrent(ρ) = real(inner(osccurrentop, ρ) / trace(ρ))
+    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ) for j in current_adjsites_ops])
+    current_fromNth(ρ) = reduce(vcat,
+                                [real.([inner(j, ρ) / trace(ρ) for j in ops])
+                                 for ops ∈ current_fromNth_ops])
     chainlevels(ρ) = real.(levels(num_eigenspace_projs, trace(ρ)^(-1) * ρ))
     osclevelsL(ρ) = real.(levels(osc_levels_projs_left, trace(ρ)^(-1) * ρ))
     osclevelsR(ρ) = real.(levels(osc_levels_projs_right, trace(ρ)^(-1) * ρ))
@@ -250,9 +249,8 @@ let
     tout,
     normalisation,
     occnlist,
-    nearcurrentlist,
-    farcurrentlist,
-    osccurrentlist,
+    current_adjsites_list,
+    current_fromNth_joinedlist,
     ranks,
     osclevelsLlist,
     osclevelsRlist,
@@ -266,9 +264,8 @@ let
                              parameters["MP_maximum_bond_dimension"];
                              fout=[trace,
                                    occn,
-                                   nearcurrent,
-                                   farcurrent,
-                                   osccurrent,
+                                   current_adjsites,
+                                   current_fromNth,
                                    linkdims,
                                    osclevelsL,
                                    osclevelsR,
@@ -277,8 +274,17 @@ let
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
-    nearcurrentlist = mapreduce(permutedims, vcat, nearcurrentlist)
-    farcurrentlist = mapreduce(permutedims, vcat, farcurrentlist)
+    current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
+    current_fromNth_joinedlist = mapreduce(permutedims,
+                                           vcat,
+                                           current_fromNth_joinedlist)
+    # Se ho costruito tutto correttamente, current_fromNth_joinedlist è una
+    # matrice con un numero di colonne pari a n_spin_sites².
+    # Le prime n_spin_sites colonne sono la corrente a partire dal primo sito;
+    # le seconde n_spin_sites colonne sono quella dal secondo sito, e così via.
+    n = isqrt(size(current_fromNth_joinedlist, 2))
+    current_fromNth_lists = [current_fromNth_joinedlist[:,(1 + i*n):(n + i*n)]
+                             for i ∈ 0:n-1]
     ranks = mapreduce(permutedims, vcat, ranks)
     chainlevelslist = mapreduce(permutedims, vcat, chainlevelslist)
     osclevelsLlist = mapreduce(permutedims, vcat, osclevelsLlist)
@@ -291,15 +297,16 @@ let
                               :occ_n_right])
       push!(dict, name => occnlist[:,j])
     end
-    for (j, name) in enumerate([Symbol("near_current$n")
-                                for n ∈ 1:size(nearcurrentlist, 2)])
-      push!(dict, name => nearcurrentlist[:,j])
+    for (j, name) in enumerate([Symbol("current_adjsites$n")
+                                for n ∈ 1:size(current_adjsites_list, 2)])
+      push!(dict, name => current_adjsites_list[:,j])
     end
-    for (j, name) in enumerate([Symbol("far_current$n")
-                                for n ∈ 1:size(farcurrentlist, 2)])
-      push!(dict, name => farcurrentlist[:,j])
+    for (k, list) in enumerate(current_fromNth_lists)
+      for (j, name) ∈ enumerate([Symbol("current_$k/$n")
+                                 for n in 1:size(list, 2)])
+        push!(dict, name => list[:,j])
+      end
     end
-    push!(dict, :osccurrent => osccurrentlist)
     for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
       push!(dict, name => osclevelsLlist[:,j])
     end
@@ -324,9 +331,8 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
     push!(occ_n_super, occnlist)
-    push!(nearcurrent_super, nearcurrentlist)
-    push!(farcurrent_super, farcurrentlist)
-    push!(osccurrent_super, osccurrentlist)
+    push!(current_adjsites_super, current_adjsites_list)
+    push!(current_fromNth_super, current_fromNth_lists)
     push!(chain_levels_super, chainlevelslist)
     push!(osc_levels_left_super, osclevelsLlist)
     push!(osc_levels_right_super, osclevelsRlist)
@@ -439,10 +445,10 @@ let
 
   # Grafico della corrente di spin
   # ------------------------------
-  N = size(nearcurrent_super[begin], 2)
+  N = size(current_adjsites_super[begin], 2)
   sitelabels = ["L"; string.(1:N+1); "R"]
   plt = groupplot(timesteps_super,
-                  nearcurrent_super,
+                  current_adjsites_super,
                   parameter_lists;
                   labels=reduce(hcat,
                                 ["($(sitelabels[j]),$(sitelabels[j+1]))"
@@ -455,31 +461,20 @@ let
 
   savefig(plt, "current_btw_adjacent_sites.png")
 
-  N = size(farcurrent_super[begin], 2)
-  plt = groupplot(timesteps_super,
-                  farcurrent_super,
-                  parameter_lists;
-                  labels=hcat(["(1,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle j_{1,k}\rangle",
-                  plottitle="Corrente di spin (dal primo spin)",
-                  plotsize=plotsize)
-
-  savefig(plt, "spin_current_from_first_spin.png")
-
-  # Grafico della corrente tra gli oscillatori
-  # ------------------------------------------
-  plt = unifiedplot(timesteps_super,
-                    osccurrent_super,
+  for (k, list) in enumerate(current_fromNth_super)
+    N = size(list[begin], 2)
+    plt = groupplot(timesteps_super,
+                    list,
                     parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\langle j_{L,R}\rangle",
-                    plottitle="Corrente tra gli oscillatori",
+                    labels=reduce(hcat, ["l=$l" for l ∈ 1:N]),
+                    linestyles=reduce(hcat, repeat([:solid], N)),
+                    commonxlabel=L"\lambda\, t",
+                    commonylabel=LaTeXString("\\langle j_{$k,l}\\rangle"),
+                    plottitle="Corrente di spin (dal $(k)° spin)",
                     plotsize=plotsize)
 
-  savefig(plt, "current_btw_oscillators.png")
+    savefig(plt, "spin_current_fromsite$k.png")
+  end
 
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------
