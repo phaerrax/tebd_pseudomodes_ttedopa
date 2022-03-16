@@ -120,7 +120,7 @@ let
     γ = parameters["spectral_density_half_width"]
     κ = parameters["spectral_density_overall_factor"]
     # La densità spettrale è data da
-    # J(ω) = κγ/π ⋅ 1/(γ² + (ω-Ω)²)
+    # J(ω) = κ² ⋅ γ/π ⋅ 1/(γ² + (ω-Ω)²)
     T = parameters["temperature"]
     ωc = parameters["frequency_cutoff"]
     osc_dim = parameters["oscillator_space_dimension"]
@@ -153,7 +153,7 @@ let
        - n_osc_left+n_spin_sites+1:end -> catena di oscillatori a destra
     =#
     # Calcolo dei coefficienti dalla densità spettrale
-    J(ω) = κ * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
+    J(ω) = κ^2 * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
     Jtherm = ω -> thermalisedJ(J, ω, T)
     Jzero  = ω -> thermalisedJ(J, ω, 0)
     (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
