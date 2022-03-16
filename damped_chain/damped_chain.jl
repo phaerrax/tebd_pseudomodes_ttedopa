@@ -87,8 +87,9 @@ let
     interactioncfs = repeat([1], n_spin_sites-1)
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ξL = T == 0 ? κ : κ * (1 + 2 / (ℯ^(ε/T) - 1))
-    ξR = κ
+    avgn(ε,T) = T == 0 ? 0 : (ℯ^(ε/T) - 1)^(-1)
+    ξL = κ * (1 + 2avgn(ε,T))
+    ξR = κ * (1 + 2avgn(ε,0))
     ℓlist[begin] += ξL * op("Damping", sites[begin]) * op("Id", sites[begin+1])
     ℓlist[end] += ξR * op("Id", sites[end-1]) * op("Damping", sites[end])
     #
