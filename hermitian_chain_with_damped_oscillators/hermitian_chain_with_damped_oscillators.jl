@@ -10,7 +10,7 @@ using CSV
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
 if gethostname() == "qtech.fisica.unimi.it" ||
-   gethostname() == "qtech2.fisica.unimi.it"
+  gethostname() == "qtech2.fisica.unimi.it"
   ENV["GKSwstype"] = "100"
   @info "Esecuzione su server remoto. Output grafico disattivato."
 else
@@ -51,7 +51,7 @@ let
   timesteps_super = []
   occ_n_super = []
   current_adjsites_super = []
-  current_fromNth_super = []
+  current_allsites_super = []
   bond_dimensions_super = []
   chain_levels_super = []
   osc_levels_left_super = []
@@ -69,8 +69,8 @@ let
   kappa_list = [p["oscillator_spin_interaction_coefficient"]
                 for p ∈ parameter_lists]
   if allequal(n_spin_sites_list) &&
-     allequal(osc_dim_list) &&
-     allequal(kappa_list)
+    allequal(osc_dim_list) &&
+    allequal(kappa_list)
     preload = true
     n_spin_sites = first(n_spin_sites_list)
     osc_dim = first(osc_dim_list)
@@ -84,15 +84,15 @@ let
 
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
-                      [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
-                  for n ∈ 1:length(sites)]
+                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                   for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
     current_adjsites_ops = [κ*current(sites, 1, 2);
-                      [-0.5*current(sites, j, j+1)
-                       for j ∈ spin_range[1:end-1]];
-                      κ*current(sites, spin_range[end], spin_range[end]+1)]
-    current_fromNth_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
+                            [-0.5*current(sites, j, j+1)
+                             for j ∈ spin_range[1:end-1]];
+                            κ*current(sites, spin_range[end], spin_range[end]+1)]
+    current_allsites_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
                            for N in spin_range]
 
     # - l'occupazione degli autospazi dell'operatore numero
@@ -156,23 +156,23 @@ let
     end
 
     #= Definizione degli operatori nell'equazione di Lindblad
-       ======================================================
-       I siti del sistema sono numerati come segue:
-       | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
-         ↑   │                        │          ↑
-         │   └───────────┬────────────┘          │
-         │               │                       │
-         │        catena di spin                 │
-       oscillatore sx                    oscillatore dx
+    ======================================================
+    I siti del sistema sono numerati come segue:
+    | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
+    ↑   │                        │          ↑
+    │   └───────────┬────────────┘          │
+    │               │                       │
+    │        catena di spin                 │
+    oscillatore sx                    oscillatore dx
     =#
     localcfs = [ω; repeat([ε], n_spin_sites); ω]
     interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
     ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
-                         op("Id", sites[begin+1])
+    op("Id", sites[begin+1])
     ℓlist[end] += γᵣ * op("Id", sites[end-1]) *
-                       op("Damping", sites[end]; ω=ω, T=0)
+    op("Damping", sites[end]; ω=ω, T=0)
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -186,15 +186,15 @@ let
     if !preload
       # - i numeri di occupazione
       num_op_list = [MPS(sites,
-                        [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
-                    for n ∈ 1:length(sites)]
+                         [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                     for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
       current_adjsites_ops = [κ*current(sites, 1, 2);
-                        [-0.5*current(sites, j, j+1)
-                        for j ∈ spin_range[1:end-1]];
-                        κ*current(sites, spin_range[end], spin_range[end]+1)]
-      current_fromNth_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
+                              [-0.5*current(sites, j, j+1)
+                               for j ∈ spin_range[1:end-1]];
+                              κ*current(sites, spin_range[end], spin_range[end]+1)]
+      current_allsites_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
                              for N in spin_range]
 
       # - l'occupazione degli autospazi dell'operatore numero
@@ -235,9 +235,9 @@ let
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
     current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ) for j in current_adjsites_ops])
-    current_fromNth(ρ) = reduce(vcat,
+    current_allsites(ρ) = reduce(vcat,
                                 [real.([inner(j, ρ) / trace(ρ) for j in ops])
-                                 for ops ∈ current_fromNth_ops])
+                                 for ops ∈ current_allsites_ops])
     chainlevels(ρ) = real.(levels(num_eigenspace_projs, trace(ρ)^(-1) * ρ))
     osclevelsL(ρ) = real.(levels(osc_levels_projs_left, trace(ρ)^(-1) * ρ))
     osclevelsR(ρ) = real.(levels(osc_levels_projs_right, trace(ρ)^(-1) * ρ))
@@ -250,7 +250,7 @@ let
     normalisation,
     occnlist,
     current_adjsites_list,
-    current_fromNth_joinedlist,
+    current_allsites_list,
     ranks,
     osclevelsLlist,
     osclevelsRlist,
@@ -265,7 +265,7 @@ let
                              fout=[trace,
                                    occn,
                                    current_adjsites,
-                                   current_fromNth,
+                                   current_allsites,
                                    linkdims,
                                    osclevelsL,
                                    osclevelsR,
@@ -275,16 +275,7 @@ let
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
-    current_fromNth_joinedlist = mapreduce(permutedims,
-                                           vcat,
-                                           current_fromNth_joinedlist)
-    # Se ho costruito tutto correttamente, current_fromNth_joinedlist è una
-    # matrice con un numero di colonne pari a n_spin_sites².
-    # Le prime n_spin_sites colonne sono la corrente a partire dal primo sito;
-    # le seconde n_spin_sites colonne sono quella dal secondo sito, e così via.
-    n = isqrt(size(current_fromNth_joinedlist, 2))
-    current_fromNth_lists = [current_fromNth_joinedlist[:,(1 + i*n):(n + i*n)]
-                             for i ∈ 0:n-1]
+    current_allsites_list = mapreduce(permutedims, vcat, current_allsites_list)
     ranks = mapreduce(permutedims, vcat, ranks)
     chainlevelslist = mapreduce(permutedims, vcat, chainlevelslist)
     osclevelsLlist = mapreduce(permutedims, vcat, osclevelsLlist)
@@ -293,18 +284,18 @@ let
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
     for (j, name) in enumerate([:occ_n_left;
-                              [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
-                              :occ_n_right])
+                                [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
+                                :occ_n_right])
       push!(dict, name => occnlist[:,j])
     end
     for (j, name) in enumerate([Symbol("current_adjsites$n")
                                 for n ∈ 1:size(current_adjsites_list, 2)])
       push!(dict, name => current_adjsites_list[:,j])
     end
-    for (k, list) in enumerate(current_fromNth_lists)
-      for (j, name) ∈ enumerate([Symbol("current_$k/$n")
-                                 for n in 1:size(list, 2)])
-        push!(dict, name => list[:,j])
+    for k ∈ 1:n_spin_sites
+      for n ∈ 1:n_spin_sites
+        colname = Symbol("current_$k/$n")
+        push!(dict, colname => current_allsites_list[:, (k-1)*n_spin_sites + n])
       end
     end
     for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
@@ -332,7 +323,7 @@ let
     push!(timesteps_super, tout)
     push!(occ_n_super, occnlist)
     push!(current_adjsites_super, current_adjsites_list)
-    push!(current_fromNth_super, current_fromNth_lists)
+    push!(current_allsites_super, current_allsites_list)
     push!(chain_levels_super, chainlevelslist)
     push!(osc_levels_left_super, osclevelsLlist)
     push!(osc_levels_right_super, osclevelsRlist)
@@ -341,11 +332,11 @@ let
   end
 
   #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
+  =======
+  Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
+  ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
+  la grandezza del font o con il colore quelli che cambiano da una
+  simulazione all'altra.
   =#
   plotsize = (600, 400)
 
@@ -393,9 +384,9 @@ let
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (solo spin)",
                   plotsize=plotsize)
-  
+
   savefig(plt, "occ_n_spins_only.png")
-  
+
   # Grafico dei numeri di occupazione (oscillatori + totale catena)
   # ---------------------------------------------------------------
   # sum(X, dims=2) prende la matrice X e restituisce un vettore colonna
@@ -461,19 +452,27 @@ let
 
   savefig(plt, "current_btw_adjacent_sites.png")
 
-  for (k, list) in enumerate(current_fromNth_super)
-    N = size(list[begin], 2)
+  # Qui purtroppo bisogna assumere che tutte le simulazioni siano state
+  # definite con lo stesso numero di spin... se no il seguente codice
+  # si rompe.
+  # `current_allsites_super` è una lista: ogni suo elemento si riferisce
+  # a una simulazione differente.
+  # Ogni suo elemento è una matrice di n_spins² colonne: la corrente dallo
+  # spin i° allo spin k° si trova nella colonna (i-1)*n_spin + k.
+  n_spins = parameter_lists[begin]["number_of_spin_sites"]
+  for i ∈ 1:n_spins
+    data = [table[:, (i-1)*n_spins .+ (1:n_spins)] for table ∈ current_allsites_super]
     plt = groupplot(timesteps_super,
-                    list,
+                    data,
                     parameter_lists;
-                    labels=reduce(hcat, ["l=$l" for l ∈ 1:N]),
-                    linestyles=reduce(hcat, repeat([:solid], N)),
+                    labels=reduce(hcat, ["l=$l" for l ∈ 1:n_spins]),
+                    linestyles=reduce(hcat, repeat([:solid], n_spins)),
                     commonxlabel=L"\lambda\, t",
-                    commonylabel=LaTeXString("\\langle j_{$k,l}\\rangle"),
-                    plottitle="Corrente di spin (dal $(k)° spin)",
+                    commonylabel=LaTeXString("\\langle j_{$i,l}\\rangle"),
+                    plottitle="Corrente tra spin (dal $(i)° spin)",
                     plotsize=plotsize)
 
-    savefig(plt, "spin_current_fromsite$k.png")
+    savefig(plt, "spin_current_fromsite$i.png")
   end
 
   # Grafico dell'occupazione degli autospazi di N della catena di spin
