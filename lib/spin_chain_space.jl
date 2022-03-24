@@ -92,6 +92,17 @@ ITensors.op(::OpName"σx:σx", ::SiteType"vecS=1/2") = σˣ ⊗ σˣ
 ITensors.op(::OpName"σx:Id", ::SiteType"vecS=1/2") = σˣ ⊗ I₂
 ITensors.op(::OpName"Id:σx", ::SiteType"vecS=1/2") = I₂ ⊗ σˣ
 ITensors.op(::OpName"Damping", ::SiteType"vecS=1/2") = (σˣ ⊗ σˣ) - (I₂ ⊗ I₂)
+function ITensors.op(::OpName"Damping2", ::SiteType"vecS=1/2"; ω::Number, T::Number)
+  if T == 0
+    n = 0
+  else
+    n = (ℯ^(ω / T) - 1)^(-1)
+  end
+  d = vec(x -> (n + 1) * (σ⁻*x*σ⁺ - 0.5*(σ⁺*σ⁻*x + x*σ⁺*σ⁻)) +
+               n * (σ⁺*x*σ⁻ - 0.5*(σ⁻*σ⁺*x + x*σ⁻*σ⁺)),
+          canonicalbasis(2))
+  return d
+end
 
 # Spazio degli spin vettorizzato (su base di Gell-Mann)
 # =====================================================
