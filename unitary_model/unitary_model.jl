@@ -88,9 +88,9 @@ let
     range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
     # - la corrente di spin
-    list = spin_current_op_list(sites[range_spins])
-    spin_current_ops = [embed_slice(sites, range_spins, j)
-                        for j in list]
+    spin_current_ops = [[current(sites, s, j)
+                         for j ∈ filter(n -> n != s, range_spins)]
+                        for s ∈ range_spins]
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
     # dell'operatore numero della catena di spin, vale a dire calcolo
@@ -179,19 +179,19 @@ let
     hlist = twositeoperators(sites, localcfs, interactioncfs)
     #
     function links_odd(τ)
-      return [(exp(-im * τ * h)) for h in hlist[1:2:end]]
+      return [exp(-im * τ * h) for h in hlist[1:2:end]]
     end
     function links_even(τ)
-      return [(exp(-im * τ * h)) for h in hlist[2:2:end]]
+      return [exp(-im * τ * h) for h in hlist[2:2:end]]
     end
 
     # Osservabili da misurare
     # =======================
     if !preload
       # - la corrente di spin
-      list = spin_current_op_list(sites[range_spins])
-      spin_current_ops = [embed_slice(sites, range_spins, j)
-                          for j in list]
+      spin_current_ops = [[current(sites, s, j)
+                           for j ∈ filter(n -> n != s, range_spins)]
+                          for s ∈ range_spins]
     end
 
     # Simulazione
@@ -243,7 +243,7 @@ let
                                 [Symbol("occ_n_right$n") for n∈1:n_osc_right]])
       push!(dict, name => occnlist[:,j])
     end
-    for (j, name) in enumerate([Symbol("spin_current$n")
+    for (j, name) in enumerate([Symbol("current_adjsites$n")
                                 for n = 1:n_spin_sites-1])
       push!(dict, name => spincurrentlist[:,j])
     end
@@ -386,7 +386,7 @@ let
   savefig(plt, "spin_current.png")
 
   # Grafico dei coefficienti della chain map
-  # ----------------------------------------
+  _ ----------------------------------------
   osc_sites = [reverse(1:length(chain[:,1]))
                for chain ∈ osc_chain_coefficients_left_super]
   plt = groupplot(osc_sites,

@@ -49,7 +49,7 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   occ_n_super = []
-  nearcurrent_super = []
+  current_adjsites_super = []
   bond_dimensions_super = []
   chain_levels_super = []
   normalisation_super = []
@@ -103,7 +103,7 @@ let
     # Osservabili da misurare
     # =======================
     # - la corrente di spin
-    nearcurrentops = [-0.5*current(sites, j, j+1)
+    current_adjsitesops = [current(sites, j, j+1)
                       for j ∈ eachindex(sites)[1:end-1]]
                     
     # - la traccia di ρ
@@ -111,7 +111,8 @@ let
 
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    nearcurrent(ρ) = real.([inner(j, ρ) / trace(ρ) for j in nearcurrentops])
+    current(ρ) = real.([inner(j, ρ) / trace(ρ)
+                        for j in current_adjsitesops])
 
     # Simulazione
     # ===========
@@ -125,7 +126,7 @@ let
     tout,
     normalisation,
     occnlist,
-    nearcurrentlist,
+    current_adjsiteslist,
     ranks = evolve(ρ₀,
                    time_step_list,
                    parameters["skip_steps"],
@@ -136,13 +137,13 @@ let
                    parameters["MP_maximum_bond_dimension"];
                    fout=[trace,
                          occn,
-                         nearcurrent,
+                         current,
                          linkdims])
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
-    nearcurrentlist = mapreduce(permutedims, vcat, nearcurrentlist)
+    current_adjsiteslist = mapreduce(permutedims, vcat, current_adjsiteslist)
     ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
@@ -150,9 +151,9 @@ let
     for (j, name) in enumerate([Symbol("occ_n_spin$n") for n = 1:n_spin_sites])
       push!(dict, name => occnlist[:,j])
     end
-    for (j, name) in enumerate([Symbol("near_current$n")
-                                for n ∈ 1:size(nearcurrentlist, 2)])
-      push!(dict, name => nearcurrentlist[:,j])
+    for (j, name) in enumerate([Symbol("current_adjsites$n")
+                                for n ∈ 1:size(current_adjsiteslist, 2)])
+      push!(dict, name => current_adjsiteslist[:,j])
     end
     for (j, name) in enumerate([Symbol("bond_dim$n")
                                 for n ∈ 1:n_spin_sites-1])
@@ -168,7 +169,7 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
     push!(occ_n_super, occnlist)
-    push!(nearcurrent_super, nearcurrentlist)
+    push!(current_adjsites_super, current_adjsiteslist)
     push!(bond_dimensions_super, ranks)
     push!(normalisation_super, normalisation)
   end
@@ -224,9 +225,9 @@ let
 
   # Grafico della corrente di spin
   # ------------------------------
-  N = size(nearcurrent_super[begin], 2)
+  N = size(current_adjsites_super[begin], 2)
   plt = groupplot(timesteps_super,
-                  nearcurrent_super,
+                  current_adjsites_super,
                   parameter_lists;
                   labels=reduce(hcat, ["($j,$(j+1))" for j ∈ 1:N]),
                   linestyles=reduce(hcat, repeat([:solid], N)),

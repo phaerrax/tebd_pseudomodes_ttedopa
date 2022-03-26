@@ -87,10 +87,10 @@ let
                   for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    current_adjsites_ops = [κ*current(sites, 1, 2);
-                      [-0.5*current(sites, j, j+1)
-                       for j ∈ spin_range[1:end-1]];
-                      κ*current(sites, spin_range[end], spin_range[end]+1)]
+    current_adjsites_ops = [-2κ*current(sites, 1, 2);
+                            [current(sites, j, j+1)
+                             for j ∈ spin_range[1:end-1]];
+                            -2κ*current(sites, spin_range[end], spin_range[end]+1)]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
     full_trace = MPS(sites, "vecId")
@@ -159,10 +159,10 @@ let
                     for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      current_adjsites_ops = [κ*current(sites, 1, 2);
-                        [-0.5*current(sites, j, j+1)
-                        for j ∈ spin_range[1:end-1]];
-                        κ*current(sites, spin_range[end], spin_range[end]+1)]
+      current_adjsites_ops = [-2κ*current(sites, 1, 2);
+                              [current(sites, j, j+1)
+                               for j ∈ spin_range[1:end-1]];
+                              -2κ*current(sites, spin_range[end], spin_range[end]+1)]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
       full_trace = MPS(sites, "vecId")
@@ -185,7 +185,8 @@ let
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ) for j in current_adjsites_ops])
+    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
+                                 for j ∈ current_adjsites_ops])
 
     # Evoluzione temporale
     # --------------------

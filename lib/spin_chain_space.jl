@@ -21,18 +21,17 @@ ê₋ = [0; 1]
 ITensors.state(::StateName"0", ::SiteType"S=1/2") = [0; 0]
 # Definisco l'operatore numero per un singolo spin, che altro non è che
 # la proiezione sullo stato |↑⟩.
-ITensors.op(::OpName"N", s::SiteType"S=1/2") = op(OpName"ProjUp"(), s)
+ITensors.op(::OpName"N", st::SiteType"S=1/2") = op(OpName"ProjUp"(), st)
 # La matrice identità
 ITensors.op(::OpName"Id", ::SiteType"S=1/2") = I₂
 # La matrice nulla
-ITensors.op(::OpName"0", ::SiteType"S=1/2") = [0 0; 0 0]
+ITensors.op(::OpName"0", ::SiteType"S=1/2") = zeros(2, 2)
 # Matrici di Pauli
-ITensors.op(::OpName"σx", ::SiteType"S=1/2") = σˣ
-ITensors.op(::OpName"σy", ::SiteType"S=1/2") = σʸ
-ITensors.op(::OpName"σz", ::SiteType"S=1/2") = σᶻ
 # Operatori di scala
-ITensors.op(::OpName"σ+", ::SiteType"S=1/2") = σ⁺
-ITensors.op(::OpName"σ-", ::SiteType"S=1/2") = σ⁻
+ITensors.op(::OpName"σ+", st::SiteType"S=1/2") = op(OpName("S+"), st)
+ITensors.op(::OpName"σ-", st::SiteType"S=1/2") = op(OpName("S-"), st)
+ITensors.op(::OpName"+", st::SiteType"S=1/2") = op(OpName("S+"), st)
+ITensors.op(::OpName"-", st::SiteType"S=1/2") = op(OpName("S-"), st)
 
 # Spazio degli spin vettorizzato
 # ==============================
@@ -72,6 +71,13 @@ function ITensors.state(::StateName"vecY", st::SiteType"vecS=1/2")
 end
 function ITensors.state(::StateName"vecZ", st::SiteType"vecS=1/2")
   return ITensors.state(StateName("vecσz"), st)
+end
+
+function ITensors.state(::StateName"vec+", ::SiteType"vecS=1/2")
+  return vec(σ⁺, canonicalbasis(2))
+end
+function ITensors.state(::StateName"vec-", ::SiteType"vecS=1/2")
+  return vec(σ⁻, canonicalbasis(2))
 end
 
 # Operatori
@@ -139,6 +145,7 @@ end
 function ITensors.state(::StateName"vecσz", ::SiteType"HvS=1/2")
   return vec(σᶻ, gellmannbasis(2))
 end
+
 function ITensors.state(::StateName"vecId", ::SiteType"HvS=1/2")
   return vec(I₂, gellmannbasis(2))
 end
@@ -148,6 +155,7 @@ end
 function ITensors.state(::StateName"vec0", ::SiteType"HvS=1/2")
   return vec(zeros(2, 2), gellmannbasis(2))
 end
+
 function ITensors.state(::StateName"vecX", st::SiteType"HvS=1/2")
   return ITensors.state(StateName("vecσx"), st)
 end
@@ -156,6 +164,13 @@ function ITensors.state(::StateName"vecY", st::SiteType"HvS=1/2")
 end
 function ITensors.state(::StateName"vecZ", st::SiteType"HvS=1/2")
   return ITensors.state(StateName("vecσz"), st)
+end
+
+function ITensors.state(::StateName"vec+", ::SiteType"HvS=1/2")
+  return vec(σ⁺, gellmannbasis(2))
+end
+function ITensors.state(::StateName"vec-", ::SiteType"HvS=1/2")
+  return vec(σ⁻, gellmannbasis(2))
 end
 
 # Operatori

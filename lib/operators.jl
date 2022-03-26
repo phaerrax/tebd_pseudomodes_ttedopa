@@ -2,8 +2,8 @@ using ITensors
 
 # Costruzione della lista di operatori 2-locali
 function twositeoperators(sites::Vector{Index{Int64}},
-                          localcfs::Vector{<:Real},
-                          interactioncfs::Vector{<:Real})
+    localcfs::Vector{<:Real},
+    interactioncfs::Vector{<:Real})
   # Restituisce la lista di termini (che dovranno essere poi esponenziati nel
   # modo consono alla simulazione) dell'Hamiltoniano o del “Lindbladiano” che
   # agiscono sulle coppie di siti adiacenti della catena.
@@ -29,8 +29,8 @@ function twositeoperators(sites::Vector{Index{Int64}},
     s1 = sites[j]
     s2 = sites[j+1]
     h = 0.5localcfs[j] * localop(s1) * op("Id", s2) +
-        0.5localcfs[j+1] * op("Id", s1) * localop(s2) +
-        interactioncfs[j] * interactionop(s1, s2)
+    0.5localcfs[j+1] * op("Id", s1) * localop(s2) +
+    interactioncfs[j] * interactionop(s1, s2)
     push!(list, h)
   end
   return list
@@ -68,34 +68,34 @@ function interactionop(s1::Index, s2::Index)
   elseif SiteType("Osc") ∈ sitetypes(s1) && SiteType("Osc") ∈ sitetypes(s2)
     t = (op("a+", s1) * op("a-", s2) +
          op("a-", s1) * op("a+", s2))
-  #
+    #
   elseif SiteType("vecS=1/2") ∈ sitetypes(s1) &&
-         SiteType("vecS=1/2") ∈ sitetypes(s2)
+    SiteType("vecS=1/2") ∈ sitetypes(s2)
     t = -0.5im * (op("σ-:Id", s1) * op("σ+:Id", s2) +
                   op("σ+:Id", s1) * op("σ-:Id", s2) -
                   op("Id:σ-", s1) * op("Id:σ+", s2) -
                   op("Id:σ+", s1) * op("Id:σ-", s2))
   elseif SiteType("vecOsc") ∈ sitetypes(s1) &&
-         SiteType("vecS=1/2") ∈ sitetypes(s2)
+    SiteType("vecS=1/2") ∈ sitetypes(s2)
     t = im * (op("asum:Id", s1) * op("σx:Id", s2) -
               op("Id:asum", s1) * op("Id:σx", s2))
   elseif SiteType("vecS=1/2") ∈ sitetypes(s1) &&
-         SiteType("vecOsc") ∈ sitetypes(s2)
+    SiteType("vecOsc") ∈ sitetypes(s2)
     t = im * (op("σx:Id", s1) * op("asum:Id", s2) -
               op("Id:σx", s1) * op("Id:asum", s2))
-  #
+    #
   elseif SiteType("HvS=1/2") ∈ sitetypes(s1) &&
-         SiteType("HvS=1/2") ∈ sitetypes(s2)
+    SiteType("HvS=1/2") ∈ sitetypes(s2)
     t = 0.5im * (op("σ-⋅", s1) * op("σ+⋅", s2) +
                  op("σ+⋅", s1) * op("σ-⋅", s2) -
                  op("⋅σ-", s1) * op("⋅σ+", s2) -
                  op("⋅σ+", s1) * op("⋅σ-", s2))
   elseif SiteType("HvOsc") ∈ sitetypes(s1) &&
-         SiteType("HvS=1/2") ∈ sitetypes(s2)
+    SiteType("HvS=1/2") ∈ sitetypes(s2)
     t = -im * (op("asum⋅", s1) * op("σx⋅", s2) -
                op("⋅asum", s1) * op("⋅σx", s2))
   elseif SiteType("HvS=1/2") ∈ sitetypes(s1) &&
-         SiteType("HvOsc") ∈ sitetypes(s2)
+    SiteType("HvOsc") ∈ sitetypes(s2)
     t = -im * (op("σx⋅", s1) * op("asum⋅", s2) -
                op("⋅σx", s1) * op("⋅asum", s2))
   else
@@ -170,17 +170,41 @@ end
 
 # Corrente tra due oscillatori
 # ----------------------------
-function current(sites::Vector{Index{Int64}},
+function current(sites,
     leftsite::Int,
     rightsite::Int)
-  # Copio la formula della corrente di spin, ma con dei generici X ed Y al
-  # posto di σˣ e σʸ: in questo modo può funzionare per tipi di sito diversi,
-  # ciascuno dei quali avrà la propria definizione di X e Y.
-  tags1 = repeat(["vecId"], length(sites))
-  tags2 = repeat(["vecId"], length(sites))
-  tags1[leftsite] = "vecX"
-  tags1[rightsite] = "vecY"
-  tags2[leftsite] = "vecY"
-  tags2[rightsite] = "vecX"
-  return MPS(sites, tags1) - MPS(sites, tags2)
+  # La funzione non discrimina, in entrata, sul tipo di siti su
+  # cui viene applicata, in modo da poterla usare anche con degli
+  # oscillatori armonici (`Osc` e le sue versioni vettorizzate) però
+  # vale solo quando sono agli estremi, cioè se gli oscillatori si
+  # trovano esattamente su `leftsite` o `rightsite`; altre situazioni
+  # non sono ammesse perché l'operatore analogo a σᶻ non c'è per essi.
+  # Usare la funzione in quel caso darebbe un errore perché lo stato
+  # od operatore "Z" non è definito per quei SiteType.
+  # E forse la definizione matematica non avrebbe nemmeno senso...
+  n = rightsite - leftsite
+  tags1 = repeat(["Id"], length(sites))
+  tags2 = repeat(["Id"], length(sites))
+  tags1[leftsite] = "+"
+  tags2[leftsite] = "-"
+  for l ∈ leftsite+1:rightsite-1
+    tags1[l] = "Z"
+    tags2[l] = "Z"
+  end
+  tags1[rightsite] = "-"
+  tags2[rightsite] = "+"
+
+  if (SiteType("S=1/2") ∈ sitetypes(first(sites)) ||
+      SiteType("Osc") ∈ sitetypes(first(sites)))
+    op = im * (-1)^n * (MPO(sites, tags1) - MPO(sites, tags2))
+  elseif (SiteType("vecS=1/2") ∈ sitetypes(first(sites)) ||
+          SiteType("HvS=1/2") ∈ sitetypes(first(sites)) ||
+          SiteType("vecOsc") ∈ sitetypes(first(sites)) ||
+          SiteType("HvOsc") ∈ sitetypes(first(sites)))
+    op = im * (-1)^n * (MPS(sites, string.("vec", tags1)) -
+                        MPS(sites, string.("vec", tags2)))
+  else
+    throw(DomainError(s, "SiteType non riconosciuto."))
+  end
+  return op
 end

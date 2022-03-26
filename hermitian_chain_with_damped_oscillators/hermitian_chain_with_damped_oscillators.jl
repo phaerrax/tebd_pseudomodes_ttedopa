@@ -88,12 +88,13 @@ let
                    for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    current_adjsites_ops = [κ*current(sites, 1, 2);
-                            [-0.5*current(sites, j, j+1)
+    current_adjsites_ops = [-2κ*current(sites, 1, 2);
+                            [current(sites, j, j+1)
                              for j ∈ spin_range[1:end-1]];
-                            κ*current(sites, spin_range[end], spin_range[end]+1)]
-    current_allsites_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
-                           for N in spin_range]
+                            -2κ*current(sites, spin_range[end], spin_range[end]+1)]
+    current_allsites_ops = [[current(sites, s, j)
+                             for j ∈ filter(n -> n != s, spin_range)]
+                            for s in spin_range]
 
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
@@ -190,12 +191,13 @@ let
                      for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      current_adjsites_ops = [κ*current(sites, 1, 2);
-                              [-0.5*current(sites, j, j+1)
+      current_adjsites_ops = [-2κ*current(sites, 1, 2);
+                              [current(sites, j, j+1)
                                for j ∈ spin_range[1:end-1]];
-                              κ*current(sites, spin_range[end], spin_range[end]+1)]
-      current_allsites_ops = [[-0.5*current(sites, N, j) for j ∈ spin_range]
-                             for N in spin_range]
+                              -2κ*current(sites, spin_range[end], spin_range[end]+1)]
+      current_allsites_ops = [[current(sites, s, j)
+                               for j ∈ filter(n -> n != s, spin_range)]
+                              for s in spin_range]
 
       # - l'occupazione degli autospazi dell'operatore numero
       num_eigenspace_projs = [embed_slice(sites,
@@ -293,8 +295,8 @@ let
       push!(dict, name => current_adjsites_list[:,j])
     end
     for k ∈ 1:n_spin_sites
-      for n ∈ 1:n_spin_sites
-        colname = Symbol("current_$k/$n")
+      for (n, s) ∈ enumerate(filter(i -> i != k, 1:n_spin_sites))
+        colname = Symbol("current_$k/$s")
         push!(dict, colname => current_allsites_list[:, (k-1)*n_spin_sites + n])
       end
     end
@@ -457,16 +459,18 @@ let
   # si rompe.
   # `current_allsites_super` è una lista: ogni suo elemento si riferisce
   # a una simulazione differente.
-  # Ogni suo elemento è una matrice di n_spins² colonne: la corrente dallo
-  # spin i° allo spin k° si trova nella colonna (i-1)*n_spin + k.
+  # Ogni suo elemento è una matrice di n_spins×(n_spins-1) colonne: la
+  # corrente dallo spin i° allo spin k° si trova nella
+  # colonna (i-1)*(n_spin-1) + k.
   n_spins = parameter_lists[begin]["number_of_spin_sites"]
   for i ∈ 1:n_spins
-    data = [table[:, (i-1)*n_spins .+ (1:n_spins)] for table ∈ current_allsites_super]
+    data = [table[:, (i-1)*(n_spins-1) .+ (1:n_spins-1)] for table ∈ current_allsites_super]
     plt = groupplot(timesteps_super,
                     data,
                     parameter_lists;
-                    labels=reduce(hcat, ["l=$l" for l ∈ 1:n_spins]),
-                    linestyles=reduce(hcat, repeat([:solid], n_spins)),
+                    labels=reduce(hcat, ["l=$l"
+                                         for l ∈ filter(n -> n != i, 1:n_spins)]),
+                    linestyles=reduce(hcat, repeat([:solid], n_spins-1)),
                     commonxlabel=L"\lambda\, t",
                     commonylabel=LaTeXString("\\langle j_{$i,l}\\rangle"),
                     plottitle="Corrente tra spin (dal $(i)° spin)",
