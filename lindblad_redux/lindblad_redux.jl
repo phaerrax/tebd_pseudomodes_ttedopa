@@ -51,7 +51,6 @@ let
   timesteps_super = []
   occ_n_super = []
   current_adjsites_super = []
-  current_fromNth_super = []
   bond_dimensions_super = []
   chain_levels_super = []
   osc_levels_left_super = []
@@ -133,24 +132,16 @@ let
                siteinds("HvOsc", 1; dim=osc_dim)]
     end
 
-    #= Definizione degli operatori nell'equazione di Lindblad
-       ======================================================
-       I siti del sistema sono numerati come segue:
-       | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
-         ↑   │                        │          ↑
-         │   └───────────┬────────────┘          │
-         │               │                       │
-         │        catena di spin                 │
-       oscillatore sx                    oscillatore dx
-    =#
+    # Definizione degli operatori nell'equazione di Lindblad
+    # ======================================================
     localcfs = [ω; repeat([ε], n_spin_sites); ω]
     interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
-                         op("Id", sites[begin+1])
-    ℓlist[end] += γᵣ * op("Id", sites[end-1]) *
-                       op("Damping", sites[end]; ω=ω, T=0)
+    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=ω, T=T) *
+                          op("Id", sites[begin+1]))
+    ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
+                        op("Damping", sites[end]; ω=ω, T=0))
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -265,84 +256,6 @@ let
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  occ_n_super,
-                  parameter_lists;
-                  labels=["L" string.(1:N-2)... "R"],
-                  linestyles=[:dash repeat([:solid], N-2)... :dash],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
-
-  savefig(plt, "occ_n_all.png")
-
-  # Grafico dell'occupazione del primo oscillatore (riunito)
-  # -------------------------------------------------------
-  # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
-  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_super]
-  plt = unifiedplot(timesteps_super,
-                    occ_n_osc_left_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\langle n_L(t)\rangle",
-                    plottitle="Occupazione dell'oscillatore sx",
-                    plotsize=plotsize)
-
-  savefig(plt, "occ_n_osc_left.png")
-
-  # Grafico dei numeri di occupazione (solo spin)
-  # ---------------------------------------------
-  spinsonly = [mat[:, 2:end-1] for mat in occ_n_super]
-  plt = groupplot(timesteps_super,
-                  spinsonly,
-                  parameter_lists;
-                  labels=hcat(string.(1:N-2)...),
-                  linestyles=hcat(repeat([:solid], N-2)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (solo spin)",
-                  plotsize=plotsize)
-  
-  savefig(plt, "occ_n_spins_only.png")
-  
-  # Grafico dei numeri di occupazione (oscillatori + totale catena)
-  # ---------------------------------------------------------------
-  # sum(X, dims=2) prende la matrice X e restituisce un vettore colonna
-  # le cui righe sono le somme dei valori sulle rispettive righe di X.
-  sums = [[mat[:, 1] sum(mat[:, 2:end-1], dims=2) mat[:, end]]
-          for mat in occ_n_super]
-  plt = groupplot(timesteps_super,
-                  sums,
-                  parameter_lists;
-                  labels=["L" "catena" "R"],
-                  linestyles=[:solid :dot :solid],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (oscillatori + totale catena)",
-                  plotsize=plotsize)
-
-  savefig(plt, "occ_n_sums.png")
-
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  N = size(bond_dimensions_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
-
-  savefig(plt, "bond_dimensions.png")
-
   # Grafico della traccia della matrice densità
   # -------------------------------------------
   # Questo serve più che altro per controllare che rimanga sempre pari a 1.
@@ -356,24 +269,6 @@ let
                     plotsize=plotsize)
 
   savefig(plt, "dm_normalisation.png")
-
-  # Grafico della corrente di spin
-  # ------------------------------
-  N = size(current_adjsites_super[begin], 2)
-  sitelabels = ["L"; string.(1:N+1); "R"]
-  plt = groupplot(timesteps_super,
-                  current_adjsites_super,
-                  parameter_lists;
-                  labels=reduce(hcat,
-                                ["($(sitelabels[j]),$(sitelabels[j+1]))"
-                                 for j ∈ eachindex(sitelabels)[1:end-1]]),
-                  linestyles=reduce(hcat, [:solid for _ ∈ sitelabels]),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle j_{k,k+1}\rangle",
-                  plottitle="Corrente (tra siti adiacenti)",
-                  plotsize=plotsize)
-
-  savefig(plt, "current_btw_adjacent_sites.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
