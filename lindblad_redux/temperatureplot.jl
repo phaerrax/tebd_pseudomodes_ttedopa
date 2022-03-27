@@ -3,7 +3,6 @@
 using Plots
 using DataFrames
 using CSV
-using GR
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -18,10 +17,9 @@ end
 
 isdat(name) = name[end-3:end] == ".dat"
 
-function parsegk(name)
-  n = replace(name, "g" => "", ".dat" => "")
-  v = split(n, "k")
-  return parse(Float64, v[1]), parse(Float64, v[2])
+function parseT(name)
+  n = replace(name, "t" => "", ".dat" => "")
+  return parse(Float64, n)
 end
 
 function extract(file, nsites)
@@ -30,7 +28,7 @@ function extract(file, nsites)
   N = length(currents)
   avg = sum(currents; init=0.0) / N
   stdev = sqrt(sum((currents .- avg).^2; init=0.0) / (N-1))
-  return [parsegk(basename(file))..., avg, stdev]
+  return [parseT(basename(file)), avg, stdev]
 end
 
 let
@@ -38,15 +36,15 @@ let
                      vcat,
                      [extract(dat, 10)
                       for dat ∈ filter(isdat, readdir(ARGS[1]; join=true))])
-  γ = values[:,1]
-  κ = values[:,2]
-  avg = values[:,3]
-  stdev = values[:,4]
-  output = Dict(:gamma => γ)
-  push!(output, :kappa => κ)
+  T = values[:,1]
+  avg = values[:,2]
+  stdev = values[:,3]
+  output = Dict(:temperature => T)
   push!(output, :Javg => avg)
   push!(output, :Jstdev => stdev)
-  CSV.write("gkgrid.dat", DataFrame(output))
-  N = isqrt(length(γ))
-  GR.contourf(γ, κ, avg)
+  table = DataFrame(output)
+  sort!(table, :temperature)
+  CSV.write("temperatureplot.dat", table)
+  plt = plot(table[!, :temperature], table[!, :Javg])
+  savefig(plt, "temperatureplot.png")
 end
