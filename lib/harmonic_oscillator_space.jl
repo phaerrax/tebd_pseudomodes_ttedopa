@@ -229,6 +229,18 @@ function ITensors.state(::StateName"ThermEq", st::SiteType"HvOsc"; dim=2, ω, T)
   return v
 end
 
+# Prodotto di X e dello stato eq. termico Z⁻¹vec(exp(-βH)) = Z⁻¹vec(exp(-ω/T N))
+function ITensors.state(::StateName"X⋅Therm", st::SiteType"HvOsc"; dim=2, ω, T)
+  if T == 0
+    mat = zeros(Float64, dim, dim)
+    mat[1, 1] = 1.0
+  else
+    mat = exp(-ω / T * num(dim))
+    mat /= tr(mat)
+  end
+  return vec((a⁺(dim) + a⁻(dim)) * mat, gellmannbasis(dim))
+end
+
 # Stati del tipo êⱼ ⊗ êₖ (servono ad esempio per poter calcolare, tramite una
 # proiezione su di essi, la componente j,k di una matrice definita su un sito
 # di tipo "HvOsc").
