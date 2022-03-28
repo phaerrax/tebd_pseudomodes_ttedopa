@@ -92,9 +92,10 @@ let
                             [current(sites, j, j+1)
                              for j ∈ spin_range[1:end-1]];
                             -2κ*current(sites, spin_range[end], spin_range[end]+1)]
-    current_allsites_ops = [[current(sites, s, j)
-                             for j ∈ filter(n -> n != s, spin_range)]
-                            for s in spin_range]
+    current_allsites_ops = [current(sites, i, j)
+                            for i ∈ spin_range
+                            for j ∈ spin_range
+                            if j > i]
 
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
@@ -195,9 +196,10 @@ let
                               [current(sites, j, j+1)
                                for j ∈ spin_range[1:end-1]];
                               -2κ*current(sites, spin_range[end], spin_range[end]+1)]
-      current_allsites_ops = [[current(sites, s, j)
-                               for j ∈ filter(n -> n != s, spin_range)]
-                              for s in spin_range]
+      current_allsites_ops = [current(sites, i, j)
+                              for i ∈ spin_range
+                              for j ∈ spin_range
+                              if j > i]
 
       # - l'occupazione degli autospazi dell'operatore numero
       num_eigenspace_projs = [embed_slice(sites,
@@ -236,10 +238,17 @@ let
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ) for j in current_adjsites_ops])
-    current_allsites(ρ) = reduce(vcat,
-                                [real.([inner(j, ρ) / trace(ρ) for j in ops])
-                                 for ops ∈ current_allsites_ops])
+    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
+                                 for j ∈ current_adjsites_ops])
+    function current_allsites(ρ)
+      pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites if j > i]
+      mat = zeros(n_spin_sites, n_spin_sites)
+      for (j, i) in zip(current_allsites_ops, pairs)
+        mat[i...] = real(inner(j, ρ) / trace(ρ))
+      end
+      mat .-= transpose(mat)
+      return Base.vec(mat')
+    end
     chainlevels(ρ) = real.(levels(num_eigenspace_projs, trace(ρ)^(-1) * ρ))
     osclevelsL(ρ) = real.(levels(osc_levels_projs_left, trace(ρ)^(-1) * ρ))
     osclevelsR(ρ) = real.(levels(osc_levels_projs_right, trace(ρ)^(-1) * ρ))
@@ -294,11 +303,9 @@ let
                                 for n ∈ 1:size(current_adjsites_list, 2)])
       push!(dict, name => current_adjsites_list[:,j])
     end
-    for k ∈ 1:n_spin_sites
-      for (n, s) ∈ enumerate(filter(i -> i != k, 1:n_spin_sites))
-        colname = Symbol("current_$k/$s")
-        push!(dict, colname => current_allsites_list[:, (k-1)*n_spin_sites + n])
-      end
+    syms = [Symbol("current_$i/$j") for i ∈ spin_range for j ∈ spin_range]
+    for (coln, s) ∈ enumerate(syms)
+        push!(dict, s => current_allsites_list[:, coln])
     end
     for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
       push!(dict, name => osclevelsLlist[:,j])
@@ -454,30 +461,34 @@ let
 
   savefig(plt, "current_btw_adjacent_sites.png")
 
-  # Qui purtroppo bisogna assumere che tutte le simulazioni siano state
-  # definite con lo stesso numero di spin... se no il seguente codice
-  # si rompe.
-  # `current_allsites_super` è una lista: ogni suo elemento si riferisce
-  # a una simulazione differente.
-  # Ogni suo elemento è una matrice di n_spins×(n_spins-1) colonne: la
-  # corrente dallo spin i° allo spin k° si trova nella
-  # colonna (i-1)*(n_spin-1) + k.
-  n_spins = parameter_lists[begin]["number_of_spin_sites"]
-  for i ∈ 1:n_spins
-    data = [table[:, (i-1)*(n_spins-1) .+ (1:n_spins-1)] for table ∈ current_allsites_super]
-    plt = groupplot(timesteps_super,
-                    data,
-                    parameter_lists;
-                    labels=reduce(hcat, ["l=$l"
-                                         for l ∈ filter(n -> n != i, 1:n_spins)]),
-                    linestyles=reduce(hcat, repeat([:solid], n_spins-1)),
-                    commonxlabel=L"\lambda\, t",
-                    commonylabel=LaTeXString("\\langle j_{$i,l}\\rangle"),
-                    plottitle="Corrente tra spin (dal $(i)° spin)",
-                    plotsize=plotsize)
+  max_n_spins = maximum([p["number_of_spin_sites"] for p in parameter_lists])
+  data = [table[:, 1:p["number_of_spin_sites"]]
+          for (p, table) in zip(parameter_lists, current_allsites_super)]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
+                  linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=LaTeXString("\\langle j_{1,l}\\rangle"),
+                  plottitle="Corrente tra spin (dal 1° spin)",
+                  plotsize=plotsize)
 
-    savefig(plt, "spin_current_fromsite$i.png")
-  end
+  savefig(plt, "spin_current_fromsite1.png")
+
+  data = [table[:, 3*p["number_of_spin_sites"] .+ (1:p["number_of_spin_sites"])]
+          for (p, table) in zip(parameter_lists, current_allsites_super)]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
+                  linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=LaTeXString("\\langle j_{4,l}\\rangle"),
+                  plottitle="Corrente tra spin (dal 4° spin)",
+                  plotsize=plotsize)
+
+  savefig(plt, "spin_current_fromsite4.png")
 
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------
