@@ -66,23 +66,26 @@ let
   # ==============
   # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  S_sites_list     = [p["number_of_spin_sites"] for p in parameter_lists]
-  max_osc_dim_list = [p["maximum_oscillator_space_dimension"] for p in parameter_lists]
-  L_sites_list     = [p["number_of_oscillators_left"] for p in parameter_lists]
-  R_sites_list     = [p["number_of_oscillators_right"] for p in parameter_lists]
+  S_sites_list        = [p["number_of_spin_sites"] for p in parameter_lists]
+  max_osc_dim_list    = [p["maximum_oscillator_space_dimension"] for p in parameter_lists]
+  osc_dims_decay_list = [p["oscillator_space_dimensions_decay"] for p in parameter_lists]
+  L_sites_list        = [p["number_of_oscillators_left"] for p in parameter_lists]
+  R_sites_list        = [p["number_of_oscillators_right"] for p in parameter_lists]
   if (allequal(S_sites_list) &&
       allequal(max_osc_dim_list) &&
+      allequal(osc_dims_decay_list) &&
       allequal(L_sites_list) &&
       allequal(R_sites_list))
     preload = true
-    n_spin_sites = first(S_sites_list)
-    max_osc_dim = first(max_osc_dim_list)
-    n_osc_left = first(L_sites_list)
-    n_osc_right = first(R_sites_list)
+    n_spin_sites   = first(S_sites_list)
+    max_osc_dim    = first(max_osc_dim_list)
+    osc_dims_decay = first(osc_dims_decay_list)
+    n_osc_left     = first(L_sites_list)
+    n_osc_right    = first(R_sites_list)
     sites = [
-             reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, 0.2)]);
+             reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, osc_dims_decay)]);
              repeat([siteind("S=1/2")], n_spin_sites);
-             [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, 0.3)]
+             [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, osc_dims_decay)]
             ]
     for n ∈ eachindex(sites)
       sites[n] = addtags(sites[n], "n=$n")
@@ -140,10 +143,11 @@ let
       n_osc_left = parameters["number_of_oscillators_left"]
       n_osc_right = parameters["number_of_oscillators_right"]
       max_osc_dim = parameters["maximum_oscillator_space_dimension"]
+      osc_dims_decay = parameters["oscillator_space_dimensions_decay"]
       sites = [
-               reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, 0.2)]);
+               reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, osc_dims_decay)]);
                repeat([siteind("S=1/2")], n_spin_sites);
-               [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, 0.3)]
+               [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, osc_dims_decay)]
               ]
       for n ∈ eachindex(sites)
         sites[n] = addtags(sites[n], "n=$n")

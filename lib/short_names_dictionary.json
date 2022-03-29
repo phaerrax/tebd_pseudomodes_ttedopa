@@ -13,6 +13,7 @@
   "spin_damping_coefficient": "κ",
   "oscillator_space_dimension": "dₒ",
   "maximum_oscillator_space_dimension": "dₘₐₓ",
+  "oscillator_space_dimensions_decay": "dim_decay",
   "left_oscillator_space_dimension": "dₒₗ",
   "right_oscillator_space_dimension": "dₒᵣ",
   "oscillator_spin_interaction_coefficient": "κ",
