@@ -22,6 +22,14 @@ a⁺(dim::Int) = diagm(-1 => [sqrt(j) for j = 1:dim-1])
 num(dim::Int) = a⁺(dim) * a⁻(dim)
 id(dim::Int) = Matrix{Int}(I, dim, dim)
 
+function oscdimensions(length, basedim, decay)
+  # Restituisce una sequenza decrescente da `basedim` a 2, da assegnare come
+  # dimensione dello spazio di Hilbert della catena di oscillatori, in modo
+  # che quelli più in profondità della catena non siano inutilmente grandi.
+  f(j) = 2 + basedim * ℯ^(-decay * j)
+  return [basedim; basedim; (Int ∘ floor ∘ f).(3:length)]
+end
+
 # Spazio degli oscillatori (normale)
 # ==================================
 alias(::SiteType"Osc") = SiteType"Qudit"()
