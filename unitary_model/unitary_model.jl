@@ -93,9 +93,8 @@ let
     range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
     # - la corrente di spin
-    spin_current_ops = [[current(sites, s, j)
-                         for j ∈ filter(n -> n != s, range_spins)]
-                        for s ∈ range_spins]
+    spin_current_ops = [current(sites, k, k+1) for k ∈ range_spins[1:end-1]]
+
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
     # dell'operatore numero della catena di spin, vale a dire calcolo
@@ -199,9 +198,7 @@ let
     # =======================
     if !preload
       # - la corrente di spin
-      spin_current_ops = [[current(sites, s, j)
-                           for j ∈ filter(n -> n != s, range_spins)]
-                          for s ∈ range_spins]
+      spin_current_ops = [current(sites, k, k+1) for k ∈ range_spins[1:end-1]]
     end
 
     # Simulazione
