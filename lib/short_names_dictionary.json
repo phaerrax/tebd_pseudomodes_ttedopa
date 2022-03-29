@@ -12,6 +12,7 @@
   "TS_expansion_order": "T-S order",
   "spin_damping_coefficient": "κ",
   "oscillator_space_dimension": "dₒ",
+  "maximum_oscillator_space_dimension": "dₘₐₓ",
   "left_oscillator_space_dimension": "dₒₗ",
   "right_oscillator_space_dimension": "dₒᵣ",
   "oscillator_spin_interaction_coefficient": "κ",

@@ -66,22 +66,27 @@ let
   # ==============
   # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  S_sites_list = [p["number_of_spin_sites"] for p in parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"] for p in parameter_lists]
-  L_sites_list = [p["number_of_oscillators_left"] for p in parameter_lists]
-  R_sites_list = [p["number_of_oscillators_right"] for p in parameter_lists]
-  if allequal(S_sites_list) &&
-     allequal(osc_dim_list) &&
-     allequal(L_sites_list) &&
-     allequal(R_sites_list)
+  S_sites_list     = [p["number_of_spin_sites"] for p in parameter_lists]
+  max_osc_dim_list = [p["maximum_oscillator_space_dimension"] for p in parameter_lists]
+  L_sites_list     = [p["number_of_oscillators_left"] for p in parameter_lists]
+  R_sites_list     = [p["number_of_oscillators_right"] for p in parameter_lists]
+  if (allequal(S_sites_list) &&
+      allequal(max_osc_dim_list) &&
+      allequal(L_sites_list) &&
+      allequal(R_sites_list))
     preload = true
     n_spin_sites = first(S_sites_list)
-    osc_dim = first(osc_dim_list)
+    max_osc_dim = first(max_osc_dim_list)
     n_osc_left = first(L_sites_list)
     n_osc_right = first(R_sites_list)
-    sites = [siteinds("Osc", n_osc_left; dim=osc_dim);
-             siteinds("S=1/2", n_spin_sites);
-             siteinds("Osc", n_osc_right; dim=osc_dim)]
+    sites = [
+             reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, 0.2)]);
+             repeat([siteind("S=1/2")], n_spin_sites);
+             [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, 0.3)]
+            ]
+    for n ∈ eachindex(sites)
+      sites[n] = addtags(sites[n], "n=$n")
+    end
 
     range_osc_left = 1:n_osc_left
     range_spins = n_osc_left .+ (1:n_spin_sites)
@@ -123,7 +128,6 @@ let
     # J(ω) = κ² ⋅ γ/π ⋅ 1/(γ² + (ω-Ω)²)
     T = parameters["temperature"]
     ωc = parameters["frequency_cutoff"]
-    osc_dim = parameters["oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     τ = parameters["simulation_time_step"]
@@ -136,9 +140,15 @@ let
       n_spin_sites = parameters["number_of_spin_sites"]
       n_osc_left = parameters["number_of_oscillators_left"]
       n_osc_right = parameters["number_of_oscillators_right"]
-      sites = [siteinds("Osc", n_osc_left; dim=osc_dim);
-               siteinds("S=1/2", n_spin_sites);
-               siteinds("Osc", n_osc_right; dim=osc_dim)]
+      max_osc_dim = parameters["maximum_oscillator_space_dimension"]
+      sites = [
+               reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, 0.2)]);
+               repeat([siteind("S=1/2")], n_spin_sites);
+               [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, 0.3)]
+              ]
+      for n ∈ eachindex(sites)
+        sites[n] = addtags(sites[n], "n=$n")
+      end
     end
 
     range_osc_left = 1:n_osc_left
@@ -386,7 +396,7 @@ let
   savefig(plt, "spin_current.png")
 
   # Grafico dei coefficienti della chain map
-  _ ----------------------------------------
+  # ----------------------------------------
   osc_sites = [reverse(1:length(chain[:,1]))
                for chain ∈ osc_chain_coefficients_left_super]
   plt = groupplot(osc_sites,
