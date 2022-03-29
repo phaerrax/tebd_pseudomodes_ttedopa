@@ -303,7 +303,9 @@ let
                                 for n ∈ 1:size(current_adjsites_list, 2)])
       push!(dict, name => current_adjsites_list[:,j])
     end
-    syms = [Symbol("current_$i/$j") for i ∈ spin_range for j ∈ spin_range]
+    syms = [Symbol("current_$i/$j")
+            for i ∈ 1:n_spin_sites
+            for j ∈ 1:n_spin_sites]
     for (coln, s) ∈ enumerate(syms)
         push!(dict, s => current_allsites_list[:, coln])
     end
