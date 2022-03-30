@@ -226,6 +226,7 @@ let
     # -----------------------
     occn(ψ) = real.(expect(ψ, "N"))
     spincurrent(ψ) = real.([inner(ψ, j * ψ) for j in spin_current_ops])
+    spinlinkdims(ψ) = linkdims(ψ)[range_spins[1:end-1]]
 
     # Evoluzione temporale
     # --------------------
@@ -239,7 +240,7 @@ let
                              links_even,
                              parameters["MP_compression_error"],
                              parameters["MP_maximum_bond_dimension"];
-                             fout=[norm, occn, spincurrent, linkdims])
+                             fout=[norm, occn, spincurrent, spinlinkdims])
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
@@ -258,7 +259,7 @@ let
                                 for n = 1:n_spin_sites-1])
       push!(dict, name => spincurrentlist[:,j])
     end
-    len = n_osc_left + n_spin_sites + n_osc_right
+    len = n_spin_sites
     for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 1:len-1])
       push!(dict, name => ranks[:,j])
     end
