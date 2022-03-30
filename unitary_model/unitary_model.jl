@@ -95,9 +95,6 @@ let
     range_spins = n_osc_left .+ (1:n_spin_sites)
     range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
-    # - la corrente di spin
-    spin_current_ops = [current(sites, k, k+1) for k ∈ range_spins[1:end-1]]
-
     # - l'occupazione degli autospazi dell'operatore numero
     # Ad ogni istante proietto lo stato corrente sugli autostati
     # dell'operatore numero della catena di spin, vale a dire calcolo
@@ -200,10 +197,15 @@ let
 
     # Osservabili da misurare
     # =======================
-    if !preload
-      # - la corrente di spin
-      spin_current_ops = [current(sites, k, k+1) for k ∈ range_spins[1:end-1]]
-    end
+    # - la corrente di spin
+    # (Ci metto anche quella tra spin e primi oscillatori)
+    spin_current_ops = [-2ηₗ*current(sites,
+                                     range_spins[1]-1,
+                                     range_spins[1]);
+                        [current(sites, j, j+1) for j ∈ range_spins[1:end-1]];
+                        -2ηᵣ*current(sites,
+                                     range_spins[end],
+                                     range_spins[end]+1)]
 
     # Simulazione
     # ===========
@@ -226,7 +228,11 @@ let
     # -----------------------
     occn(ψ) = real.(expect(ψ, "N"))
     spincurrent(ψ) = real.([inner(ψ, j * ψ) for j in spin_current_ops])
-    spinlinkdims(ψ) = linkdims(ψ)[range_spins[1:end-1]]
+    # Calcolo i ranghi tra tutti gli spin, più quelli tra gli spin e
+    # i primi oscillatori, quelli appena attaccati alla catena.
+    # Questo risolve anche il problema di come trattare questa funzione
+    # quando c'è un solo spin nella catena.
+    spinlinkdims(ψ) = linkdims(ψ)[range_osc_left[end] : range_spins[end]]
 
     # Evoluzione temporale
     # --------------------
@@ -260,7 +266,7 @@ let
       push!(dict, name => spincurrentlist[:,j])
     end
     len = n_spin_sites
-    for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 1:len-1])
+    for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 0:len])
       push!(dict, name => ranks[:,j])
     end
     push!(dict, :norm => normalisation)
@@ -370,9 +376,9 @@ let
   plt = groupplot(timesteps_super,
                   bond_dimensions_super,
                   parameter_lists;
-                  labels=[hcat(["($j,$(j+1))" for j ∈ 1:size(v, 2)]...)
+                  labels=[reduce(hcat, ["($(j-1),$j)" for j ∈ 1:size(v, 2)])
                           for v in bond_dimensions_super],
-                  linestyles=[hcat(repeat([:solid], size(v, 2))...)
+                  linestyles=[reduce(hcat, repeat([:solid], size(v, 2)))
                               for v in bond_dimensions_super],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\chi_{k,k+1}(t)",
@@ -386,9 +392,11 @@ let
   plt = groupplot(timesteps_super,
                   spin_current_super,
                   parameter_lists;
-                  labels=[hcat(["($j,$(j+1))" for j ∈ 1:size(c, 2)]...)
+                  labels=[reduce(hcat,
+                                 ["($(j-1),$j)" for j ∈ 1:size(c, 2)])
                           for c in spin_current_super],
-                  linestyles=[hcat(repeat([:solid], size(c, 2))...)
+                  linestyles=[reduce(hcat,
+                                     repeat([:solid], size(c, 2)))
                               for c in spin_current_super],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"j_{k,k+1}(t)",
