@@ -98,6 +98,10 @@ function interactionop(s1::Index, s2::Index)
     SiteType("HvOsc") ∈ sitetypes(s2)
     t = -im * (op("σx⋅", s1) * op("asum⋅", s2) -
                op("⋅σx", s1) * op("⋅asum", s2))
+  elseif SiteType("HvOsc") ∈ sitetypes(s1) &&
+    SiteType("HvOsc") ∈ sitetypes(s2)
+    t = -im * (op("asum⋅", s1) * op("asum⋅", s2) -
+               op("⋅asum", s1) * op("⋅asum", s2))
   else
     throw(DomainError((s1, s2), "SiteType non riconosciuti."))
   end
