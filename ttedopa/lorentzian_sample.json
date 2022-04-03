@@ -3,7 +3,7 @@
   "number_of_spin_sites": 10,
   "number_of_oscillators_left": 100,
   "number_of_oscillators_right": 100,
-  "maximum_oscillator_space_dimension": 5,
+  "maximum_oscillator_space_dimension": 1,
   "oscillator_space_dimensions_decay": 1,
   "frequency_cutoff": 20,
   "simulation_end_time": 5,
@@ -15,10 +15,7 @@
   "TS_expansion_order": 2,
   "PolyChaos_nquad": 1e4,
   "temperature": 20,
-  "spectral_density_peak_1": 10,
-  "spectral_density_half_width_1": 0.2,
-  "spectral_density_overall_factor_1": 0.3536,
-  "spectral_density_peak_2": 10,
-  "spectral_density_half_width_2": 0.2,
-  "spectral_density_overall_factor_2": 0.3536
+  "spectral_density_peak": 10,
+  "spectral_density_half_width": 0.2,
+  "spectral_density_overall_factor": 0.5
 }
