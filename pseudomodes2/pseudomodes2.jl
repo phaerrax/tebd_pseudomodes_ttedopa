@@ -295,7 +295,7 @@ let
   plt = groupplot(timesteps_super,
                   occ_n_super,
                   parameter_lists;
-                  labels=["L2" "L1" string.(1:N-2)... "R1" "R2"],
+                  labels=["L2" "L1" string.(1:N-4)... "R1" "R2"],
                   linestyles=[:dash :dash repeat([:solid], N-4)... :dash :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
@@ -386,14 +386,14 @@ let
   # Grafico della corrente di spin
   # ------------------------------
   N = size(current_adjsites_super[begin], 2)
-  sitelabels = ["L2"; "L1"; string.(1:N+1); "R1"; "R2"]
+  sitelabels = ["L2"; "L1"; string.(1:N-3); "R1"; "R2"]
   plt = groupplot(timesteps_super,
                   current_adjsites_super,
                   parameter_lists;
                   labels=reduce(hcat,
                                 ["($(sitelabels[j]),$(sitelabels[j+1]))"
                                  for j ∈ eachindex(sitelabels)[1:end-1]]),
-                  linestyles=reduce(hcat, [:solid for _ ∈ sitelabels]),
+                  linestyles=[:dash :dash repeat([:solid], N-3)... :dash :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle j_{k,k+1}\rangle",
                   plottitle="Corrente (tra siti adiacenti)",
@@ -410,25 +410,11 @@ let
                   labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
                   linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
                   commonxlabel=L"\lambda\, t",
-                  commonylabel=LaTeXString("\\langle j_{1,l}\\rangle"),
+                  commonylabel=L"\langle j_{1,l}\rangle",
                   plottitle="Corrente tra spin (dal 1° spin)",
                   plotsize=plotsize)
 
   savefig(plt, "spin_current_fromsite1.png")
-
-  data = [table[:, 3*p["number_of_spin_sites"] .+ (1:p["number_of_spin_sites"])]
-          for (p, table) in zip(parameter_lists, current_allsites_super)]
-  plt = groupplot(timesteps_super,
-                  data,
-                  parameter_lists;
-                  labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
-                  linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=LaTeXString("\\langle j_{4,l}\\rangle"),
-                  plottitle="Corrente tra spin (dal 4° spin)",
-                  plotsize=plotsize)
-
-  savefig(plt, "spin_current_fromsite4.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
