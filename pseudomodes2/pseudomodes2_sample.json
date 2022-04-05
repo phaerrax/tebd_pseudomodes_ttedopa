@@ -1,7 +1,7 @@
 {
-  "spin_excitation_energy": 100,
+  "spin_excitation_energy": 10,
   "number_of_spin_sites": 10,
-  "simulation_end_time": 2,
+  "simulation_end_time": 10,
   "simulation_time_step": 0.01,
   "skip_steps": 20,
   "chain_initial_state": "empty",
@@ -11,7 +11,7 @@
   "TS_expansion_order": 2,
   "oscillator_space_dimension": 8,
   "oscillator_spin_interaction_coefficient": 0.5,
-  "oscillator_interaction_coefficient": 1,
+  "oscillators_interaction_coefficient": 1,
   "oscillator_damping_coefficient_left": 1,
   "oscillator_damping_coefficient_right": 1,
   "oscillator1_frequency": 10,
