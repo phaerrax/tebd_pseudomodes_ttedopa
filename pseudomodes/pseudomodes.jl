@@ -52,6 +52,8 @@ let
   occ_n_super = []
   current_adjsites_super = []
   current_allsites_super = []
+  forwardflux_super = []
+  backwardflux_super = []
   bond_dimensions_super = []
   chain_levels_super = []
   osc_levels_left_super = []
@@ -221,6 +223,12 @@ let
       full_trace = MPS(sites, "vecId")
     end
 
+    forward_flux_ops = [forwardflux(sites, i, j)
+                        for i ∈ spin_range
+                        for j ∈ spin_range]
+    backward_flux_ops = [backwardflux(sites, i, j)
+                         for i ∈ spin_range
+                         for j ∈ spin_range]
     # Simulazione
     # ===========
     # Stato iniziale
@@ -240,6 +248,22 @@ let
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
     current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
                                  for j ∈ current_adjsites_ops])
+    function forwardflux_f(ρ)
+      pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites]
+      mat = zeros(n_spin_sites, n_spin_sites)
+      for (Ff, i) in zip(forward_flux_ops, pairs)
+        mat[i...] = real(inner(Ff, ρ) / trace(ρ))
+      end
+      return Base.vec(mat')
+    end
+    function backwardflux_f(ρ)
+      pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites]
+      mat = zeros(n_spin_sites, n_spin_sites)
+      for (Ff, i) in zip(backward_flux_ops, pairs)
+        mat[i...] = real(inner(Ff, ρ) / trace(ρ))
+      end
+      return Base.vec(mat')
+    end
     function current_allsites(ρ)
       pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites if j > i]
       mat = zeros(n_spin_sites, n_spin_sites)
@@ -262,6 +286,8 @@ let
     occnlist,
     current_adjsites_list,
     current_allsites_list,
+    forwardflux_list,
+    backwardflux_list,
     ranks,
     osclevelsLlist,
     osclevelsRlist,
@@ -277,6 +303,8 @@ let
                                    occn,
                                    current_adjsites,
                                    current_allsites,
+                                   forwardflux_f,
+                                   backwardflux_f,
                                    linkdims,
                                    osclevelsL,
                                    osclevelsR,
@@ -287,6 +315,8 @@ let
     occnlist = mapreduce(permutedims, vcat, occnlist)
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
     current_allsites_list = mapreduce(permutedims, vcat, current_allsites_list)
+    forwardflux_list = mapreduce(permutedims, vcat, forwardflux_list)
+    backwardflux_list = mapreduce(permutedims, vcat, backwardflux_list)
     ranks = mapreduce(permutedims, vcat, ranks)
     chainlevelslist = mapreduce(permutedims, vcat, chainlevelslist)
     osclevelsLlist = mapreduce(permutedims, vcat, osclevelsLlist)
@@ -335,6 +365,8 @@ let
     push!(occ_n_super, occnlist)
     push!(current_adjsites_super, current_adjsites_list)
     push!(current_allsites_super, current_allsites_list)
+    push!(forwardflux_super, forwardflux_list)
+    push!(backwardflux_super, backwardflux_list)
     push!(chain_levels_super, chainlevelslist)
     push!(osc_levels_left_super, osclevelsLlist)
     push!(osc_levels_right_super, osclevelsRlist)
@@ -491,6 +523,34 @@ let
                   plotsize=plotsize)
 
   savefig(plt, "spin_current_fromsite4.png")
+
+  data = [table[:, 1:p["number_of_spin_sites"]]
+          for (p, table) in zip(parameter_lists, forwardflux_super)]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=reduce(hcat, ["k=$k" for k ∈ 1:max_n_spins]),
+                  linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"1 \to k",
+                  plottitle="Flusso di spin in avanti, dal primo sito",
+                  plotsize=plotsize)
+
+  savefig(plt, "forwardflux_fromsite1.png")
+
+  data = [table[:, 1:p["number_of_spin_sites"]]
+          for (p, table) in zip(parameter_lists, backwardflux_super)]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=reduce(hcat, ["k=$k" for k ∈ 1:max_n_spins]),
+                  linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
+                  commonxlabel=L"\lambda\, t",
+                  commonylabel=L"k \to 1",
+                  plottitle="Flusso di spin all'indietro, dal primo sito",
+                  plotsize=plotsize)
+
+  savefig(plt, "backwardflux_fromsite1.png")
 
   # Grafico dell'occupazione degli autospazi di N della catena di spin
   # ------------------------------------------------------------------

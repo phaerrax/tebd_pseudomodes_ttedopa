@@ -212,3 +212,54 @@ function current(sites,
   end
   return op
 end
+
+function forwardflux(sites,
+    leftsite::Int,
+    rightsite::Int)
+  # Solo uno dei due termini di j_{k,k'}
+  n = rightsite - leftsite
+  tags1 = repeat(["Id"], length(sites))
+  tags1[leftsite] = "+"
+  for l ∈ leftsite+1:rightsite-1
+    tags1[l] = "Z"
+  end
+  tags1[rightsite] = "-"
+
+  if (SiteType("S=1/2") ∈ sitetypes(first(sites)) ||
+      SiteType("Osc") ∈ sitetypes(first(sites)))
+    op = im * (-1)^n * (MPO(sites, tags1) - MPO(sites, tags2))
+  elseif (SiteType("vecS=1/2") ∈ sitetypes(first(sites)) ||
+          SiteType("HvS=1/2") ∈ sitetypes(first(sites)) ||
+          SiteType("vecOsc") ∈ sitetypes(first(sites)) ||
+          SiteType("HvOsc") ∈ sitetypes(first(sites)))
+    op = im * (-1)^n * MPS(sites, string.("vec", tags1))
+  else
+    throw(DomainError(s, "SiteType non riconosciuto."))
+  end
+  return op
+end
+function backwardflux(sites,
+    leftsite::Int,
+    rightsite::Int)
+  # L'altro termine
+  n = rightsite - leftsite
+  tags2 = repeat(["Id"], length(sites))
+  tags2[leftsite] = "-"
+  for l ∈ leftsite+1:rightsite-1
+    tags2[l] = "Z"
+  end
+  tags2[rightsite] = "+"
+
+  if (SiteType("S=1/2") ∈ sitetypes(first(sites)) ||
+      SiteType("Osc") ∈ sitetypes(first(sites)))
+    op = im * (-1)^n * (MPO(sites, tags1) - MPO(sites, tags2))
+  elseif (SiteType("vecS=1/2") ∈ sitetypes(first(sites)) ||
+          SiteType("HvS=1/2") ∈ sitetypes(first(sites)) ||
+          SiteType("vecOsc") ∈ sitetypes(first(sites)) ||
+          SiteType("HvOsc") ∈ sitetypes(first(sites)))
+    op = im * (-1)^n * MPS(sites, string.("vec", tags2))
+  else
+    throw(DomainError(s, "SiteType non riconosciuto."))
+  end
+  return op
+end
