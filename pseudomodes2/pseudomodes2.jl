@@ -313,7 +313,7 @@ let
                     parameter_lists;
                     linestyle=:solid,
                     xlabel=L"\lambda\, t",
-                    ylabel=L"\langle n_L(t)\rangle",
+                    ylabel=L"\langle n_{L2}(t)\rangle",
                     plottitle="Occupazione dell'oscillatore sx",
                     plotsize=plotsize)
 
@@ -325,8 +325,8 @@ let
   plt = groupplot(timesteps_super,
                   spinsonly,
                   parameter_lists;
-                  labels=hcat(string.(1:N-2)...),
-                  linestyles=hcat(repeat([:solid], N-2)...),
+                  labels=reduce(hcat, string.(1:N-4)),
+                  linestyles=reduce(hcat, repeat([:solid], N-4)),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (solo spin)",
@@ -345,10 +345,10 @@ let
   plt = groupplot(timesteps_super,
                   sums,
                   parameter_lists;
-                  labels=["L" "catena" "R"],
+                  labels=["L1+L2" "spin" "R1+R2"],
                   linestyles=[:solid :dot :solid],
                   commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
+                  commonylabel=L"\sum_i\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (oscillatori + totale catena)",
                   plotsize=plotsize)
 
@@ -357,11 +357,14 @@ let
   # Grafico dei ranghi del MPS
   # --------------------------
   N = size(bond_dimensions_super[begin], 2)
+  sitelabels = ["L2"; "L1"; string.(1:N-3); "R1"; "R2"]
   plt = groupplot(timesteps_super,
                   bond_dimensions_super,
                   parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
+                  labels=reduce(hcat,
+                                ["($(sitelabels[j]),$(sitelabels[j+1]))"
+                                 for j ∈ eachindex(sitelabels)[1:end-1]]),
+                  linestyles=[:dash :dash repeat([:solid], N-4)... :dash :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",
@@ -393,7 +396,7 @@ let
                   labels=reduce(hcat,
                                 ["($(sitelabels[j]),$(sitelabels[j+1]))"
                                  for j ∈ eachindex(sitelabels)[1:end-1]]),
-                  linestyles=[:dash :dash repeat([:solid], N-3)... :dash :dash],
+                  linestyles=[:dash :dash repeat([:solid], N-4)... :dash :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle j_{k,k+1}\rangle",
                   plottitle="Corrente (tra siti adiacenti)",

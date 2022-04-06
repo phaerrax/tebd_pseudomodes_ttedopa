@@ -450,12 +450,15 @@ let
 
   # Grafico dei ranghi del MPS
   # --------------------------
-  N = size(bond_dimensions_super[begin])[2]
+  N = size(bond_dimensions_super[begin], 2)
+  sitelabels = ["L"; string.(1:N-1); "R"]
   plt = groupplot(timesteps_super,
                   bond_dimensions_super,
                   parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
+                  labels=reduce(hcat,
+                                ["($(sitelabels[j]),$(sitelabels[j+1]))"
+                                 for j ∈ eachindex(sitelabels)[1:end-1]]),
+                  linestyles=[:dash repeat([:solid], N-2)... :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",

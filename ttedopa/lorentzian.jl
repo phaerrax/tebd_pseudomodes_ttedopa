@@ -374,13 +374,20 @@ let
 
   # Grafico dei ranghi del MPS
   # --------------------------
+  ranklabels=[reduce(hcat, ["(l1,s1)";
+                            ["(s$j,s$(j+1))" for j ∈ 1:size(v, 2)-3];
+                            "(s10,r1)";
+                            "max"])
+                          for v ∈ bond_dimensions_super]
+  ranklinestyles = [reduce(hcat, [repeat([:solid], size(v, 2)-1);
+                                  :dash])
+                    for v ∈ bond_dimensions_super]
+
   plt = groupplot(timesteps_super,
                   bond_dimensions_super,
                   parameter_lists;
-                  labels=[reduce(hcat, ["($(j-1),$j)" for j ∈ 1:size(v, 2)])
-                          for v in bond_dimensions_super],
-                  linestyles=[reduce(hcat, repeat([:solid], size(v, 2)))
-                              for v in bond_dimensions_super],
+                  labels=ranklabels,
+                  linestyles=ranklinestyles,
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",
