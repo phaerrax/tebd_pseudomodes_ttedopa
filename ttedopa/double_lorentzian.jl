@@ -233,7 +233,8 @@ let
     # i primi oscillatori, quelli appena attaccati alla catena.
     # Questo risolve anche il problema di come trattare questa funzione
     # quando c'è un solo spin nella catena.
-    spinlinkdims(ψ) = linkdims(ψ)[range_osc_left[end] : range_spins[end]]
+    spinlinkdims(ψ) = [linkdims(ψ)[range_osc_left[end] : range_spins[end]];
+                       maxlinkdim(ψ)]
 
     # Evoluzione temporale
     # --------------------
