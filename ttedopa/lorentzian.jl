@@ -415,12 +415,11 @@ let
 
   # Grafico dei coefficienti della chain map
   # ----------------------------------------
-  osc_sites = [reverse(1:length(chain[:,1]))
-               for chain ∈ osc_chain_coefficients_left_super]
-  plt = groupplot(osc_sites,
+  plt = groupplot([1:p["number_of_oscillators_left"]
+                   for p ∈ parameter_lists],
                   osc_chain_coefficients_left_super,
                   parameter_lists;
-                  labels=[L"\Omega_i" L"\kappa_i"],
+                  labels=["Ωᵢ" "κᵢ"],
                   linestyles=[:solid :solid],
                   commonxlabel=L"i",
                   commonylabel="Coefficiente",
@@ -430,12 +429,11 @@ let
 
   savefig(plt, "osc_left_coefficients.png")
 
-  osc_sites = [1:length(chain[:,1])
-               for chain ∈ osc_chain_coefficients_right_super]
-  plt = groupplot(osc_sites,
+  plt = groupplot([1:p["number_of_oscillators_right"]
+                   for p ∈ parameter_lists],
                   osc_chain_coefficients_right_super,
                   parameter_lists;
-                  labels=[L"\Omega_i" L"\kappa_i"],
+                  labels=["Ωᵢ" "κᵢ"],
                   linestyles=[:solid :solid],
                   commonxlabel=L"i",
                   commonylabel="Coefficiente",
