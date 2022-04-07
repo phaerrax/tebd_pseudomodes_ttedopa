@@ -445,20 +445,31 @@ let
 
   # Istantanea dei numeri di occupazione alla fine
   # ----------------------------------------------
-  plt = groupplot([[reverse(rangeL); rangeS; rangeR]
-                     for (rangeL, rangeS, rangeR) ∈ zip(range_osc_left_super,
-                                                        range_spins_super,
-                                                        range_osc_right_super)],
+  plt = unifiedplot([[rangeL; rangeS; rangeR] for (rangeL, rangeS, rangeR)
+                   ∈ zip(range_osc_left_super,
+                         range_spins_super,
+                         range_osc_right_super)],
                     snapshot_super,
                     parameter_lists;
-                    labels=[L"\langle n_i\rangle"],
-                    linestyles=[:solid],
-                    commonxlabel=L"i",
-                    commonylabel="Numero di occupazione",
-                    plottitle="Numeri di occupazione alla fine",
+                    linestyle=:solid,
+                    xlabel=L"i",
+                    ylabel="Numero di occupazione",
+                    plottitle="Numeri di occupazione, alla fine",
                     plotsize=plotsize)
 
   savefig(plt, "snapshot.png")
+
+  plt = unifiedplot(range_spins_super,
+                    [occn[range_spins] for (occn, range_spins)
+                     ∈ zip(snapshot_super, range_spins_super)],
+                    parameter_lists;
+                    linestyle=:solid,
+                    xlabel=L"i",
+                    ylabel="Numero di occupazione",
+                    plottitle="Numeri di occupazione, alla fine, solo spin",
+                    plotsize=plotsize)
+
+  savefig(plt, "snapshot_spins.png")
 
   # Grafico della norma dello stato
   # -------------------------------
