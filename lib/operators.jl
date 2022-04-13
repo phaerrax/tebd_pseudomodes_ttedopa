@@ -100,8 +100,13 @@ function interactionop(s1::Index, s2::Index)
                op("⋅σx", s1) * op("⋅asum", s2))
   elseif SiteType("HvOsc") ∈ sitetypes(s1) &&
     SiteType("HvOsc") ∈ sitetypes(s2)
-    t = -im * (op("asum⋅", s1) * op("asum⋅", s2) -
-               op("⋅asum", s1) * op("⋅asum", s2))
+    # Interazione del tipo H = a₁†a₂ + a₂†a₁, da inserire
+    # nel commutatore -i[H,ρ]:
+    # -i (a₁†a₂ ρ + a₂†a₁ ρ - ρ a₁†a₂ - ρ a₂†a₁)
+    t = -im * (op("a+⋅", s1) * op("a-⋅", s2) +
+               op("a+⋅", s2) * op("a-⋅", s1) -
+               op("⋅a+", s1) * op("⋅a-", s2) -
+               op("⋅a+", s2) * op("⋅a-", s1))
   else
     throw(DomainError((s1, s2), "SiteType non riconosciuti."))
   end

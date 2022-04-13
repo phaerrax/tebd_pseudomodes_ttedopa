@@ -66,11 +66,7 @@ let
                        for p ∈ parameter_lists]
   osc_dim_list = [p["oscillator_space_dimension"]
                   for p ∈ parameter_lists]
-  kappa_list = [p["oscillator_spin_interaction_coefficient"]
-                for p ∈ parameter_lists]
-  if allequal(n_spin_sites_list) &&
-    allequal(osc_dim_list) &&
-    allequal(kappa_list)
+  if allequal(n_spin_sites_list) && allequal(osc_dim_list)
     preload = true
     n_spin_sites = first(n_spin_sites_list)
     osc_dim = first(osc_dim_list)
@@ -79,7 +75,7 @@ let
 
     sites = [siteinds("HvOsc", 2; dim=osc_dim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 2; dim=osc_dim)]
+             siteinds("HvOsc", 1; dim=osc_dim)]
 
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
@@ -109,11 +105,19 @@ let
     # - parametri fisici
     ε = parameters["spin_excitation_energy"]
     # λ = 1
-    κ = parameters["oscillator_spin_interaction_coefficient"]
-    ζ = parameters["oscillators_interaction_coefficient"]
-    γ = parameters["oscillator_damping_coefficient"]
-    ω₁ = parameters["oscillator1_frequency"]
-    ω₂ = parameters["oscillator2_frequency"]
+    κ₁ = parameters["oscillatorL1_spin_interaction_coefficient"]
+    ω₁ = parameters["oscillatorL1_frequency"]
+    γ₁ = parameters["oscillatorL1_damping_coefficient"]
+    #
+    κ₂ = parameters["oscillatorL2_spin_interaction_coefficient"]
+    ω₂ = parameters["oscillatorL2_frequency"]
+    γ₂ = parameters["oscillatorL2_damping_coefficient"]
+    #
+    κᵣ = parameters["oscillatorR_spin_interaction_coefficient"]
+    ωᵣ = parameters["oscillatorR_frequency"]
+    γᵣ = parameters["oscillatorR_damping_coefficient"]
+    #
+    η = parameters["oscillators_interaction_coefficient"]
     T = parameters["temperature"]
     oscdim = parameters["oscillator_space_dimension"]
 
@@ -125,24 +129,47 @@ let
     # Costruzione della catena
     # ========================
     if !preload
-      n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
+      n_spin_sites = parameters["number_of_spin_sites"]
       spin_range = 2 .+ (1:n_spin_sites)
 
       sites = [siteinds("HvOsc", 2; dim=osc_dim);
                siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 2; dim=osc_dim)]
+               siteinds("HvOsc", 1; dim=osc_dim)]
     end
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
-    localcfs = [ω₂; ω₁; repeat([ε], n_spin_sites); ω₁; ω₂]
-    interactioncfs = [ζ; κ; repeat([1], n_spin_sites-1); κ; ζ]
+    # Calcolo dei coefficienti dell'Hamiltoniano trasformato
+    n(T,ω) = T == 0 ? 0 : 1/(ℯ^(T/ω) - 1)
+    ω̃₁ = (ω₁*κ₁^2 + ω₂*κ₂^2 + 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
+    ω̃₂ = (ω₂*κ₁^2 + ω₁*κ₂^2 - 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
+    κ̃₁ = sqrt(κ₁^2 + κ₂^2)
+    κ̃₂ = ((ω₂-ω₁)*κ₁*κ₂ + η*(κ₁^2 - κ₂^2)) / (κ₁^2 + κ₂^2)
+    γ̃₁⁺ = (κ₁^2*γ₁*(n(T,ω₁)+1) + κ₂^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
+    γ̃₁⁻ = (κ₁^2*γ₁*n(T,ω₁) + κ₂^2*γ₂*n(T,ω₂)) / (κ₁^2 + κ₂^2)
+    γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
+    γ̃₂⁻ = (κ₂^2*γ₁*n(T,ω₁) + κ₁^2*γ₂*n(T,ω₂)) / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) ) / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂) - γ₁*n(T,ω₁) ) / (κ₁^2 + κ₂^2)
+    localcfs = [ω̃₂; ω̃₁; repeat([ε], n_spin_sites); ωᵣ]
+    interactioncfs = [κ̃₂; κ̃₁; repeat([1], n_spin_sites-1); κᵣ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
-    # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γ * (op("Damping", sites[begin]; ω=ω₂, T=T) *
-                         op("Id", sites[begin+1]))
-    ℓlist[end] += γ * (op("Id", sites[end-1]) *
-                       op("Damping", sites[end]; ω=ω₂, T=0))
+    # Aggiungo agli operatori già creati gli operatori di dissipazione:
+    # · per il primo oscillatore a sinistra,
+    ℓlist[1] += γ̃₂⁺ * op("Lindb+", sites[1]) * op("Id", sites[2])
+    ℓlist[1] += γ̃₂⁻ * op("Lindb-", sites[1]) * op("Id", sites[2])
+    # · per il secondo oscillatore (occhio che non essendo più all'estremo
+    #   della catena questo operatore viene diviso tra ℓ₁,₂ e ℓ₂,₃),
+    ℓlist[1] += 0.5γ̃₁⁺ * op("Id", sites[1]) * op("Lindb+", sites[2])
+    ℓlist[1] += 0.5γ̃₁⁻ * op("Id", sites[1]) * op("Lindb-", sites[2])
+    ℓlist[2] += 0.5γ̃₁⁺ * op("Lindb+", sites[2]) * op("Id", sites[3])
+    ℓlist[2] += 0.5γ̃₁⁻ * op("Lindb-", sites[2]) * op("Id", sites[3])
+    # · l'operatore misto su (1) e (2),
+    ℓlist[1] += (γ̃₁₂⁺ * mixedlindbladplus(sites[1], sites[2]) +
+                 γ̃₁₂⁻ * mixedlindbladminus(sites[1], sites[2]))
+    # · infine per l'oscillatore a destra, come al solito,
+    ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
+                        op("Damping", sites[end]; ω=ωᵣ, T=0))
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -169,16 +196,12 @@ let
       full_trace = MPS(sites, "vecId")
     end
 
-    current_adjsites_ops = [-2ζ*current(sites, 1, 2);
-                            -2κ*current(sites, 2, 3);
+    current_adjsites_ops = [-2κ̃₁*current(sites, 2, 3);
                             [current(sites, j, j+1)
                              for j ∈ spin_range[1:end-1]];
-                            -2κ*current(sites,
-                                        spin_range[end],
-                                        spin_range[end]+1);
-                            -2ζ*current(sites,
-                                        spin_range[end]+1,
-                                        spin_range[end]+2)]
+                            -2κᵣ*current(sites,
+                                         spin_range[end],
+                                         spin_range[end]+1)]
 
     # Simulazione
     # ===========
@@ -188,13 +211,12 @@ let
     # Lo stato iniziale della catena è dato da "chain_initial_state".
     ρ₀ = chain(parse_init_state_osc(sites[1],
                                     parameters["left_oscillator_initial_state"];
-                                    ω=ω₂, T=T),
+                                    ω=ω̃₂, T=T),
                parse_init_state_osc(sites[2],
                                     parameters["left_oscillator_initial_state"];
-                                    ω=ω₁, T=T),
+                                    ω=ω̃₁, T=T),
                parse_init_state(sites[spin_range],
                                 parameters["chain_initial_state"]),
-               parse_init_state_osc(sites[end-1], "empty"),
                parse_init_state_osc(sites[end], "empty"))
 
     # Osservabili
@@ -295,8 +317,8 @@ let
   plt = groupplot(timesteps_super,
                   occ_n_super,
                   parameter_lists;
-                  labels=["L2" "L1" string.(1:N-4)... "R1" "R2"],
-                  linestyles=[:dash :dash repeat([:solid], N-4)... :dash :dash],
+                  labels=["L2" "L1" string.(1:N-3)... "R"],
+                  linestyles=[:dash :dash repeat([:solid], N-2)... :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione",
@@ -304,29 +326,14 @@ let
 
   savefig(plt, "occ_n_all.png")
 
-  # Grafico dell'occupazione del primo oscillatore (riunito)
-  # -------------------------------------------------------
-  # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
-  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_super]
-  plt = unifiedplot(timesteps_super,
-                    occ_n_osc_left_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\langle n_{L2}(t)\rangle",
-                    plottitle="Occupazione dell'oscillatore sx",
-                    plotsize=plotsize)
-
-  savefig(plt, "occ_n_osc_left.png")
-
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
-  spinsonly = [mat[:, 3:end-2] for mat in occ_n_super]
+  spinsonly = [mat[:, 3:end-1] for mat in occ_n_super]
   plt = groupplot(timesteps_super,
                   spinsonly,
                   parameter_lists;
-                  labels=reduce(hcat, string.(1:N-4)),
-                  linestyles=reduce(hcat, repeat([:solid], N-4)),
+                  labels=reduce(hcat, string.(1:N-3)),
+                  linestyles=reduce(hcat, repeat([:solid], N-3)),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (solo spin)",
@@ -340,12 +347,12 @@ let
   # le cui righe sono le somme dei valori sulle rispettive righe di X.
   sums = [hcat(sum(mat[:, 1:2], dims=2),
                sum(mat[:, 3:end-2], dims=2),
-               sum(mat[:, end-1:end], dims=2))
+               mat[:, end])
           for mat ∈ occ_n_super]
   plt = groupplot(timesteps_super,
                   sums,
                   parameter_lists;
-                  labels=["L1+L2" "spin" "R1+R2"],
+                  labels=["L1+L2" "spin" "R"],
                   linestyles=[:solid :dot :solid],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\sum_i\langle n_i(t)\rangle",
@@ -357,14 +364,14 @@ let
   # Grafico dei ranghi del MPS
   # --------------------------
   N = size(bond_dimensions_super[begin], 2)
-  sitelabels = ["L2"; "L1"; string.(1:N-3); "R1"; "R2"]
+  sitelabels = ["L2"; "L1"; string.(1:N-2); "R"]
   plt = groupplot(timesteps_super,
                   bond_dimensions_super,
                   parameter_lists;
                   labels=reduce(hcat,
                                 ["($(sitelabels[j]),$(sitelabels[j+1]))"
                                  for j ∈ eachindex(sitelabels)[1:end-1]]),
-                  linestyles=[:dash :dash repeat([:solid], N-4)... :dash :dash],
+                  linestyles=[:dash :dash repeat([:solid], N-3)... :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",
@@ -389,14 +396,14 @@ let
   # Grafico della corrente di spin
   # ------------------------------
   N = size(current_adjsites_super[begin], 2)
-  sitelabels = ["L2"; "L1"; string.(1:N-3); "R1"; "R2"]
+  sitelabels = ["L1"; string.(1:N-1); "R"]
   plt = groupplot(timesteps_super,
                   current_adjsites_super,
                   parameter_lists;
                   labels=reduce(hcat,
                                 ["($(sitelabels[j]),$(sitelabels[j+1]))"
                                  for j ∈ eachindex(sitelabels)[1:end-1]]),
-                  linestyles=[:dash :dash repeat([:solid], N-4)... :dash :dash],
+                  linestyles=[:dash repeat([:solid], N-2)... :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle j_{k,k+1}\rangle",
                   plottitle="Corrente (tra siti adiacenti)",

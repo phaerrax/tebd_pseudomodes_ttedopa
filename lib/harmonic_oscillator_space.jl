@@ -299,6 +299,20 @@ function ITensors.op(::OpName"Id", ::SiteType"HvOsc"; dim=2)
   return vec(identity, gellmannbasis(dim))
 end
 
+function ITensors.op(::OpName"⋅a+", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> x*a⁺(dim), gellmannbasis(dim))
+end
+function ITensors.op(::OpName"a+⋅", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> a⁺(dim)*x, gellmannbasis(dim))
+end
+
+function ITensors.op(::OpName"⋅a-", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> x*a⁻(dim), gellmannbasis(dim))
+end
+function ITensors.op(::OpName"a-⋅", ::SiteType"HvOsc"; dim=2)
+  return vec(x -> a⁻(dim)*x, gellmannbasis(dim))
+end
+
 function ITensors.op(::OpName"⋅asum", ::SiteType"HvOsc"; dim=2)
   return vec(x -> x*(a⁺(dim)+a⁻(dim)), gellmannbasis(dim))
 end
@@ -340,6 +354,36 @@ function ITensors.op(::OpName"Damping", ::SiteType"HvOsc"; dim=2, ω::Number, T:
   return d
 end
 
+function ITensors.op(::OpName"Lindb+", ::SiteType"HvOsc"; dim=2)
+  A = a⁻(dim)
+  A⁺ = a⁺(dim)
+  d = vec(x -> A*x*A⁺ - 0.5*(A⁺*A*x + x*A⁺*A), gellmannbasis(dim))
+  return d
+end
+function ITensors.op(::OpName"Lindb-", ::SiteType"HvOsc"; dim=2)
+  A = a⁻(dim)
+  A⁺ = a⁺(dim)
+  d = vec(x -> A⁺*x*A - 0.5*(A*A⁺*x + x*A*A⁺),
+          gellmannbasis(dim))
+  return d
+end
+
+function mixedlindbladplus(s1::Index{Int64}, s2::Index{Int64})
+  return (op("a-⋅", s1) * op("⋅a+", s2) +
+          op("a-⋅", s2) * op("⋅a+", s1) -
+          0.5*(op("a+⋅", s1) * op("a-⋅", s2) +
+               op("a+⋅", s2) * op("a-⋅", s1)) -
+          0.5*(op("⋅a+", s1) * op("⋅a-", s2) +
+               op("⋅a+", s2) * op("⋅a-", s1)))
+end
+function mixedlindbladminus(s1::Index{Int64}, s2::Index{Int64})
+  return (op("a+⋅", s1) * op("⋅a-", s2) +
+          op("a+⋅", s2) * op("⋅a-", s1) -
+          0.5*(op("a-⋅", s1) * op("a+⋅", s2) +
+               op("a-⋅", s2) * op("a+⋅", s1)) -
+          0.5*(op("⋅a-", s1) * op("⋅a+", s2) +
+               op("⋅a-", s2) * op("⋅a+", s1)))
+end
 # Proiezione sugli autostati dell'operatore numero
 # ------------------------------------------------
 # Il sito è uno solo quindi basta usare i vettori della base canonica
