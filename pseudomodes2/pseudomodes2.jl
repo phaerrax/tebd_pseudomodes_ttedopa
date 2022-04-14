@@ -207,14 +207,28 @@ let
     # ===========
     # Stato iniziale
     # --------------
-    # L'oscillatore sx è in equilibrio termico, quello dx è vuoto.
+    # L'ambiente sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
-    ρ₀ = chain(parse_init_state_osc(sites[1],
-                                    parameters["left_oscillator_initial_state"];
-                                    ω=ω̃₂, T=T),
-               parse_init_state_osc(sites[2],
-                                    parameters["left_oscillator_initial_state"];
-                                    ω=ω̃₁, T=T),
+    # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
+    # 1) Calcolo la matrice densità dello stato termico
+    HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
+             ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
+             κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
+                   a⁻(osc_dim) ⊗ a⁺(osc_dim)))
+    M = exp(-1/T * HoscL)
+    M /= tr(M)
+    # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
+    v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
+    # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
+    iv = itensor(v, sites[1], sites[2])
+    # 4) lo decompongo in due pezzi con una SVD
+    f1, f2, _, _ = factorize(iv, sites[1]; which_decomp="svd")
+    # 5) rinomino il Link tra i due fattori come "Link,l=1" anziché
+    #    "Link,fact" che è il Tag assegnato da `factorize`
+    replacetags!(f1, "fact" => "l=1")
+    replacetags!(f2, "fact" => "l=1")
+
+    ρ₀ = chain(MPS([f1, f2]),
                parse_init_state(sites[spin_range],
                                 parameters["chain_initial_state"]),
                parse_init_state_osc(sites[end], "empty"))
@@ -264,7 +278,6 @@ let
     current_allsites_list = mapreduce(permutedims, vcat, current_allsites_list)
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
     ranks = mapreduce(permutedims, vcat, ranks)
-    
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
