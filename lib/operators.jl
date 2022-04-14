@@ -115,6 +115,7 @@ end
 
 function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
     linkseven, maxerr, maxrank; fout)
+  @info "Calcolo della decomposizione di Suzuki-Trotter dell'operatore di evoluzione."
   τ = timesteplist[2] - timesteplist[1]
   if STorder == 1
     # Se l'ordine di espansione è 1, non ci sono semplificazioni da fare.
@@ -151,6 +152,7 @@ function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
   # Ora comincia l'evoluzione temporale.
   # Applicare `list` allo stato significa farlo evolvere per nskip*τ, dove
   # τ è il passo di integrazione.
+  @info "Avvio del calcolo dell'evoluzione temporale."
   state = initialstate
   returnvalues = [[f(state) for f in fout]]
 

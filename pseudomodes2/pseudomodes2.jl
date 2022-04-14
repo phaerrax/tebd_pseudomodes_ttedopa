@@ -34,6 +34,7 @@ include(lib_path * "/operators.jl")
 # di Lindblad.
 
 let  
+  @info "Lettura dei file con i parametri."
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
 
@@ -95,9 +96,7 @@ let
   end
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
-    # Impostazione dei parametri
-    # ==========================
-
+    @info "($current_sim_n di $tot_sim_n) Costruzione degli operatori di evoluzione temporale."
     # - parametri per ITensors
     max_err = parameters["MP_compression_error"]
     max_dim = parameters["MP_maximum_bond_dimension"]
@@ -207,6 +206,7 @@ let
     # ===========
     # Stato iniziale
     # --------------
+    @info "($current_sim_n di $tot_sim_n) Creazione dello stato iniziale."
     # L'ambiente sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
     # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
@@ -279,6 +279,7 @@ let
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
     ranks = mapreduce(permutedims, vcat, ranks)
 
+    @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
     for (j, name) in enumerate([:occ_n_left;
@@ -320,6 +321,7 @@ let
   la grandezza del font o con il colore quelli che cambiano da una
   simulazione all'altra.
   =#
+  @info "Creazione dei grafici."
   plotsize = (600, 400)
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
