@@ -139,17 +139,17 @@ let
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
     # Calcolo dei coefficienti dell'Hamiltoniano trasformato
-    n(T,ω) = T == 0 ? 0 : 1/(ℯ^(T/ω) - 1)
+    n(T,ω) = T == 0 ? 0 : 1/(ℯ^(ω/T) - 1)
     ω̃₁ = (ω₁*κ₁^2 + ω₂*κ₂^2 + 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
     ω̃₂ = (ω₂*κ₁^2 + ω₁*κ₂^2 - 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
     κ̃₁ = sqrt(κ₁^2 + κ₂^2)
     κ̃₂ = ((ω₂-ω₁)*κ₁*κ₂ + η*(κ₁^2 - κ₂^2)) / (κ₁^2 + κ₂^2)
     γ̃₁⁺ = (κ₁^2*γ₁*(n(T,ω₁)+1) + κ₂^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
-    γ̃₁⁻ = (κ₁^2*γ₁*n(T,ω₁) + κ₂^2*γ₂*n(T,ω₂)) / (κ₁^2 + κ₂^2)
+    γ̃₁⁻ = (κ₁^2*γ₁* n(T,ω₁)    + κ₂^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
     γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
-    γ̃₂⁻ = (κ₂^2*γ₁*n(T,ω₁) + κ₁^2*γ₂*n(T,ω₂)) / (κ₁^2 + κ₂^2)
+    γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
     γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) ) / (κ₁^2 + κ₂^2)
-    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂) - γ₁*n(T,ω₁) ) / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )     / (κ₁^2 + κ₂^2)
     localcfs = [ω̃₂; ω̃₁; repeat([ε], n_spin_sites); ωᵣ]
     interactioncfs = [κ̃₂; κ̃₁; repeat([1], n_spin_sites-1); κᵣ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
@@ -207,31 +207,39 @@ let
     # Stato iniziale
     # --------------
     @info "($current_sim_n di $tot_sim_n) Creazione dello stato iniziale."
-    # L'ambiente sx è in equilibrio termico, quello dx è vuoto.
-    # Lo stato iniziale della catena è dato da "chain_initial_state".
-    # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
-    # 1) Calcolo la matrice densità dello stato termico
-    HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
-             ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
-             κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
-                   a⁻(osc_dim) ⊗ a⁺(osc_dim)))
-    M = exp(-1/T * HoscL)
-    M /= tr(M)
-    # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-    v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
-    # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
-    iv = itensor(v, sites[1], sites[2])
-    # 4) lo decompongo in due pezzi con una SVD
-    f1, f2, _, _ = factorize(iv, sites[1]; which_decomp="svd")
-    # 5) rinomino il Link tra i due fattori come "Link,l=1" anziché
-    #    "Link,fact" che è il Tag assegnato da `factorize`
-    replacetags!(f1, "fact" => "l=1")
-    replacetags!(f2, "fact" => "l=1")
+    if parameters["left_oscillator_initial_state"] == "thermal"
+      # L'ambiente sx è in equilibrio termico, quello dx è vuoto.
+      # Lo stato iniziale della catena è dato da "chain_initial_state".
+      # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
+      # 1) Calcolo la matrice densità dello stato termico
+      HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
+               ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
+               κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
+                     a⁻(osc_dim) ⊗ a⁺(osc_dim)))
+      M = exp(-1/T * HoscL)
+      M /= tr(M)
+      # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
+      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
+      # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
+      iv = itensor(v, sites[1], sites[2])
+      # 4) lo decompongo in due pezzi con una SVD
+      f1, f2, _, _ = factorize(iv, sites[1]; which_decomp="svd")
+      # 5) rinomino il Link tra i due fattori come "Link,l=1" anziché
+      #    "Link,fact" che è il Tag assegnato da `factorize`
+      replacetags!(f1, "fact" => "l=1")
+      replacetags!(f2, "fact" => "l=1")
 
-    ρ₀ = chain(MPS([f1, f2]),
-               parse_init_state(sites[spin_range],
-                                parameters["chain_initial_state"]),
-               parse_init_state_osc(sites[end], "empty"))
+      ρ₀ = chain(MPS([f1, f2]),
+                 parse_init_state(sites[spin_range],
+                                  parameters["chain_initial_state"]),
+                 parse_init_state_osc(sites[end], "empty"))
+    elseif parameters["left_oscillator_initial_state"] == "empty"
+      ρ₀ = chain(parse_init_state_osc(sites[1], "empty"),
+                 parse_init_state_osc(sites[2], "empty"),
+                 parse_init_state(sites[spin_range],
+                                  parameters["chain_initial_state"]),
+                 parse_init_state_osc(sites[end], "empty"))
+    end
 
     # Osservabili
     # -----------
@@ -361,7 +369,7 @@ let
   # sum(X, dims=2) prende la matrice X e restituisce un vettore colonna
   # le cui righe sono le somme dei valori sulle rispettive righe di X.
   sums = [hcat(sum(mat[:, 1:2], dims=2),
-               sum(mat[:, 3:end-2], dims=2),
+               sum(mat[:, 3:end-1], dims=2),
                mat[:, end])
           for mat ∈ occ_n_super]
   plt = groupplot(timesteps_super,
