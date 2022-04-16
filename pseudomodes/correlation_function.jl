@@ -51,7 +51,7 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   Xcorrelation_super = []
-  FT_super = []
+  #FT_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -64,8 +64,7 @@ let
     # - parametri fisici
     ε = parameters["spin_excitation_energy"]
     # λ = 1
-    #κ = parameters["oscillator_spin_interaction_coefficient"]
-    κ = 0.0
+    κ = parameters["oscillator_spin_interaction_coefficient"]
     γₗ = parameters["oscillator_damping_coefficient_left"]
     γᵣ = parameters["oscillator_damping_coefficient_right"]
     ω = parameters["oscillator_frequency"]
@@ -97,7 +96,9 @@ let
       oscillatore sx                               oscillatore dx
     =#
     localcfs = [ω; repeat([ε], n_spin_sites); ω]
-    interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
+    interactioncfs = [0.0; repeat([1], n_spin_sites-1); 0.0]
+    # Devo porre κ=0 in modo che l'evoluzione sia quella dello
+    # pseudomodo isolato.
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
     ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=ω, T=T) *
@@ -136,33 +137,39 @@ let
     # Osservabili
     # -----------
     X₀ = MPS(sites, [i == 1 ? "vecX" : "vecId" for i ∈ eachindex(sites)])
-    correlation(ρ) = real(inner(X₀, ρ))
+    correlation(ρ) = κ^2 * inner(X₀, ρ)
 
     # Evoluzione temporale
     # --------------------
     @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    tout, correlationlist = evolve(X₀ρ₀,
-                                   time_step_list,
-                                   parameters["skip_steps"],
-                                   parameters["TS_expansion_order"],
-                                   links_odd,
-                                   links_even,
-                                   parameters["MP_compression_error"],
-                                   parameters["MP_maximum_bond_dimension"];
-                                   fout=[correlation])
+    tout, calcXcorrelation = evolve(X₀ρ₀,
+                                    time_step_list,
+                                    parameters["skip_steps"],
+                                    parameters["TS_expansion_order"],
+                                    links_odd,
+                                    links_even,
+                                    parameters["MP_compression_error"],
+                                    parameters["MP_maximum_bond_dimension"];
+                                    fout=[correlation])
     #FT = rfft(correlationlist) 
     ν(ω,T) = T == 0 ? 0.0 : (ℯ^(ω/T)-1)^(-1)
-    c₀ = 2ν(ω,T) - 1
-    c₀ = correlation(X₀ρ₀)
-    γ = γₗ
-    expXcorrelation = [c₀ * ℯ^(-γ*t) * cos(ω*t) for t ∈ tout]
-    Xcorrelationlist = hcat(correlationlist, expXcorrelation)
+    function cᴿ(κ, Ω, γ, T, t)
+      if T != 0
+        κ^2 * (coth(0.5*Ω/T)*cos(Ω*t) - im*sin(Ω*t)) * ℯ^(-0.5γ*t)
+      else
+        κ^2 * ℯ^(-im*Ω*t - 0.5γ*t)
+      end
+    end
+    expXcorrelation = [cᴿ(κ,ω,γₗ,T, t) for t ∈ tout]
+    Xcorrelation = hcat(calcXcorrelation, expXcorrelation)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    push!(dict, :correlation_calc => Xcorrelationlist[:,1])
-    push!(dict, :correlation_exp => Xcorrelationlist[:,2])
+    push!(dict, :correlation_calc_re => real.(calcXcorrelation))
+    push!(dict, :correlation_calc_im => imag.(calcXcorrelation))
+    push!(dict, :correlation_exp_re  => real.(expXcorrelation))
+    push!(dict, :correlation_exp_im  => imag.(expXcorrelation))
     #push!(dict, :spectraldensity => FT)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
@@ -172,8 +179,8 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
-    push!(Xcorrelation_super, Xcorrelationlist)
-    push!(FT_super, correlationlist)
+    push!(Xcorrelation_super, Xcorrelation)
+    #push!(FT_super, correlationlist)
   end
 
   #= Grafici
@@ -189,17 +196,33 @@ let
 
   # Grafico della funzione di correlazione
   # --------------------------------------
+  data = [[real.(Xcorrelation[:,1])  real.(Xcorrelation[:,2])]
+          for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
-                  Xcorrelation_super,
+                  data,
                   parameter_lists;
                   labels=["calculated" "expected"],
                   linestyles=[:solid :dash],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle X(t)X(0)\rangle",
-                  plottitle="Funzione di correlazione",
+                  commonxlabel=L"t",
+                  commonylabel=L"\mathrm{Re}\,(\langle X(t)X(0)\rangle)",
+                  plottitle="Funzione di correlazione (parte reale)",
                   plotsize=plotsize)
 
-  savefig(plt, "Xcorrelation.png")
+  savefig(plt, "Xcorrelation_re.png")
+
+  data = [[imag.(Xcorrelation[:,1])  imag.(Xcorrelation[:,2])]
+          for Xcorrelation ∈ Xcorrelation_super]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=["calculated" "expected"],
+                  linestyles=[:solid :dash],
+                  commonxlabel=L"t",
+                  commonylabel=L"\mathrm{Im}\,(\langle X(t)X(0)\rangle)",
+                  plottitle="Funzione di correlazione (parte immaginaria)",
+                  plotsize=plotsize)
+
+  savefig(plt, "Xcorrelation_im.png")
 
   ## Grafico della (supposta) densità spettrale
   ## ------------------------------------------
