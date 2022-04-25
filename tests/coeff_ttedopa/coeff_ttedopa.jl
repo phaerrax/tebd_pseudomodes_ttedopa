@@ -6,12 +6,18 @@ using DataFrames
 using CSV
 using JSON
 
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
-include(lib_path * "/tedopa.jl")
+rootdirname = "simulazioni_tesi"
+sourcepath = Base.source_path()
+# Cartella base: determina il percorso assoluto del file in esecuzione, e
+# rimuovi tutto ciò che segue rootdirname.
+ind = findfirst(rootdirname, sourcepath)
+rootpath = sourcepath[begin:ind[end]]
+# `rootpath` è la cartella principale del progetto.
+libpath = joinpath(rootpath, "lib")
+
+include(joinpath(libpath, "utils.jl"))
+include(joinpath(libpath, "plotting.jl"))
+include(joinpath(libpath, "tedopa.jl"))
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -42,7 +48,7 @@ let
   κ = parameters["spectral_density_overall_factor"]
 
   # Calcolo dei coefficienti dalla densità spettrale
-  J(ω) = κ * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
+  J(ω) = κ^2 * 0.5γ/π * (1 / ((0.5γ)^2 + (ω-Ω)^2) - 1 / ((0.5γ)^2 + (ω+Ω)^2))
   Jtherm = ω -> thermalisedJ(J, ω, T)
   Jzero  = ω -> thermalisedJ(J, ω, 0)
   (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
