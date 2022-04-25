@@ -163,7 +163,7 @@ let
        - n_osc_left+n_spin_sites+1:end -> catena di oscillatori a destra
     =#
     # Calcolo dei coefficienti dalla densità spettrale
-    J(ω) = κ^2 * γ/π * (1 / (γ^2 + (ω-Ω)^2) - 1 / (γ^2 + (ω+Ω)^2))
+    J(ω) = κ^2 * 0.5γ/π * (1 / ((0.5γ)^2 + (ω-Ω)^2) - 1 / ((0.5γ)^2 + (ω+Ω)^2))
     Jtherm = ω -> thermalisedJ(J, ω, T)
     Jzero  = ω -> thermalisedJ(J, ω, 0)
     (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(Jtherm,
