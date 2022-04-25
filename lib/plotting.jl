@@ -24,7 +24,12 @@ function subplot_title(values_dict, keys)
   # Questa funzione costruisce il titolo personalizzato per ciascun sottografico,
   # che indica solo i parametri che cambiano da una simulazione all'altra
   #
-  f = open(lib_path * "/short_names_dictionary.json", "r")
+  rootdirname = "simulazioni_tesi"
+  sourcepath = Base.source_path()
+  ind = findfirst(rootdirname, sourcepath)
+  rootpath = sourcepath[begin:ind[end]]
+  libpath = joinpath(rootpath, "lib")
+  f = open(joinpath(libpath, "short_names_dictionary.json"), "r")
   # Carico il dizionario dei "nomi brevi" per i parametri.
   short_name = JSON.parse(read(f, String))
   close(f)
@@ -48,7 +53,12 @@ function shared_title_fake_plot(subject::String, parameters)
   hidden_parameters = ["simulation_end_time", "skip_steps", "filename"]
   _, repeated_parameters = categorise_parameters(parameters)
   #
-  f = open(lib_path * "/short_names_dictionary.json", "r")
+  rootdirname = "simulazioni_tesi"
+  sourcepath = Base.source_path()
+  ind = findfirst(rootdirname, sourcepath)
+  rootpath = sourcepath[begin:ind[end]]
+  libpath = joinpath(rootpath, "lib")
+  f = open(joinpath(libpath, "short_names_dictionary.json"), "r")
   # Carico il dizionario dei "nomi brevi" per i parametri.
   short_name = JSON.parse(read(f, String))
   close(f)
