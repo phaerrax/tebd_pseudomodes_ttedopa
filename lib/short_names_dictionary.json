@@ -48,5 +48,9 @@
   "number_of_oscillators_right": "Nᵣ",
   "ohmic_decay_factor": "Ω",
   "ohmic_exponent": "s",
-  "ohmic_mult_factor": "λₒₕₘ"
+  "ohmic_mult_factor": "λₒₕₘ",
+  "original_oscillator_spin_interaction_coefficient": "κₒᵣ",
+  "original_oscillator_damping_coefficient": "γₒᵣ",
+  "original_oscillator_frequency": "ωₒᵣ",
+  "original_temperature": "Tₒᵣ"
 }
