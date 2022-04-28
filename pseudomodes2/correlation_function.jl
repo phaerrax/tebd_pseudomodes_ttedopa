@@ -6,7 +6,7 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-using FFTW
+#using FFTW
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -64,14 +64,21 @@ let
     # - parametri fisici
     ε = parameters["spin_excitation_energy"]
     # λ = 1
-    #κ = parameters["oscillator_spin_interaction_coefficient"]
-    κ = 0.0
-    ζ = parameters["oscillators_interaction_coefficient"]
-    γ = parameters["oscillator_damping_coefficient"]
-    ω₁ = parameters["oscillator1_frequency"]
-    ω₂ = parameters["oscillator2_frequency"]
+    κ₁ = parameters["oscillatorL1_spin_interaction_coefficient"]
+    ω₁ = parameters["oscillatorL1_frequency"]
+    γ₁ = parameters["oscillatorL1_damping_coefficient"]
+    #
+    κ₂ = parameters["oscillatorL2_spin_interaction_coefficient"]
+    ω₂ = parameters["oscillatorL2_frequency"]
+    γ₂ = parameters["oscillatorL2_damping_coefficient"]
+    #
+    κᵣ = parameters["oscillatorR_spin_interaction_coefficient"]
+    ωᵣ = parameters["oscillatorR_frequency"]
+    γᵣ = parameters["oscillatorR_damping_coefficient"]
+    #
+    η = parameters["oscillators_interaction_coefficient"]
     T = parameters["temperature"]
-    osc_dim = parameters["oscillator_space_dimension"]
+    oscdim = parameters["oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -87,24 +94,39 @@ let
              siteinds("HvS=1/2", n_spin_sites);
              siteinds("HvOsc", 2; dim=osc_dim)]
 
-    #= Definizione degli operatori nell'equazione di Lindblad
-    ======================================================
-    I siti del sistema sono numerati come segue:
-    | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
-      ↑   │                                │          ↑
-      │   └───────────┬────────────────────┘          │
-      │               │                               │
-      │        catena di spin                         │
-      oscillatore sx                               oscillatore dx
-    =#
-    localcfs = [ω₂; ω₁; repeat([ε], n_spin_sites); ω₁; ω₂]
-    interactioncfs = [ζ; κ; repeat([1], n_spin_sites-1); κ; ζ]
+    # Definizione degli operatori nell'equazione di Lindblad
+    # ===================================================
+    # Calcolo dei coefficienti dell'Hamiltoniano trasformato
+    n(T,ω) = T == 0 ? 0 : 1/(ℯ^(ω/T) - 1)
+    ω̃₁ = (ω₁*κ₁^2 + ω₂*κ₂^2 + 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
+    ω̃₂ = (ω₂*κ₁^2 + ω₁*κ₂^2 - 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
+    κ̃₁ = sqrt(κ₁^2 + κ₂^2)
+    κ̃₂ = ((ω₂-ω₁)*κ₁*κ₂ + η*(κ₁^2 - κ₂^2)) / (κ₁^2 + κ₂^2)
+    γ̃₁⁺ = (κ₁^2*γ₁*(n(T,ω₁)+1) + κ₂^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
+    γ̃₁⁻ = (κ₁^2*γ₁* n(T,ω₁)    + κ₂^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
+    γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
+    γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) ) / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )     / (κ₁^2 + κ₂^2)
+    localcfs = [ω̃₂; ω̃₁; repeat([ε], n_spin_sites); ωᵣ]
+    interactioncfs = [κ̃₂; κ̃₁; repeat([1], n_spin_sites-1); κᵣ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
-    # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γ * (op("Damping", sites[begin]; ω=ω₂, T=T) *
-                         op("Id", sites[begin+1]))
-    ℓlist[end] += γ * (op("Id", sites[end-1]) *
-                       op("Damping", sites[end]; ω=ω₂, T=0))
+    # Aggiungo agli operatori già creati gli operatori di dissipazione:
+    # · per il primo oscillatore a sinistra,
+    ℓlist[1] += γ̃₂⁺ * op("Lindb+", sites[1]) * op("Id", sites[2])
+    ℓlist[1] += γ̃₂⁻ * op("Lindb-", sites[1]) * op("Id", sites[2])
+    # · per il secondo oscillatore (occhio che non essendo più all'estremo
+    #   della catena questo operatore viene diviso tra ℓ₁,₂ e ℓ₂,₃),
+    ℓlist[1] += 0.5γ̃₁⁺ * op("Id", sites[1]) * op("Lindb+", sites[2])
+    ℓlist[1] += 0.5γ̃₁⁻ * op("Id", sites[1]) * op("Lindb-", sites[2])
+    ℓlist[2] += 0.5γ̃₁⁺ * op("Lindb+", sites[2]) * op("Id", sites[3])
+    ℓlist[2] += 0.5γ̃₁⁻ * op("Lindb-", sites[2]) * op("Id", sites[3])
+    # · l'operatore misto su (1) e (2),
+    ℓlist[1] += (γ̃₁₂⁺ * mixedlindbladplus(sites[1], sites[2]) +
+                 γ̃₁₂⁻ * mixedlindbladminus(sites[1], sites[2]))
+    # · infine per l'oscillatore a destra, come al solito,
+    ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
+                        op("Damping", sites[end]; ω=ωᵣ, T=0))
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -129,14 +151,31 @@ let
     # Stato iniziale
     # --------------
     # Lo stato iniziale qui è X₀ρ₀ (vedi eq. sopra).
-    # In ρ₀, l'oscillatore sx è in equilibrio termico, quello dx è vuoto.
-    # Lo stato iniziale della catena è dato da "chain_initial_state".
-    X₀ρ₀ = chain(MPS([state(sites[1], "ThermEq"; ω=ω₂, T=T)]),
-                 MPS([state(sites[2], "X⋅Therm"; ω=ω₁, T=T)]),
-                 parse_init_state(sites[spin_range],
-                                  parameters["chain_initial_state"]),
-                 MPS([state(sites[end-1], "0")]),
-                 MPS([state(sites[end],   "0")]))
+    # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
+    # 1) Calcolo la matrice densità dello stato termico
+    HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
+             ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
+             κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
+                   a⁻(osc_dim) ⊗ a⁺(osc_dim)))
+    M = exp(-1/T * HoscL)
+    M /= tr(M)
+    P = (a⁺(osc_dim) + a⁻(osc_dim)) * M
+    # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
+    v = vec(P, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
+    # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
+    iv = itensor(v, sites[1], sites[2])
+    # 4) lo decompongo in due pezzi con una SVD
+    f1, f2, _, _ = factorize(iv, sites[1]; which_decomp="svd")
+    # 5) rinomino il Link tra i due fattori come "Link,l=1" anziché
+    #    "Link,fact" che è il Tag assegnato da `factorize`
+    replacetags!(f1, "fact" => "l=1")
+    replacetags!(f2, "fact" => "l=1")
+
+    X₀ρ₀ = chain(MPS([f1, f2]),
+               parse_init_state(sites[spin_range],
+                                parameters["chain_initial_state"]),
+               MPS([state(sites[end-1], "0")]),
+               MPS([state(sites[end],   "0")]))
 
     # Osservabili
     # -----------
