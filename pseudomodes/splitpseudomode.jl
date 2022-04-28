@@ -100,7 +100,16 @@ let
     newpar = parameters
 
     κ = pop!(parameters, "oscillator_spin_interaction_coefficient")
-    γ = pop!(parameters, "oscillator_damping_coefficient")
+    if (haskey(parameters, "oscillator_damping_coefficient_left") &&
+        haskey(parameters, "oscillator_damping_coefficient_right"))
+      γₗ = pop!(parameters, "oscillator_damping_coefficient_left")
+      γᵣ = pop!(parameters, "oscillator_damping_coefficient_right")
+    elseif haskey(parameters, "oscillator_damping_coefficient")
+      γₗ = pop!(parameters, "oscillator_damping_coefficient")
+      γᵣ = γₗ
+    else
+      throw(ErrorException("Oscillator damping coefficient not provided."))
+    end
     Ω = pop!(parameters, "oscillator_frequency")
     T = pop!(parameters, "temperature")
 
@@ -110,14 +119,14 @@ let
     push!(parameters, "oscillatorL1_frequency" => Ω)
     push!(parameters,
           "oscillatorL1_spin_interaction_coefficient" => κ*sqrt(1+n(T,Ω)) )
-    push!(parameters, "oscillatorL1_damping_coefficient" => γ)
+    push!(parameters, "oscillatorL1_damping_coefficient" => γₗ)
     push!(parameters, "oscillatorL2_frequency" => -Ω)
     push!(parameters,
           "oscillatorL2_spin_interaction_coefficient" => κ*sqrt(n(T,Ω)) )
-    push!(parameters, "oscillatorL2_damping_coefficient" => γ)
+    push!(parameters, "oscillatorL2_damping_coefficient" => γₗ)
     push!(parameters, "oscillatorR_frequency" => Ω)
     push!(parameters, "oscillatorR_spin_interaction_coefficient" => κ)
-    push!(parameters, "oscillatorR_damping_coefficient" => γ)
+    push!(parameters, "oscillatorR_damping_coefficient" => γᵣ)
     #push!(parameters, "temperature" => 0)
     #push!(parameters, "oscillators_interaction_coefficient" => 0)
 

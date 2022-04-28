@@ -69,7 +69,16 @@ let
     ε = parameters["spin_excitation_energy"]
     # λ = 1
     κ = parameters["oscillator_spin_interaction_coefficient"]
-    γ = parameters["oscillator_damping_coefficient"]
+    if (haskey(parameters, "oscillator_damping_coefficient_left") &&
+        haskey(parameters, "oscillator_damping_coefficient_right"))
+      γₗ = parameters["oscillator_damping_coefficient_left"]
+      γᵣ = parameters["oscillator_damping_coefficient_right"]
+    elseif haskey(parameters, "oscillator_damping_coefficient")
+      γₗ = parameters["oscillator_damping_coefficient"]
+      γᵣ = γₗ
+    else
+      throw(ErrorException("Oscillator damping coefficient not provided."))
+    end
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
     osc_dim = parameters["oscillator_space_dimension"]
@@ -102,9 +111,9 @@ let
     interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γ * (op("Damping", sites[begin]; ω=ω, T=T) *
+    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=ω, T=T) *
                          op("Id", sites[begin+1]))
-    ℓlist[end] += γ * (op("Id", sites[end-1]) *
+    ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
                        op("Damping", sites[end]; ω=ω, T=0))
     #
     function links_odd(τ)

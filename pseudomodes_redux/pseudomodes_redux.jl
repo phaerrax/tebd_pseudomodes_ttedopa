@@ -110,9 +110,17 @@ let
     ε = parameters["spin_excitation_energy"]
     # λ = 1
     κ = parameters["oscillator_spin_interaction_coefficient"]
-    γₗ = parameters["oscillator_damping_coefficient_left"]
-    γᵣ = parameters["oscillator_damping_coefficient_right"]
     ω = parameters["oscillator_frequency"]
+    if (haskey(parameters, "oscillator_damping_coefficient_left") &&
+        haskey(parameters, "oscillator_damping_coefficient_right"))
+      γₗ = parameters["oscillator_damping_coefficient_left"]
+      γᵣ = parameters["oscillator_damping_coefficient_right"]
+    elseif haskey(parameters, "oscillator_damping_coefficient")
+      γₗ = parameters["oscillator_damping_coefficient"]
+      γᵣ = γₗ
+    else
+      throw(ErrorException("Oscillator damping coefficient not provided."))
+    end
     T = parameters["temperature"]
     osc_dim = parameters["oscillator_space_dimension"]
 
