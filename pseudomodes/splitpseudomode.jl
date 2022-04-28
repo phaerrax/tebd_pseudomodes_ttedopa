@@ -97,68 +97,44 @@ let
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     @info "($current_sim_n di $tot_sim_n) Costruzione degli operatori di evoluzione temporale."
-    newpar = parameters
 
-    κ = pop!(parameters, "oscillator_spin_interaction_coefficient")
+    κ = parameters["oscillator_spin_interaction_coefficient"]
     if (haskey(parameters, "oscillator_damping_coefficient_left") &&
         haskey(parameters, "oscillator_damping_coefficient_right"))
-      γₗ = pop!(parameters, "oscillator_damping_coefficient_left")
-      γᵣ = pop!(parameters, "oscillator_damping_coefficient_right")
+      γₗ = parameters["oscillator_damping_coefficient_left"]
+      γᵣ = parameters["oscillator_damping_coefficient_right"]
     elseif haskey(parameters, "oscillator_damping_coefficient")
-      γₗ = pop!(parameters, "oscillator_damping_coefficient")
+      γₗ = parameters["oscillator_damping_coefficient"]
       γᵣ = γₗ
     else
       throw(ErrorException("Oscillator damping coefficient not provided."))
     end
-    Ω = pop!(parameters, "oscillator_frequency")
-    T = pop!(parameters, "temperature")
+    Ω = parameters["oscillator_frequency"]
+    T = parameters["temperature"]
 
     n(T,ω) = T == 0 ? 0.0 : (ℯ^(ω/T)-1)^(-1)
-
-    # Transform the pseudomode into two zero-temperature new modes.
-    push!(parameters, "oscillatorL1_frequency" => Ω)
-    push!(parameters,
-          "oscillatorL1_spin_interaction_coefficient" => κ*sqrt(1+n(T,Ω)) )
-    push!(parameters, "oscillatorL1_damping_coefficient" => γₗ)
-    push!(parameters, "oscillatorL2_frequency" => -Ω)
-    push!(parameters,
-          "oscillatorL2_spin_interaction_coefficient" => κ*sqrt(n(T,Ω)) )
-    push!(parameters, "oscillatorL2_damping_coefficient" => γₗ)
-    push!(parameters, "oscillatorR_frequency" => Ω)
-    push!(parameters, "oscillatorR_spin_interaction_coefficient" => κ)
-    push!(parameters, "oscillatorR_damping_coefficient" => γᵣ)
-    #push!(parameters, "temperature" => 0)
-    #push!(parameters, "oscillators_interaction_coefficient" => 0)
 
     # Set new initial oscillator states as empty.
     parameters["left_oscillator_initial_state"] = "empty"
 
-    # Save old parameters for quick reference.
-    #push!(newpar, "original_oscillator_spin_interaction_coefficient" => κ)
-    #push!(newpar, "original_oscillator_damping_coefficient" => γ)
-    #push!(newpar, "original_oscillator_frequency" => Ω)
-    #push!(newpar, "original_temperature" => T)
-
-    # Remove the filename from the JSON file.
-    #newfile = pop!(newpar, "filename")
-    # - parametri per ITensors
+    # ITensors internal parameters
     max_err = parameters["MP_compression_error"]
     max_dim = parameters["MP_maximum_bond_dimension"]
 
-    # - parametri fisici
+    # Transform the pseudomode into two zero-temperature new modes.
     ε = parameters["spin_excitation_energy"]
     # λ = 1
-    κ₁ = parameters["oscillatorL1_spin_interaction_coefficient"]
-    ω₁ = parameters["oscillatorL1_frequency"]
-    γ₁ = parameters["oscillatorL1_damping_coefficient"]
+    κ₁ = κ * sqrt( 1+n(T,Ω) )
+    ω₁ = Ω
+    γ₁ = γₗ
     #
-    κ₂ = parameters["oscillatorL2_spin_interaction_coefficient"]
-    ω₂ = parameters["oscillatorL2_frequency"]
-    γ₂ = parameters["oscillatorL2_damping_coefficient"]
+    κ₂ = κ * sqrt( n(T,Ω) )
+    ω₂ = -Ω
+    γ₂ = γₗ
     #
-    κᵣ = parameters["oscillatorR_spin_interaction_coefficient"]
-    ωᵣ = parameters["oscillatorR_frequency"]
-    γᵣ = parameters["oscillatorR_damping_coefficient"]
+    κᵣ = κ
+    ωᵣ = Ω
+    #γᵣ = γᵣ
     #
     η = 0
     T = 0
@@ -191,8 +167,8 @@ let
     γ̃₁⁻ = (κ₁^2*γ₁* n(T,ω₁)    + κ₂^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
     γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
     γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
-    γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) ) / (κ₁^2 + κ₂^2)
-    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )     / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) )  / (κ₁^2 + κ₂^2)
+    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )      / (κ₁^2 + κ₂^2)
     localcfs = [ω̃₂; ω̃₁; repeat([ε], n_spin_sites); ωᵣ]
     interactioncfs = [κ̃₂; κ̃₁; repeat([1], n_spin_sites-1); κᵣ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
