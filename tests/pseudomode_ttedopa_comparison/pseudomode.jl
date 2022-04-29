@@ -152,20 +152,20 @@ let
     # --------------------
     @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    tout,
-    normalisation,
-    occnlist,
-    ranks = evolve(ρ₀,
-                   time_step_list,
-                   parameters["skip_steps"],
-                   parameters["TS_expansion_order"],
-                   links_odd,
-                   links_even,
-                   parameters["MP_compression_error"],
-                   parameters["MP_maximum_bond_dimension"];
-                   fout=[trace,
-                         occn,
-                         linkdims])
+    @time begin
+      tout,
+      normalisation,
+      occnlist,
+      ranks = evolve(ρ₀,
+                     time_step_list,
+                     parameters["skip_steps"],
+                     parameters["TS_expansion_order"],
+                     links_odd,
+                     links_even,
+                     parameters["MP_compression_error"],
+                     parameters["MP_maximum_bond_dimension"];
+                     fout=[trace, occn, linkdims])
+    end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output

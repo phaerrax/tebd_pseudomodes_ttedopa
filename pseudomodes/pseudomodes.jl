@@ -289,34 +289,36 @@ let
     # --------------------
     @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    tout,
-    normalisation,
-    occnlist,
-    current_adjsites_list,
-    current_allsites_list,
-    forwardflux_list,
-    backwardflux_list,
-    ranks,
-    osclevelsLlist,
-    osclevelsRlist,
-    chainlevelslist = evolve(ρ₀,
-                             time_step_list,
-                             parameters["skip_steps"],
-                             parameters["TS_expansion_order"],
-                             links_odd,
-                             links_even,
-                             parameters["MP_compression_error"],
-                             parameters["MP_maximum_bond_dimension"];
-                             fout=[trace,
-                                   occn,
-                                   current_adjsites,
-                                   current_allsites,
-                                   forwardflux_f,
-                                   backwardflux_f,
-                                   linkdims,
-                                   osclevelsL,
-                                   osclevelsR,
-                                   chainlevels])
+    @time begin
+      tout,
+      normalisation,
+      occnlist,
+      current_adjsites_list,
+      current_allsites_list,
+      forwardflux_list,
+      backwardflux_list,
+      ranks,
+      osclevelsLlist,
+      osclevelsRlist,
+      chainlevelslist = evolve(ρ₀,
+                               time_step_list,
+                               parameters["skip_steps"],
+                               parameters["TS_expansion_order"],
+                               links_odd,
+                               links_even,
+                               parameters["MP_compression_error"],
+                               parameters["MP_maximum_bond_dimension"];
+                               fout=[trace,
+                                     occn,
+                                     current_adjsites,
+                                     current_allsites,
+                                     forwardflux_f,
+                                     backwardflux_f,
+                                     linkdims,
+                                     osclevelsL,
+                                     osclevelsR,
+                                     chainlevels])
+    end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output

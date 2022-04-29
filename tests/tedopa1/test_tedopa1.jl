@@ -173,18 +173,20 @@ let
     progress = Progress(length(time_step_list), 1, message, 30)
     skip_count = 1
 
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state;
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        push!(occ_n, expect(current_state, "N"))
-        push!(coherence, spincoherence(current_state))
-        push!(bond_dimensions, linkdims(current_state))
+    @time begin
+      for _ in time_step_list[2:end]
+        current_state = apply(evo,
+                              current_state;
+                              cutoff=max_err,
+                              maxdim=max_dim)
+        if skip_count % skip_steps == 0
+          push!(occ_n, expect(current_state, "N"))
+          push!(coherence, spincoherence(current_state))
+          push!(bond_dimensions, linkdims(current_state))
+        end
+        next!(progress)
+        skip_count += 1
       end
-      next!(progress)
-      skip_count += 1
     end
 
     snapshot = occ_n[end]
