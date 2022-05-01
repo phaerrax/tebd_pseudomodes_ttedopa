@@ -135,6 +135,7 @@ let
   plt = groupplot(timesteps_super,
                   occn_relerr_super,
                   parameter_lists;
+                  maxyrange=(-100, 100),
                   labels=[reduce(hcat,
                                  ["S$n" for n ∈ eachindex(range_spins)])
                           for range_spins ∈ range_spins_super],
