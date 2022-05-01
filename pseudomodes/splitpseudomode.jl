@@ -59,42 +59,6 @@ let
   osc_levels_right_super = []
   normalisation_super = []
 
-  # Precaricamento
-  # ==============
-  # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
-  # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  n_spin_sites_list = [p["number_of_spin_sites"]
-                       for p ∈ parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"]
-                  for p ∈ parameter_lists]
-  if allequal(n_spin_sites_list) && allequal(osc_dim_list)
-    preload = true
-    n_spin_sites = first(n_spin_sites_list)
-    osc_dim = first(osc_dim_list)
-
-    range_spins = 2 .+ (1:n_spin_sites)
-
-    sites = [siteinds("HvOsc", 2; dim=osc_dim);
-             siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
-
-    # - i numeri di occupazione
-    num_op_list = [MPS(sites,
-                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
-                   for n ∈ 1:length(sites)]
-
-    # - la corrente tra siti
-    current_allsites_ops = [current(sites, i, j)
-                            for i ∈ range_spins
-                            for j ∈ range_spins
-                            if j > i]
-
-    # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecId")
-  else
-    preload = false
-  end
-
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     @info "($current_sim_n di $tot_sim_n) Costruzione degli operatori di evoluzione temporale."
 
@@ -147,44 +111,51 @@ let
 
     # Costruzione della catena
     # ========================
-    if !preload
-      n_spin_sites = parameters["number_of_spin_sites"]
-      range_spins = 2 .+ (1:n_spin_sites)
+    n_spin_sites = parameters["number_of_spin_sites"]
+    range_spins = 2 .+ (1:n_spin_sites)
 
-      sites = [siteinds("HvOsc", 2; dim=osc_dim);
-               siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 1; dim=osc_dim)]
-    end
+    sites = [siteinds("HvOsc", 2; dim=osc_dim);
+             siteinds("HvS=1/2", n_spin_sites);
+             siteinds("HvOsc", 1; dim=osc_dim)]
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
-    # Calcolo dei coefficienti dell'Hamiltoniano trasformato
+    # Calcolo i coefficienti dell'Hamiltoniano trasformato.
     ω̃₁ = (ω₁*κ₁^2 + ω₂*κ₂^2 + 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
     ω̃₂ = (ω₂*κ₁^2 + ω₁*κ₂^2 - 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
     κ̃₁ = sqrt(κ₁^2 + κ₂^2)
     κ̃₂ = ((ω₂-ω₁)*κ₁*κ₂ + η*(κ₁^2 - κ₂^2)) / (κ₁^2 + κ₂^2)
-    γ̃₁⁺ = (κ₁^2*γ₁*(n(T,ω₁)+1) + κ₂^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
-    γ̃₁⁻ = (κ₁^2*γ₁* n(T,ω₁)    + κ₂^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
-    γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
-    γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
-    γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) )  / (κ₁^2 + κ₂^2)
-    γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )      / (κ₁^2 + κ₂^2)
+    # Dato che T = 0 dappertutto, posso semplificare qualcosa.
+    #γ̃₁⁺ = (κ₁^2*γ₁*(n(T,ω₁)+1) + κ₂^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
+    #γ̃₁⁻ = (κ₁^2*γ₁* n(T,ω₁)    + κ₂^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
+    #γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
+    #γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
+    #γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) )  / (κ₁^2 + κ₂^2)
+    #γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )      / (κ₁^2 + κ₂^2)
+    γ̃₁⁺ = (κ₁^2*γ₁ + κ₂^2*γ₂) / (κ₁^2 + κ₂^2)
+    γ̃₁⁻ = 0
+    γ̃₂⁺ = (κ₂^2*γ₁ + κ₁^2*γ₂) / (κ₁^2 + κ₂^2)
+    γ̃₂⁻ = 0
+    γ̃₁₂⁺ = 0 # perché γ₁ = γ₂
+    γ̃₁₂⁻ = 0
+
     localcfs = [ω̃₂; ω̃₁; repeat([ε], n_spin_sites); ωᵣ]
     interactioncfs = [κ̃₂; κ̃₁; repeat([1], n_spin_sites-1); κᵣ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli operatori già creati gli operatori di dissipazione:
+    # rimuovo direttamente quelli nulli.
     # · per il primo oscillatore a sinistra,
     ℓlist[1] += γ̃₂⁺ * op("Lindb+", sites[1]) * op("Id", sites[2])
-    ℓlist[1] += γ̃₂⁻ * op("Lindb-", sites[1]) * op("Id", sites[2])
+    #ℓlist[1] += γ̃₂⁻ * op("Lindb-", sites[1]) * op("Id", sites[2])
     # · per il secondo oscillatore (occhio che non essendo più all'estremo
     #   della catena questo operatore viene diviso tra ℓ₁,₂ e ℓ₂,₃),
     ℓlist[1] += 0.5γ̃₁⁺ * op("Id", sites[1]) * op("Lindb+", sites[2])
-    ℓlist[1] += 0.5γ̃₁⁻ * op("Id", sites[1]) * op("Lindb-", sites[2])
+    #ℓlist[1] += 0.5γ̃₁⁻ * op("Id", sites[1]) * op("Lindb-", sites[2])
     ℓlist[2] += 0.5γ̃₁⁺ * op("Lindb+", sites[2]) * op("Id", sites[3])
-    ℓlist[2] += 0.5γ̃₁⁻ * op("Lindb-", sites[2]) * op("Id", sites[3])
+    #ℓlist[2] += 0.5γ̃₁⁻ * op("Lindb-", sites[2]) * op("Id", sites[3])
     # · l'operatore misto su (1) e (2),
-    ℓlist[1] += (γ̃₁₂⁺ * mixedlindbladplus(sites[1], sites[2]) +
-                 γ̃₁₂⁻ * mixedlindbladminus(sites[1], sites[2]))
+    #ℓlist[1] += γ̃₁₂⁺ * mixedlindbladplus(sites[1], sites[2])
+    #ℓlist[1] += γ̃₁₂⁻ * mixedlindbladminus(sites[1], sites[2])
     # · infine per l'oscillatore a destra, come al solito,
     ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
                         op("Damping", sites[end]; ω=ωᵣ, T=0))
@@ -198,28 +169,16 @@ let
 
     # Osservabili da misurare
     # =======================
-    if !preload
-      # - i numeri di occupazione
-      num_op_list = [MPS(sites,
-                         [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
-                     for n ∈ 1:length(sites)]
+    # - i numeri di occupazione
+    num_op_list = [MPS(sites,
+                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
+                   for n ∈ 1:length(sites)]
 
-      # - la corrente tra siti
-      current_allsites_ops = [current(sites, i, j)
-                              for i ∈ range_spins
-                              for j ∈ range_spins
-                              if j > i]
+    # - la normalizzazione (cioè la traccia) della matrice densità
+    full_trace = MPS(sites, "vecId")
 
-      # - la normalizzazione (cioè la traccia) della matrice densità
-      full_trace = MPS(sites, "vecId")
-    end
-
-    current_adjsites_ops = [-2κ̃₁*current(sites, 2, 3);
-                            [current(sites, j, j+1)
-                             for j ∈ range_spins[1:end-1]];
-                            -2κᵣ*current(sites,
-                                         range_spins[end],
-                                         range_spins[end]+1)]
+    current_adjsites_ops = [current(sites, j, j+1)
+                            for j ∈ range_spins[1:end-1]]
 
     # Simulazione
     # ===========
@@ -266,15 +225,6 @@ let
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
     current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
                                  for j ∈ current_adjsites_ops])
-    function current_allsites(ρ)
-      pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites if j > i]
-      mat = zeros(n_spin_sites, n_spin_sites)
-      for (j, i) in zip(current_allsites_ops, pairs)
-        mat[i...] = real(inner(j, ρ) / trace(ρ))
-      end
-      mat .-= transpose(mat)
-      return Base.vec(mat')
-    end
 
     # Evoluzione temporale
     # --------------------
@@ -284,7 +234,6 @@ let
       tout,
       normalisation,
       occnlist,
-      current_allsites_list,
       current_adjsites_list,
       ranks =  evolve(ρ₀,
                       time_step_list,
@@ -296,7 +245,6 @@ let
                       parameters["MP_maximum_bond_dimension"];
                       fout=[trace,
                             occn,
-                            current_allsites,
                             current_adjsites,
                             linkdims])
     end
@@ -304,32 +252,30 @@ let
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
-    current_allsites_list = mapreduce(permutedims, vcat, current_allsites_list)
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
     ranks = mapreduce(permutedims, vcat, ranks)
 
     @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([:occ_n_left;
-                                [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
-                                :occ_n_right])
+    for (j, name) in enumerate([:occn_l2;
+                                :occn_l1;
+                                [Symbol("occn_s$n") for n = 1:n_spin_sites];
+                                :occn_r1])
       push!(dict, name => occnlist[:,j])
     end
-    syms = [Symbol("current_$i/$j")
-            for i ∈ 1:n_spin_sites
-            for j ∈ 1:n_spin_sites]
-    for (coln, s) ∈ enumerate(syms)
-        push!(dict, s => current_allsites_list[:, coln])
+    for coln ∈ eachindex(current_adjsites_ops)
+      syms = [Symbol("current_$i/$(i+1)")]
+        push!(dict, s => current_adjsites_list[:, coln])
     end
     len = n_spin_sites + 2
     for (j, name) in enumerate([Symbol("bond_dim$n")
                                 for n ∈ 1:len-1])
       push!(dict, name => ranks[:,j])
     end
-    push!(dict, :full_trace => normalisation)
+    push!(dict, :trace => normalisation)
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
@@ -337,7 +283,6 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
     push!(occ_n_super, occnlist)
-    push!(current_allsites_super, current_allsites_list)
     push!(current_adjsites_super, current_adjsites_list)
     push!(bond_dimensions_super, ranks)
     push!(normalisation_super, normalisation)
@@ -455,20 +400,20 @@ let
 
   savefig(plt, "current_btw_adjacent_sites.png")
 
-  max_n_spins = maximum([p["number_of_spin_sites"] for p in parameter_lists])
-  data = [table[:, 1:p["number_of_spin_sites"]]
-          for (p, table) in zip(parameter_lists, current_allsites_super)]
-  plt = groupplot(timesteps_super,
-                  data,
-                  parameter_lists;
-                  labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
-                  linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle j_{1,l}\rangle",
-                  plottitle="Corrente tra spin (dal 1° spin)",
-                  plotsize=plotsize)
+  #max_n_spins = maximum([p["number_of_spin_sites"] for p in parameter_lists])
+  #data = [table[:, 1:p["number_of_spin_sites"]]
+  #        for (p, table) in zip(parameter_lists, current_allsites_super)]
+  #plt = groupplot(timesteps_super,
+  #                data,
+  #                parameter_lists;
+  #                labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
+  #                linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
+  #                commonxlabel=L"\lambda\, t",
+  #                commonylabel=L"\langle j_{1,l}\rangle",
+  #                plottitle="Corrente tra spin (dal 1° spin)",
+  #                plotsize=plotsize)
 
-  savefig(plt, "spin_current_fromsite1.png")
+  #savefig(plt, "spin_current_fromsite1.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
