@@ -71,7 +71,16 @@ function shared_title_fake_plot(subject::String, parameters)
   return title_fake_plot
 end
 
-function groupplot(x_super, y_super, parameter_super; labels, linestyles, commonxlabel, commonylabel, plottitle, plotsize)
+function groupplot(x_super,
+    y_super,
+    parameter_super;
+    maxyrange = nothing,
+    labels,
+    linestyles,
+    commonxlabel,
+    commonylabel,
+    plottitle,
+    plotsize)
   #= Crea un'immagine che raggruppa i grafici dei dati delle coppie
      (X,Y) ∈ x_super × y_super; in alto viene posto un titolo, grande, che
      elenca anche i parametri usati nelle simulazioni e comuni a tutti i
@@ -106,6 +115,8 @@ function groupplot(x_super, y_super, parameter_super; labels, linestyles, common
      · `commonxlabel`: etichetta delle ascisse (comune a tutti)
 
      · `commonylabel`: etichetta delle ordinate (comune a tutti)
+     
+     · `maxyrange`: minimo e massimo valore delle ordinate da mostrare (per tutti) 
 
      · `plottitle`: titolo grande del grafico
 
@@ -116,6 +127,17 @@ function groupplot(x_super, y_super, parameter_super; labels, linestyles, common
   yminima = minimum.(y_super)
   ymaxima = maximum.(y_super)
   ylimits = (minimum(yminima), maximum(ymaxima))
+  # Limito l'asse y a maxyrange _solo_ se i grafici non ci stanno già
+  # dentro da soli.
+  if maxyrange != nothing
+    if ylimits[begin] < maxyrange[begin]
+      ylimits = (maxyrange[begin], ylimits[end])
+    end
+    if maxyrange[end] < ylimits[end]
+      ylimits = (ylimits[begin], maxyrange[end])
+    end
+  end
+
   # Smisto i parametri in ripetuti e non, per creare i titoli dei grafici.
   distinct_parameters, _ = categorise_parameters(parameter_super)
   # Calcolo la grandezza totale dell'immagine a partire da quella dei grafici.
