@@ -119,29 +119,35 @@ function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
   τ = timesteplist[2] - timesteplist[1]
   if STorder == 1
     # Se l'ordine di espansione è 1, non ci sono semplificazioni da fare.
-    list = repeat([linksodd(τ), linkseven(τ)], nskip)
+    list = [linksodd(τ), linkseven(τ)]
+    seq = repeat([1, 2], nskip)
   elseif STorder == 2
     # Al secondo ordine, posso raggruppare gli operatori con t/2 in modo
     # da risparmiare un po' di calcoli (e di errori numerici...): anziché
     # avere 3*nskip serie di operatori da applicare allo stato tra una
     # misurazione e la successiva, ne ho solo 2*nskip+1.
-    list = [linksodd(0.5τ),
-            repeat([linkseven(τ), linksodd(τ)], nskip-1)...,
-            linkseven(τ),
-            linksodd(0.5τ)]
+    #list = [linksodd(0.5τ),
+    #        repeat([linkseven(τ), linksodd(τ)], nskip-1)...,
+    #        linkseven(τ),
+    #        linksodd(0.5τ)]
+    list = [linksodd(0.5τ), linkseven(τ), linksodd(τ)]
+    seq = [1; repeat([2, 3], nskip-1); 2; 1]
   elseif STorder == 4
-    # Anche qui si potrebbe applicare qualche ottimizzazione componendo
-    # qualche operatore, ma non ho trovato niente che faccia grandi
-    # differenze.
     c = (4 - 4^(1/3))^(-1)
-    ops = [linksodd(c * τ),
+    #list = repeat([linksodd(c * τ),
+    #       linkseven(2c * τ),
+    #       linksodd((0.5 - c) * τ),
+    #       linkseven((1 - 4c) * τ),
+    #       linksodd((0.5 - c) * τ),
+    #       linkseven(2c * τ),
+    #       linksodd(c * τ)], nskip)
+    list = [linksodd(c * τ),
            linkseven(2c * τ),
            linksodd((0.5 - c) * τ),
-           linkseven((1 - 4c) * τ),
-           linksodd((0.5 - c) * τ),
-           linkseven(2c * τ),
-           linksodd(c * τ)]
-    list = repeat(ops, nskip)
+           linkseven((1 - 4c) * τ)]
+    seq = repeat([1, 2, 3, 4, 3, 2, 1], nskip)
+    # Qui c'è ancora qualche margine di ottimizzazione: si potrebbe ad
+    # esempio raggruppare il primo e l'ultimo linksodd quando nskip>1.
   else
     throw(DomainError(order,
                       "L'espansione di Trotter-Suzuki all'ordine $STorder "*
@@ -158,9 +164,9 @@ function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
 
   tout = timesteplist[1:nskip:end]
   progress = Progress(length(tout), 1, "Simulazione in corso", 30)
-  for _ in timesteplist[1+nskip:nskip:end]
-    for sweep in list
-      state = apply(sweep, state, cutoff=maxerr, maxdim=maxrank)
+  for _ ∈ timesteplist[1+nskip:nskip:end]
+    for n ∈ seq
+      state .= apply(list[n], state, cutoff=maxerr, maxdim=maxrank)
     end
     push!(returnvalues, [f(state) for f in fout])
     next!(progress)
