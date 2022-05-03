@@ -114,9 +114,9 @@ let
     n_spin_sites = parameters["number_of_spin_sites"]
     range_spins = 2 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 2; dim=osc_dim);
+    sites = [siteinds("HvOsc", 2; dim=oscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
+             siteinds("HvOsc", 1; dim=oscdim)]
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
@@ -132,9 +132,9 @@ let
     #γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
     #γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) )  / (κ₁^2 + κ₂^2)
     #γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )      / (κ₁^2 + κ₂^2)
-    γ̃₁⁺ = (κ₁^2*γ₁ + κ₂^2*γ₂) / (κ₁^2 + κ₂^2)
+    γ̃₁⁺ = γ₁ # == γ₂
     γ̃₁⁻ = 0
-    γ̃₂⁺ = (κ₂^2*γ₁ + κ₁^2*γ₂) / (κ₁^2 + κ₂^2)
+    γ̃₂⁺ = γ₂
     γ̃₂⁻ = 0
     γ̃₁₂⁺ = 0 # perché γ₁ = γ₂
     γ̃₁₂⁻ = 0
@@ -190,14 +190,14 @@ let
       # Lo stato iniziale della catena è dato da "chain_initial_state".
       # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
       # 1) Calcolo la matrice densità dello stato termico
-      HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
-               ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
-               κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
-                     a⁻(osc_dim) ⊗ a⁺(osc_dim)))
+      HoscL = (ω̃₁ * num(oscdim) ⊗ id(oscdim) +
+               ω̃₂ * id(oscdim) ⊗ num(oscdim) +
+               κ̃₂ * (a⁺(oscdim) ⊗ a⁻(oscdim) +
+                     a⁻(oscdim) ⊗ a⁺(oscdim)))
       M = exp(-1/T * HoscL)
       M /= tr(M)
       # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
+      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(oscdim), gellmannbasis(oscdim))...]])
       # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
       iv = itensor(v, sites[1], sites[2])
       # 4) lo decompongo in due pezzi con una SVD
@@ -265,13 +265,12 @@ let
       push!(dict, name => occnlist[:,j])
     end
     for coln ∈ eachindex(current_adjsites_ops)
-      syms = [Symbol("current_$i/$(i+1)")]
-        push!(dict, s => current_adjsites_list[:, coln])
+      s = Symbol("current_$coln/$(coln+1)")
+      push!(dict, s => current_adjsites_list[:, coln])
     end
-    len = n_spin_sites + 2
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:len-1])
-      push!(dict, name => ranks[:,j])
+    for j ∈ 1:size(ranks, 2)
+      s = Symbol("bond_dim$j")
+      push!(dict, s => ranks[:,j])
     end
     push!(dict, :trace => normalisation)
     table = DataFrame(dict)
@@ -307,7 +306,7 @@ let
                   occ_n_super,
                   parameter_lists;
                   labels=["L2" "L1" string.(1:N-3)... "R"],
-                  linestyles=[:dash :dash repeat([:solid], N-2)... :dash],
+                  linestyles=[:dash :dash repeat([:solid], N-3)... :dash],
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione",
@@ -385,14 +384,14 @@ let
   # Grafico della corrente di spin
   # ------------------------------
   N = size(current_adjsites_super[begin], 2)
-  sitelabels = ["L1"; string.(1:N-1); "R"]
+  sitelabels = string.(1:N)
   plt = groupplot(timesteps_super,
                   current_adjsites_super,
                   parameter_lists;
                   labels=reduce(hcat,
                                 ["($(sitelabels[j]),$(sitelabels[j+1]))"
                                  for j ∈ eachindex(sitelabels)[1:end-1]]),
-                  linestyles=[:dash repeat([:solid], N-2)... :dash],
+                  linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"\lambda\, t",
                   commonylabel=L"\langle j_{k,k+1}\rangle",
                   plottitle="Corrente (tra siti adiacenti)",
