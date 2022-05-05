@@ -95,23 +95,32 @@ let
 
     t = 0:(parameters["simulation_time_step"]):(parameters["simulation_end_time"])
     ureal = U(step(t), H(Ω,κ))
-    uasymp = U(step(t), H(repeat([Ω[end]], nosc), repeat([κ[end]], nosc-1)))
-    asymp = similar(t)
-    n1 = similar(t)
-    n12 = similar(t)
-    ψasymp= s₁
+    uasym = U(step(t), H(repeat([Ω[end]], nosc), repeat([κ[end]], nosc-1)))
+    nreal1 = similar(t)
+    nreal2 = similar(t)
+    nasym1 = similar(t)
+    nasym2 = similar(t)
+    ψasym = s₁
     ψreal = s₁
     for i ∈ eachindex(t)
-      asymp[i] = occn1(ψasymp)
-      n1[i] = occn1(ψreal)
-      n12[i] = occn1(ψreal) + occn2(ψreal)
+      nreal1[i], nreal2[i] = occn1(ψreal), occn2(ψreal)
+      nasym1[i], nasym2[i] = occn1(ψasym), occn2(ψasym)
       ψreal = ureal*ψreal
-      ψasymp = uasymp*ψasymp
+      ψasym = uasym*ψasym
     end
     push!(timeranges, t)
-    push!(first2sitesevos, n12)
-    push!(firstsiteevos, n1)
-    push!(asymptoticevos, asymp)
+    push!(firstsiteevos, nreal1)
+    push!(first2sitesevos, nreal1 .+ nreal2)
+    push!(asymptoticevos, nasym1)
+
+    dict = Dict(:time => collect(t))
+    push!(dict, :occn_real1 => nreal1)
+    push!(dict, :occn_real2 => nreal2)
+    push!(dict, :occn_asym1 => nasym1)
+    push!(dict, :occn_asym2 => nasym2)
+    table = DataFrame(dict)
+    filename = replace(parameters["filename"], ".json" => ".dat")
+    CSV.write(filename, table)
   end
 
   plotsize = (600, 400)
