@@ -6,7 +6,6 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-#using FFTW
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -19,20 +18,20 @@ else
   # Se la chiave "GKSwstype" non esiste non succede niente.
 end
 
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/harmonic_oscillator_space.jl")
-include(lib_path * "/operators.jl")
+rootdirname = "simulazioni_tesi"
+sourcepath = Base.source_path()
+# Cartella base: determina il percorso assoluto del file in esecuzione, e
+# rimuovi tutto ciò che segue rootdirname.
+ind = findfirst(rootdirname, sourcepath)
+rootpath = sourcepath[begin:ind[end]]
+# `rootpath` è la cartella principale del progetto.
+libpath = joinpath(rootpath, "lib")
 
-# Questo programma calcola l'evoluzione della catena di spin
-# smorzata agli estremi, usando le tecniche dei MPS ed MPO.
-# In questo caso la catena è descritta dalla vettorizzazione della
-# matrice densità, la quale evolve nel tempo secondo l'equazione
-# di Lindblad.
+include(joinpath(libpath, "utils.jl"))
+include(joinpath(libpath, "plotting.jl"))
+include(joinpath(libpath, "spin_chain_space.jl"))
+include(joinpath(libpath, "harmonic_oscillator_space.jl"))
+include(joinpath(libpath, "operators.jl"))
 
 let  
   parameter_lists = load_parameters(ARGS)
@@ -51,9 +50,9 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   Xcorrelation_super = []
-  FT_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
+    @info "($current_sim_n di $tot_sim_n) Lettura dei parametri dal file."
     # Impostazione dei parametri
     # ==========================
 
@@ -90,26 +89,40 @@ let
     n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
     spin_range = 2 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 2; dim=osc_dim);
+    sites = [siteinds("HvOsc", 2; dim=oscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 2; dim=osc_dim)]
+             siteinds("HvOsc", 1; dim=oscdim)]
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ===================================================
     # Calcolo dei coefficienti dell'Hamiltoniano trasformato
+    @info "($current_sim_n di $tot_sim_n) Costruzione dell'operatore di evoluzione."
     n(T,ω) = T == 0 ? 0 : 1/(ℯ^(ω/T) - 1)
+
     ω̃₁ = (ω₁*κ₁^2 + ω₂*κ₂^2 + 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
     ω̃₂ = (ω₂*κ₁^2 + ω₁*κ₂^2 - 2η*κ₁*κ₂) / (κ₁^2 + κ₂^2)
+
     κ̃₁ = sqrt(κ₁^2 + κ₂^2)
     κ̃₂ = ((ω₂-ω₁)*κ₁*κ₂ + η*(κ₁^2 - κ₂^2)) / (κ₁^2 + κ₂^2)
+
     γ̃₁⁺ = (κ₁^2*γ₁*(n(T,ω₁)+1) + κ₂^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
     γ̃₁⁻ = (κ₁^2*γ₁* n(T,ω₁)    + κ₂^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
+
     γ̃₂⁺ = (κ₂^2*γ₁*(n(T,ω₁)+1) + κ₁^2*γ₂*(n(T,ω₂)+1)) / (κ₁^2 + κ₂^2)
     γ̃₂⁻ = (κ₂^2*γ₁* n(T,ω₁)    + κ₁^2*γ₂* n(T,ω₂))    / (κ₁^2 + κ₂^2)
+
     γ̃₁₂⁺ = κ₁*κ₂*( γ₂*(n(T,ω₂)+1) - γ₁*(n(T,ω₁)+1) ) / (κ₁^2 + κ₂^2)
     γ̃₁₂⁻ = κ₁*κ₂*( γ₂*n(T,ω₂)     - γ₁*n(T,ω₁) )     / (κ₁^2 + κ₂^2)
-    localcfs = [ω̃₂; ω̃₁; repeat([ε], n_spin_sites); ωᵣ]
-    interactioncfs = [κ̃₂; κ̃₁; repeat([1], n_spin_sites-1); κᵣ]
+
+    localcfs = zeros(Float64, length(sites))
+    localcfs[1] = ω̃₂
+    localcfs[2] = ω̃₁
+    # L'evoluzione deve avvenire con l'operatore dell'ambiente isolato, quindi
+    # "stacco" il sistema aperto mettendo a zero tutti i coefficienti che
+    # non riguardano tale sottosistema. In questo modo non faccio fare calcoli
+    # inutili al programma.
+    interactioncfs = zeros(Float64, length(sites)-1)
+    interactioncfs[1] = κ̃₂
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli operatori già creati gli operatori di dissipazione:
     # · per il primo oscillatore a sinistra,
@@ -148,20 +161,28 @@ let
 
     # Simulazione
     # ===========
+    @info "($current_sim_n di $tot_sim_n) Costruzione dello stato iniziale."
     # Stato iniziale
     # --------------
     # Lo stato iniziale qui è X₀ρ₀ (vedi eq. sopra).
     # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
-    # 1) Calcolo la matrice densità dello stato termico
-    HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
-             ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
-             κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
-                   a⁻(osc_dim) ⊗ a⁺(osc_dim)))
-    M = exp(-1/T * HoscL)
-    M /= tr(M)
-    P = (a⁺(osc_dim) + a⁻(osc_dim)) * M
+    # 1) per gli oscillatori
+    if T != 0 # ρ₀ = Z⁻¹exp(-βH)
+      HoscL = (ω̃₁ * num(oscdim) ⊗ id(oscdim) +
+               ω̃₂ * id(oscdim) ⊗ num(oscdim) +
+               κ̃₂ * (a⁺(oscdim) ⊗ a⁻(oscdim) +
+                     a⁻(oscdim) ⊗ a⁺(oscdim)))
+      M = exp(-1/T * HoscL)
+      M /= tr(M)
+    else # ρ₀ = |∅⟩ ⟨∅| = |0⟩ ⟨0| ⊗ |0⟩ ⟨0|
+      emptystate = zeros(Float64, oscdim, oscdim)
+      emptystate[1, 1] = 1.0
+      M = emptystate ⊗ emptystate
+    end
+    P = (id(oscdim) ⊗ (a⁺(oscdim) + a⁻(oscdim))) * M
     # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-    v = vec(P, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
+    v = vec(P, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(oscdim),
+                                                     gellmannbasis(oscdim))...]])
     # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
     iv = itensor(v, sites[1], sites[2])
     # 4) lo decompongo in due pezzi con una SVD
@@ -174,13 +195,13 @@ let
     X₀ρ₀ = chain(MPS([f1, f2]),
                parse_init_state(sites[spin_range],
                                 parameters["chain_initial_state"]),
-               MPS([state(sites[end-1], "0")]),
+               #MPS([state(sites[end-1], "0")]),
                MPS([state(sites[end],   "0")]))
 
     # Osservabili
     # -----------
     X₀ = MPS(sites, [i == 2 ? "vecX" : "vecId" for i ∈ eachindex(sites)])
-    correlation(ρ) = real(inner(X₀, ρ))
+    correlation(ρ) = κ̃₁^2 * real(inner(X₀, ρ))
 
     # Evoluzione temporale
     # --------------------
@@ -195,18 +216,15 @@ let
                                    parameters["MP_compression_error"],
                                    parameters["MP_maximum_bond_dimension"];
                                    fout=[correlation])
-    #FT = rfft(correlationlist) 
-    ν(ω,T) = T == 0 ? 0.0 : (ℯ^(ω/T)-1)^(-1)
-    c₀ = 2ν(ω₁,T) - 1
-    c₀ = correlation(X₀ρ₀)
-    expXcorrelation = [c₀ * ℯ^(-γ*t) * cos(ω₁*t) for t ∈ tout]
-    Xcorrelationlist = hcat(correlationlist, expXcorrelation)
+    
+    @info "($current_sim_n di $tot_sim_n) Scrittura dei file di output."
+    #expXcorrelation = [c₀ * ℯ^(-γ*t) * cos(ω₁*t) for t ∈ tout]
+    #Xcorrelationlist = hcat(correlationlist, expXcorrelation)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    push!(dict, :correlation_calc => Xcorrelationlist[:,1])
-    push!(dict, :correlation_exp => Xcorrelationlist[:,2])
-    #push!(dict, :spectraldensity => FT)
+    #push!(dict, :correlation_calc => Xcorrelationlist[:,1])
+    push!(dict, :correlation_exp => correlationlist)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -215,12 +233,12 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
-    push!(Xcorrelation_super, Xcorrelationlist)
-    push!(FT_super, correlationlist)
+    push!(Xcorrelation_super, correlationlist)
   end
 
+  @info "Creazione dei grafici."
   #= Grafici
-  =======
+     =======
   Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
   ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
   la grandezza del font o con il colore quelli che cambiano da una
