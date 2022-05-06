@@ -66,21 +66,111 @@ let
     else
       throw(ErrorException("Oscillator damping coefficient not provided."))
     end
+    ε = parameters["spin_excitation_energy"]
+    # λ = 1
     Ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
 
     n(T,ω) = T == 0 ? 0.0 : (ℯ^(ω/T)-1)^(-1)
 
-    # Set new initial oscillator states as empty.
-    parameters["left_oscillator_initial_state"] = "empty"
-
     # ITensors internal parameters
     max_err = parameters["MP_compression_error"]
     max_dim = parameters["MP_maximum_bond_dimension"]
+    oscdim = parameters["oscillator_space_dimension"]
+    oscdim_single = oscdim*3
+
+    # - intervallo temporale delle simulazioni
+    time_step = parameters["simulation_time_step"]
+    time_step_list = construct_step_list(parameters)
+    skip_steps = parameters["skip_steps"]
+
+    # +-----------------------------------------------------+ 
+    # | Part 1: correlation function of a single pseudomode |
+    # +-----------------------------------------------------+
+    n_spin_sites = parameters["number_of_spin_sites"]
+    range_spins = 1 .+ (1:n_spin_sites)
+
+    sites = [siteinds("HvOsc", 1; dim=oscdim_single);
+             siteinds("HvS=1/2", n_spin_sites);
+             siteinds("HvOsc", 1; dim=oscdim_single)]
+
+    localcfs = zeros(Float64, length(sites))
+    localcfs[1] = Ω
+    interactioncfs = zeros(Float64, length(sites)-1)
+    ℓlist = twositeoperators(sites, localcfs, interactioncfs)
+    # Aggiungo agli estremi della catena gli operatori di dissipazione
+    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=Ω, T=T) *
+                          op("Id", sites[begin+1]))
+    ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
+                        op("Damping", sites[end]; ω=Ω, T=0))
+    #
+    function links_odd1(τ)
+      return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
+    end
+    function links_even1(τ)
+      return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
+    end
+
+    # Simulazione
+    # ===========
+    # Stato iniziale
+    # --------------
+    # Lo stato iniziale qui è X₀ρ₀.
+    # In ρ₀, l'oscillatore sx è in equilibrio termico, quello dx è vuoto.
+    # Lo stato iniziale della catena è dato da "chain_initial_state".
+    X₀ρ₀ = chain(MPS([state(sites[1], "X⋅Therm"; ω=Ω, T=T)]),
+                 parse_init_state(sites[range_spins],
+                                  parameters["chain_initial_state"]),
+                 MPS([state(sites[end], "0")]))
+
+    # Osservabili
+    # -----------
+    X₀ = MPS(sites, [i == 1 ? "vecX" : "vecId" for i ∈ eachindex(sites)])
+    correlation_single(ρ) = κ^2 * inner(X₀, ρ)
+
+    # Evoluzione temporale
+    # --------------------
+    @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
+
+    tout, singleXcorrelation = evolve(X₀ρ₀,
+                                    time_step_list,
+                                    parameters["skip_steps"],
+                                    parameters["TS_expansion_order"],
+                                    links_odd1,
+                                    links_even1,
+                                    parameters["MP_compression_error"],
+                                    parameters["MP_maximum_bond_dimension"];
+                                    fout=[correlation_single])
+    dict = Dict(:time => tout)
+
+    function cᴿ(κ, Ω, γ, T, t)
+      if T != 0
+        κ^2 * (coth(0.5*Ω/T)*cos(Ω*t) - im*sin(Ω*t)) * ℯ^(-0.5γ*t)
+      else
+        κ^2 * ℯ^(-im*Ω*t - 0.5γ*t)
+      end
+    end
+
+    expXcorrelation = [cᴿ(κ,Ω,γₗ,T, t) for t ∈ tout]
+    push!(dict, :correlation_exp_re  => real.(expXcorrelation))
+    push!(dict, :correlation_exp_im  => imag.(expXcorrelation))
+
+    push!(dict, :correlation_single_re => real.(singleXcorrelation))
+    push!(dict, :correlation_single_im => imag.(singleXcorrelation))
+
+    # +----------------------------------------------------+ 
+    # | Part 2: correlation function of a split pseudomode |
+    # +----------------------------------------------------+
+    # Set new initial oscillator states as empty.
+    parameters["left_oscillator_initial_state"] = "empty"
+
+    range_spins = 2 .+ (1:n_spin_sites)
+
+    sites = [siteinds("HvOsc", 2; dim=oscdim);
+             siteinds("HvS=1/2", n_spin_sites);
+             siteinds("HvOsc", 1; dim=oscdim)]
 
     # Transform the pseudomode into two zero-temperature new modes.
-    ε = parameters["spin_excitation_energy"]
-    # λ = 1
     κ₁ = κ * sqrt( 1+n(T,Ω) )
     ω₁ = Ω
     γ₁ = γₗ
@@ -94,21 +184,6 @@ let
     #γᵣ = γᵣ
     #
     η = 0
-    oscdim = parameters["oscillator_space_dimension"]
-
-    # - intervallo temporale delle simulazioni
-    time_step = parameters["simulation_time_step"]
-    time_step_list = construct_step_list(parameters)
-    skip_steps = parameters["skip_steps"]
-
-    # Costruzione della catena
-    # ========================
-    n_spin_sites = parameters["number_of_spin_sites"]
-    range_spins = 2 .+ (1:n_spin_sites)
-
-    sites = [siteinds("HvOsc", 2; dim=oscdim);
-             siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=oscdim)]
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
@@ -157,10 +232,10 @@ let
     ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
                         op("Damping", sites[end]; ω=ωᵣ, T=0))
     #
-    function links_odd(τ)
+    function links_odd2(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
     end
-    function links_even(τ)
+    function links_even2(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[2:2:end]]
     end
 
@@ -208,40 +283,27 @@ let
     # Osservabili
     # -----------
     X₀ = MPS(sites, [i == 2 ? "vecX" : "vecId" for i ∈ eachindex(sites)])
-    correlation(ρ) = κ̃₁^2 * inner(X₀, ρ)
+    correlation_split(ρ) = κ̃₁^2 * inner(X₀, ρ)
 
     # Evoluzione temporale
     # --------------------
     @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
-    tout, calcXcorrelation = evolve(X₀ρ₀,
+    tout, splitXcorrelation = evolve(X₀ρ₀,
                                     time_step_list,
                                     parameters["skip_steps"],
                                     parameters["TS_expansion_order"],
-                                    links_odd,
-                                    links_even,
+                                    links_odd2,
+                                    links_even2,
                                     parameters["MP_compression_error"],
                                     parameters["MP_maximum_bond_dimension"];
-                                    fout=[correlation])
+                                    fout=[correlation_split])
 
     @info "($current_sim_n di $tot_sim_n) Scrittura dei file di output."
 
-    function cᴿ(κ, Ω, γ, T, t)
-      if T != 0
-        κ^2 * (coth(0.5*Ω/T)*cos(Ω*t) - im*sin(Ω*t)) * ℯ^(-0.5γ*t)
-      else
-        κ^2 * ℯ^(-im*Ω*t - 0.5γ*t)
-      end
-    end
-    expXcorrelation = [cᴿ(κ,Ω,γₗ,T, t) for t ∈ tout]
-    Xcorrelation = hcat(calcXcorrelation, expXcorrelation)
+    push!(dict, :correlation_split_re => real.(splitXcorrelation))
+    push!(dict, :correlation_split_im => imag.(splitXcorrelation))
 
-    # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => tout)
-    push!(dict, :correlation_calc_re => real.(calcXcorrelation))
-    push!(dict, :correlation_calc_im => imag.(calcXcorrelation))
-    push!(dict, :correlation_exp_re  => real.(expXcorrelation))
-    push!(dict, :correlation_exp_im  => imag.(expXcorrelation))
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -250,7 +312,9 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
-    push!(Xcorrelation_super, Xcorrelation)
+    push!(Xcorrelation_super, hcat(singleXcorrelation,
+                                   splitXcorrelation,
+                                   expXcorrelation))
   end
 
   @info "Creazione dei grafici."
@@ -267,13 +331,15 @@ let
 
   # Grafico della funzione di correlazione
   # --------------------------------------
-  data = [[real.(Xcorrelation[:,1])  real.(Xcorrelation[:,2])]
+  data = [[real.(Xcorrelation[:,1]);;
+           real.(Xcorrelation[:,2]);;
+           real.(Xcorrelation[:,3])]
           for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
                   data,
                   parameter_lists;
-                  labels=["calculated" "expected"],
-                  linestyles=[:solid :dash],
+                  labels=["single p.mode" "split p.mode" "expected"],
+                  linestyles=[:solid :solid :dash],
                   commonxlabel=L"t",
                   commonylabel=L"\mathrm{Re}\,(\langle X(t)X(0)\rangle)",
                   plottitle="Funzione di correlazione (parte reale)",
@@ -281,13 +347,15 @@ let
 
   savefig(plt, "Xcorrelation_re.png")
 
-  data = [[imag.(Xcorrelation[:,1])  imag.(Xcorrelation[:,2])]
+  data = [[imag.(Xcorrelation[:,1]);;
+           imag.(Xcorrelation[:,2]);;
+           imag.(Xcorrelation[:,3])]
           for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
                   data,
                   parameter_lists;
-                  labels=["calculated" "expected"],
-                  linestyles=[:solid :dash],
+                  labels=["single p.mode" "split p.mode" "expected"],
+                  linestyles=[:solid :solid :dash],
                   commonxlabel=L"t",
                   commonylabel=L"\mathrm{Im}\,(\langle X(t)X(0)\rangle)",
                   plottitle="Funzione di correlazione (parte immaginaria)",
@@ -304,7 +372,7 @@ let
                   labels=["real part" "imag part"],
                   linestyles=[:solid :dash],
                   commonxlabel=L"t",
-                  commonylabel=L"\langle X(t)X(0)\rangle_{calc}-\langle X(t)X(0)\rangle_{exp}",
+                  commonylabel=L"\langle X(t)X(0)\rangle_\mathrm{single}-\langle X(t)X(0)\rangle_\mathrm{split}",
                   plottitle="Diff. funzioni di correlazione",
                   plotsize=plotsize)
 
