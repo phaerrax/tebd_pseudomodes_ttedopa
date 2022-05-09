@@ -149,7 +149,7 @@ function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
     # Qui c'è ancora qualche margine di ottimizzazione: si potrebbe ad
     # esempio raggruppare il primo e l'ultimo linksodd quando nskip>1.
   else
-    throw(DomainError(order,
+    throw(DomainError(STorder,
                       "L'espansione di Trotter-Suzuki all'ordine $STorder "*
                       "non è supportata. Attualmente sono disponibili "*
                       "solo le espansioni con ordine 1, 2 o 4."))
