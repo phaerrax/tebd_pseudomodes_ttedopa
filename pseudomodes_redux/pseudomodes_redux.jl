@@ -34,6 +34,7 @@ include(lib_path * "/operators.jl")
 # di Lindblad.
 
 let  
+  @info "Lettura dei file con i parametri."
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
 
@@ -81,16 +82,15 @@ let
              siteinds("HvS=1/2", n_spin_sites);
              siteinds("HvOsc", 1; dim=osc_dim)]
 
+
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
                   for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    current_adjsites_ops = [-2κ*current(sites, 1, 2);
-                            [current(sites, j, j+1)
-                             for j ∈ spin_range[1:end-1]];
-                            -2κ*current(sites, spin_range[end], spin_range[end]+1)]
+    current_adjsites_ops = [current(sites, j, j+1)
+                             for j ∈ spin_range[1:end-1]]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
     full_trace = MPS(sites, "vecId")
@@ -99,6 +99,7 @@ let
   end
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
+    @info "($current_sim_n di $tot_sim_n) Costruzione degli operatori di evoluzione temporale."
     # Impostazione dei parametri
     # ==========================
 
@@ -110,7 +111,7 @@ let
     ε = parameters["spin_excitation_energy"]
     # λ = 1
     κ = parameters["oscillator_spin_interaction_coefficient"]
-    ω = parameters["oscillator_frequency"]
+    Ω = parameters["oscillator_frequency"]
     if (haskey(parameters, "oscillator_damping_coefficient_left") &&
         haskey(parameters, "oscillator_damping_coefficient_right"))
       γₗ = parameters["oscillator_damping_coefficient_left"]
@@ -142,14 +143,14 @@ let
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
-    localcfs = [ω; repeat([ε], n_spin_sites); ω]
+    localcfs = [Ω; repeat([ε], n_spin_sites); Ω]
     interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=ω, T=T) *
+    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=Ω, T=T) *
                           op("Id", sites[begin+1]))
     ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
-                        op("Damping", sites[end]; ω=ω, T=0))
+                        op("Damping", sites[end]; ω=Ω, T=0))
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -167,10 +168,8 @@ let
                     for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      current_adjsites_ops = [-2κ*current(sites, 1, 2);
-                              [current(sites, j, j+1)
-                               for j ∈ spin_range[1:end-1]];
-                              -2κ*current(sites, spin_range[end], spin_range[end]+1)]
+      current_adjsites_ops = [current(sites, j, j+1)
+                               for j ∈ spin_range[1:end-1]]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
       full_trace = MPS(sites, "vecId")
@@ -180,11 +179,12 @@ let
     # ===========
     # Stato iniziale
     # --------------
+    @info "($current_sim_n di $tot_sim_n) Creazione dello stato iniziale."
     # L'oscillatore sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
     ρ₀ = chain(parse_init_state_osc(sites[1],
                                     parameters["left_oscillator_initial_state"];
-                                    ω=ω, T=T),
+                                    ω=Ω, T=T),
                parse_init_state(sites[2:end-1],
                                 parameters["chain_initial_state"]),
                parse_init_state_osc(sites[end], "empty"))
@@ -192,9 +192,9 @@ let
     # Osservabili
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
-    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
-                                 for j ∈ current_adjsites_ops])
+    occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
+    current_adjsites(ρ) = real.([inner(j, ρ)
+                                 for j ∈ current_adjsites_ops]) ./ trace(ρ)
 
     # Evoluzione temporale
     # --------------------
@@ -224,24 +224,24 @@ let
     ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
+    @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([:occ_n_left;
-                              [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
+    for (j, name) ∈ enumerate([:occ_n_left;
+                              [Symbol("occ_n_spin$n") for n ∈ 1:n_spin_sites];
                               :occ_n_right])
       push!(dict, name => occnlist[:,j])
     end
-    for (j, name) in enumerate([Symbol("current_adjsites$n")
-                                for n ∈ 1:size(current_adjsites_list, 2)])
-      push!(dict, name => current_adjsites_list[:,j])
+    for j ∈ 1:size(current_adjsites_list, 2)
+      sym = Symbol("current_$j/$(j+1)")
+      push!(dict, sym => current_adjsites_list[:,j])
     end
-    len = n_spin_sites + 2
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:len-1])
-      push!(dict, name => ranks[:,j])
+    for j ∈ 1:size(ranks, 2)
+      sym = Symbol("bond_dim$j/$(j+1)")
+      push!(dict, sym => ranks[:,j])
     end
-    push!(dict, :full_trace => normalisation)
+    push!(dict, :trace => normalisation)
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
@@ -261,6 +261,7 @@ let
      la grandezza del font o con il colore quelli che cambiano da una
      simulazione all'altra.
   =#
+  @info "Creazione dei grafici."
   plotsize = (600, 400)
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
@@ -272,8 +273,8 @@ let
                     normalisation_super,
                     parameter_lists;
                     linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\operatorname{tr}\,\rho(t)",
+                    xlabel=L"t",
+                    ylabel=L"\mathrm{tr}\,\rho(t)",
                     plottitle="Normalizzazione della matrice densità",
                     plotsize=plotsize)
 

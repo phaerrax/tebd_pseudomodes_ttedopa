@@ -222,9 +222,9 @@ let
     # Osservabili
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
-    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
-                                 for j ∈ current_adjsites_ops])
+    occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
+    current_adjsites(ρ) = real.([inner(j, ρ)
+                                 for j ∈ current_adjsites_ops]) ./ trace(ρ)
 
     # Evoluzione temporale
     # --------------------

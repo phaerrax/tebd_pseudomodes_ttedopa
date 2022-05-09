@@ -90,7 +90,7 @@ let
                             if j > i]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecId")
+    traceMPS = MPS(sites, "vecId")
   else
     preload = false
   end
@@ -192,7 +192,7 @@ let
                               if j > i]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
-      full_trace = MPS(sites, "vecId")
+      traceMPS = MPS(sites, "vecId")
     end
 
     current_adjsites_ops = [-2κ̃₁*current(sites, 2, 3);
@@ -243,15 +243,16 @@ let
 
     # Osservabili
     # -----------
-    trace(ρ) = real(inner(full_trace, ρ))
-    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
-                                 for j ∈ current_adjsites_ops])
+    trace(ρ) = real(inner(traceMPS, ρ))
+    occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
+    current_adjsites(ρ) = real.([inner(j, ρ)
+                                 for j ∈ current_adjsites_ops]) ./ trace(ρ)
     function current_allsites(ρ)
       pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites if j > i]
       mat = zeros(n_spin_sites, n_spin_sites)
-      for (j, i) in zip(current_allsites_ops, pairs)
-        mat[i...] = real(inner(j, ρ) / trace(ρ))
+      trρ = trace(ρ)
+      for (J, (k,l)) in zip(current_allsites_ops, pairs)
+        mat[k,l] = real(inner(J, ρ) / trρ)
       end
       mat .-= transpose(mat)
       return Base.vec(mat')
@@ -308,9 +309,9 @@ let
                                 for n ∈ 1:len-1])
       push!(dict, name => ranks[:,j])
     end
-    push!(dict, :full_trace => normalisation)
+    push!(dict, :trace => normalisation)
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)

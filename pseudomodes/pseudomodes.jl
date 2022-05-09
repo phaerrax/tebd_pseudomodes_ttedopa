@@ -73,23 +73,23 @@ let
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   n_spin_sites_list = [p["number_of_spin_sites"]
                        for p ∈ parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"]
+  oscdim_list = [p["oscillator_space_dimension"]
                   for p ∈ parameter_lists]
   kappa_list = [p["oscillator_spin_interaction_coefficient"]
                 for p ∈ parameter_lists]
   if (allequal(n_spin_sites_list) &&
-      allequal(osc_dim_list) &&
+      allequal(oscdim_list) &&
       allequal(kappa_list))
     preload = true
     n_spin_sites = first(n_spin_sites_list)
-    osc_dim = first(osc_dim_list)
+    oscdim = first(oscdim_list)
     κ = first(kappa_list)
 
     spin_range = 1 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 1; dim=osc_dim);
+    sites = [siteinds("HvOsc", 1; dim=oscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
+             siteinds("HvOsc", 1; dim=oscdim)]
 
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
@@ -120,11 +120,11 @@ let
     osc_levels_projs_left = [embed_slice(sites,
                                          1:1,
                                          osc_levels_proj(sites[1], n))
-                             for n=0:osc_dim-1]
+                             for n=0:oscdim-1]
     osc_levels_projs_right = [embed_slice(sites,
                                           n_spin_sites+2:n_spin_sites+2,
                                           osc_levels_proj(sites[end], n))
-                              for n=0:osc_dim-1]
+                              for n=0:oscdim-1]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
     traceMPS = MPS(sites, "vecId")
@@ -157,7 +157,7 @@ let
     end
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
-    osc_dim = parameters["oscillator_space_dimension"]
+    oscdim = parameters["oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -170,9 +170,9 @@ let
       n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
       spin_range = 1 .+ (1:n_spin_sites)
 
-      sites = [siteinds("HvOsc", 1; dim=osc_dim);
+      sites = [siteinds("HvOsc", 1; dim=oscdim);
                siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 1; dim=osc_dim)]
+               siteinds("HvOsc", 1; dim=oscdim)]
     end
 
     #= Definizione degli operatori nell'equazione di Lindblad
@@ -229,11 +229,11 @@ let
       osc_levels_projs_left = [embed_slice(sites,
                                            1:1,
                                            osc_levels_proj(sites[1], n))
-                               for n=0:osc_dim-1]
+                               for n=0:oscdim-1]
       osc_levels_projs_right = [embed_slice(sites,
                                             n_spin_sites+2:n_spin_sites+2,
                                             osc_levels_proj(sites[end], n))
-                                for n=0:osc_dim-1]
+                                for n=0:oscdim-1]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
       traceMPS = MPS(sites, "vecId")
@@ -264,30 +264,33 @@ let
     # Osservabili
     # -----------
     trace(ρ) = real(inner(traceMPS, ρ))
-    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
-                                 for j ∈ current_adjsites_ops])
+    occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
+    current_adjsites(ρ) = real.([inner(j, ρ)
+                                 for j ∈ current_adjsites_ops]) ./ trace(ρ)
     function forwardflux_f(ρ)
       pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites]
       mat = zeros(n_spin_sites, n_spin_sites)
-      for (Ff, i) in zip(forward_flux_ops, pairs)
-        mat[i...] = real(inner(Ff, ρ) / trace(ρ))
+      trρ = trace(ρ)
+      for (Ff, (i,j)) in zip(forward_flux_ops, pairs)
+        mat[i,j] = real(inner(Ff, ρ) / trρ)
       end
       return Base.vec(mat')
     end
     function backwardflux_f(ρ)
       pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites]
       mat = zeros(n_spin_sites, n_spin_sites)
-      for (Ff, i) in zip(backward_flux_ops, pairs)
-        mat[i...] = real(inner(Ff, ρ) / trace(ρ))
+      trρ = trace(ρ)
+      for (Bf, (i,j)) in zip(backward_flux_ops, pairs)
+        mat[i,j] = real(inner(Bf, ρ) / trρ)
       end
       return Base.vec(mat')
     end
     function current_allsites(ρ)
       pairs = [(i,j) for i ∈ 1:n_spin_sites for j ∈ 1:n_spin_sites if j > i]
       mat = zeros(n_spin_sites, n_spin_sites)
-      for (j, i) in zip(current_allsites_ops, pairs)
-        mat[i...] = real(inner(j, ρ) / trace(ρ))
+      trρ = trace(ρ)
+      for (J, (k,l)) in zip(current_allsites_ops, pairs)
+        mat[k,l] = real(inner(J, ρ) / trρ)
       end
       mat .-= transpose(mat)
       return Base.vec(mat')
@@ -346,36 +349,37 @@ let
     @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([:occ_n_left;
-                                [Symbol("occ_n_spin$n") for n = 1:n_spin_sites];
-                                :occ_n_right])
-      push!(dict, name => occnlist[:,j])
-    end
-    for (j, name) in enumerate([Symbol("current_adjsites$n")
-                                for n ∈ 1:size(current_adjsites_list, 2)])
-      push!(dict, name => current_adjsites_list[:,j])
-    end
-    syms = [Symbol("current_$i/$j")
-            for i ∈ 1:n_spin_sites
-            for j ∈ 1:n_spin_sites]
-    for (coln, s) ∈ enumerate(syms)
-        push!(dict, s => current_allsites_list[:, coln])
-    end
-    for (j, name) in enumerate([Symbol("levels_left$n") for n = 0:osc_dim-1])
-      push!(dict, name => osclevelsLlist[:,j])
-    end
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
-      push!(dict, name => chainlevelslist[:,j])
-    end
-    for (j, name) in enumerate([Symbol("levels_right$n") for n = 0:osc_dim:-1])
-      push!(dict, name => osclevelsRlist[:,j])
-    end
-    len = n_spin_sites + 2
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:len-1])
-      push!(dict, name => ranks[:,j])
-    end
     push!(dict, :trace => normalisation)
+    occn_symbols = [:occ_n_left;
+                    [Symbol("occ_n_spin$n") for n ∈ 1:n_spin_sites];
+                    :occ_n_right]
+    for (n, sym) in enumerate(occn_symbols)
+      push!(dict, sym => occnlist[:, n])
+    end
+    for n ∈ 1:size(current_adjsites_list, 2)
+      sym = Symbol("current_adjsites$n")
+      push!(dict, sym => current_adjsites_list[:, n])
+    end
+    current_symbols = [Symbol("current_$i/$j")
+                       for i ∈ 1:n_spin_sites
+                       for j ∈ 1:n_spin_sites]
+    for (n, sym) ∈ enumerate(current_symbols)
+        push!(dict, sym => current_allsites_list[:, n])
+    end
+    for n ∈ 0:oscdim-1
+      sym = Symbol("levels_left$n")
+      push!(dict, sym => osclevelsLlist[:, n])
+      sym = Symbol("levels_right$n")
+      push!(dict, sym => osclevelsRlist[:, n])
+    end
+    for n ∈ 0:n_spin_sites
+      sym = Symbol("levels_chain$n") 
+      push!(dict, sym => chainlevelslist[:, n])
+    end
+    for n ∈ 1:size(ranks, 2)
+      sym = Symbol("bond_dim_$n/$(n+1)")
+      push!(dict, sym => ranks[:, n])
+    end
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
@@ -410,7 +414,7 @@ let
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
+  N = size(occ_n_super[begin], 2)
   plt = groupplot(timesteps_super,
                   occ_n_super,
                   parameter_lists;
@@ -582,7 +586,7 @@ let
   # ------------------------------------------------------------------
   # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
   # restanti valori.
-  N = size(chain_levels_super[begin])[2] - 1
+  N = size(chain_levels_super[begin], 2) - 1
   plt = groupplot(timesteps_super,
                   chain_levels_super,
                   parameter_lists;
@@ -600,7 +604,7 @@ let
   # ------------------------------------------------------
   for (list, pos) in zip([osc_levels_left_super, osc_levels_right_super],
                          ["sx", "dx"])
-    N = size(list[begin])[2] - 1
+    N = size(list[begin], 2) - 1
     plt = groupplot(timesteps_super,
                     list,
                     parameter_lists;
