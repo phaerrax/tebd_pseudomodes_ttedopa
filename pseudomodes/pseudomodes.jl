@@ -18,14 +18,20 @@ else
   # Se la chiave "GKSwstype" non esiste non succede niente.
 end
 
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/harmonic_oscillator_space.jl")
-include(lib_path * "/operators.jl")
+rootdirname = "simulazioni_tesi"
+sourcepath = Base.source_path()
+# Cartella base: determina il percorso assoluto del file in esecuzione, e
+# rimuovi tutto ciò che segue rootdirname.
+ind = findfirst(rootdirname, sourcepath)
+rootpath = sourcepath[begin:ind[end]]
+# `rootpath` è la cartella principale del progetto.
+libpath = joinpath(rootpath, "lib")
+
+include(joinpath(libpath, "utils.jl"))
+include(joinpath(libpath, "plotting.jl"))
+include(joinpath(libpath, "spin_chain_space.jl"))
+include(joinpath(libpath, "harmonic_oscillator_space.jl"))
+include(joinpath(libpath, "operators.jl"))
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -34,6 +40,7 @@ include(lib_path * "/operators.jl")
 # di Lindblad.
 
 let  
+  @info "Lettura dei file con i parametri."
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
 
@@ -70,9 +77,9 @@ let
                   for p ∈ parameter_lists]
   kappa_list = [p["oscillator_spin_interaction_coefficient"]
                 for p ∈ parameter_lists]
-  if allequal(n_spin_sites_list) &&
-    allequal(osc_dim_list) &&
-    allequal(kappa_list)
+  if (allequal(n_spin_sites_list) &&
+      allequal(osc_dim_list) &&
+      allequal(kappa_list))
     preload = true
     n_spin_sites = first(n_spin_sites_list)
     osc_dim = first(osc_dim_list)
@@ -120,12 +127,13 @@ let
                               for n=0:osc_dim-1]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
-    full_trace = MPS(sites, "vecId")
+    traceMPS = MPS(sites, "vecId")
   else
     preload = false
   end
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
+    @info "($current_sim_n di $tot_sim_n) Costruzione degli operatori di evoluzione temporale."
     # Impostazione dei parametri
     # ==========================
 
@@ -181,10 +189,10 @@ let
     interactioncfs = [κ; repeat([1], n_spin_sites-1); κ]
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γₗ * op("Damping", sites[begin]; ω=ω, T=T) *
-    op("Id", sites[begin+1])
-    ℓlist[end] += γᵣ * op("Id", sites[end-1]) *
-    op("Damping", sites[end]; ω=ω, T=0)
+    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=ω, T=T) *
+                          op("Id", sites[begin+1]))
+    ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
+                        op("Damping", sites[end]; ω=ω, T=0))
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -228,9 +236,11 @@ let
                                 for n=0:osc_dim-1]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
-      full_trace = MPS(sites, "vecId")
+      traceMPS = MPS(sites, "vecId")
     end
 
+    # Memo: [(i,j) for i ∈ 1:n for j ∈ 1:n] =
+    # [(1,1) (1,2) … (1,n) (2,1) … (n,n-1) (n,n)]
     forward_flux_ops = [forwardflux(sites, i, j)
                         for i ∈ spin_range
                         for j ∈ spin_range]
@@ -241,6 +251,7 @@ let
     # ===========
     # Stato iniziale
     # --------------
+    @info "($current_sim_n di $tot_sim_n) Creazione dello stato iniziale."
     # L'oscillatore sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
     ρ₀ = chain(parse_init_state_osc(sites[1],
@@ -252,7 +263,7 @@ let
 
     # Osservabili
     # -----------
-    trace(ρ) = real(inner(full_trace, ρ))
+    trace(ρ) = real(inner(traceMPS, ρ))
     occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
     current_adjsites(ρ) = real.([inner(j, ρ) / trace(ρ)
                                  for j ∈ current_adjsites_ops])
@@ -332,6 +343,7 @@ let
     osclevelsLlist = mapreduce(permutedims, vcat, osclevelsLlist)
     osclevelsRlist = mapreduce(permutedims, vcat, osclevelsRlist)
 
+    @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
     for (j, name) in enumerate([:occ_n_left;
@@ -363,9 +375,9 @@ let
                                 for n ∈ 1:len-1])
       push!(dict, name => ranks[:,j])
     end
-    push!(dict, :full_trace => normalisation)
+    push!(dict, :trace => normalisation)
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
@@ -391,6 +403,7 @@ let
   la grandezza del font o con il colore quelli che cambiano da una
   simulazione all'altra.
   =#
+  @info "Creazione dei grafici."
   plotsize = (600, 400)
 
   distinct_p, repeated_p = categorise_parameters(parameter_lists)
