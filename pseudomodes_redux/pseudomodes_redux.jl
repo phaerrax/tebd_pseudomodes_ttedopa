@@ -64,23 +64,42 @@ let
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   n_spin_sites_list = [p["number_of_spin_sites"]
                        for p ∈ parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"]
-                  for p ∈ parameter_lists]
   kappa_list = [p["oscillator_spin_interaction_coefficient"]
                 for p ∈ parameter_lists]
-  if allequal(n_spin_sites_list) &&
-     allequal(osc_dim_list) &&
-     allequal(kappa_list)
+  # I file dei parametri potrebbero avere `cold_...` e `hot_...` oppure soltanto
+  # `oscillator_space_dimension`. Devo differenziare i due casi.
+  # Se cerco di costruire la lista dei `cold_...` ma nei file non c'è questa
+  # chiave, Julia lancia un KeyError.
+  # Eseguo quindi in questo punto del codice quello che faccio poi con γ:
+  # controllo se esistono i due oscdim differenti, altrimenti prendo quello
+  # in comune e lo copio nei due valori. Se non c'è neanche quello, va bene che
+  # Julia lanci un errore: significa che i file di parametri sono malformati.
+  for p ∈ parameter_lists
+    if (!haskey(p, "hot_oscillator_space_dimension") &&
+        !haskey(p, "cold_oscillator_space_dimension"))
+      push!(p, "hot_oscillator_space_dimension" => p["oscillator_space_dimension"])
+      push!(p, "cold_oscillator_space_dimension" => p["oscillator_space_dimension"])
+    end
+  end
+  hotoscdim_list = [p["hot_oscillator_space_dimension"]
+                    for p ∈ parameter_lists]
+  coldoscdim_list = [p["cold_oscillator_space_dimension"]
+                    for p ∈ parameter_lists]
+  if (allequal(n_spin_sites_list) &&
+      allequal(kappa_list) &&
+      allequal(hotoscdim_list) &&
+      allequal(coldoscdim_list))
     preload = true
+    hotoscdim = first(hotoscdim_list)
+    coldoscdim = first(coldoscdim_list)
     n_spin_sites = first(n_spin_sites_list)
-    osc_dim = first(osc_dim_list)
     κ = first(kappa_list)
 
     spin_range = 1 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 1; dim=osc_dim);
+    sites = [siteinds("HvOsc", 1; dim=hotoscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
+             siteinds("HvOsc", 1; dim=coldoscdim)]
 
 
     # - i numeri di occupazione
@@ -123,7 +142,8 @@ let
       throw(ErrorException("Oscillator damping coefficient not provided."))
     end
     T = parameters["temperature"]
-    osc_dim = parameters["oscillator_space_dimension"]
+    hotoscdim = parameters["hot_oscillator_space_dimension"]
+    coldoscdim = parameters["cold_oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -136,9 +156,9 @@ let
       n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
       spin_range = 1 .+ (1:n_spin_sites)
 
-      sites = [siteinds("HvOsc", 1; dim=osc_dim);
+      sites = [siteinds("HvOsc", 1; dim=hotoscdim);
                siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 1; dim=osc_dim)]
+               siteinds("HvOsc", 1; dim=coldoscdim)]
     end
 
     # Definizione degli operatori nell'equazione di Lindblad

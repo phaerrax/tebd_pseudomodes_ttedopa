@@ -102,7 +102,14 @@ let
     #
     η = 0
     T = 0
-    oscdim = parameters["oscillator_space_dimension"]
+    if (haskey(parameters, "hot_oscillator_space_dimension") &&
+        haskey(parameters, "cold_oscillator_space_dimension"))
+      hotoscdim = parameters["hot_oscillator_space_dimension"]
+      coldoscdim = parameters["cold_oscillator_space_dimension"]
+    else
+      hotoscdim = parameters["oscillator_space_dimension"]
+      coldoscdim = parameters["oscillator_space_dimension"]
+    end
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -114,9 +121,9 @@ let
     n_spin_sites = parameters["number_of_spin_sites"]
     range_spins = 2 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 2; dim=oscdim);
+    sites = [siteinds("HvOsc", 2; dim=hotoscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=oscdim)]
+             siteinds("HvOsc", 1; dim=coldoscdim)]
 
     # Definizione degli operatori nell'equazione di Lindblad
     # ======================================================
@@ -190,14 +197,14 @@ let
       # Lo stato iniziale della catena è dato da "chain_initial_state".
       # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
       # 1) Calcolo la matrice densità dello stato termico
-      HoscL = (ω̃₁ * num(oscdim) ⊗ id(oscdim) +
-               ω̃₂ * id(oscdim) ⊗ num(oscdim) +
-               κ̃₂ * (a⁺(oscdim) ⊗ a⁻(oscdim) +
-                     a⁻(oscdim) ⊗ a⁺(oscdim)))
+      HoscL = (ω̃₁ * num(hotoscdim) ⊗ id(hotoscdim) +
+               ω̃₂ * id(hotoscdim) ⊗ num(hotoscdim) +
+               κ̃₂ * (a⁺(hotoscdim) ⊗ a⁻(hotoscdim) +
+                     a⁻(hotoscdim) ⊗ a⁺(hotoscdim)))
       M = exp(-1/T * HoscL)
       M /= tr(M)
       # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(oscdim), gellmannbasis(oscdim))...]])
+      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(hotoscdim), gellmannbasis(hotoscdim))...]])
       # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
       iv = itensor(v, sites[1], sites[2])
       # 4) lo decompongo in due pezzi con una SVD

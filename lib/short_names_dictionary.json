@@ -16,6 +16,8 @@
   "oscillator_space_dimensions_decay": "dim_decay",
   "left_oscillator_space_dimension": "dₒₗ",
   "right_oscillator_space_dimension": "dₒᵣ",
+  "hot_oscillator_space_dimension": "dₒᴴ",
+  "cold_oscillator_space_dimension": "dₒᶜ",
   "oscillator_spin_interaction_coefficient": "κ",
   "oscillators_interaction_coefficient": "η",
   "oscillator_damping_coefficient": "γ",

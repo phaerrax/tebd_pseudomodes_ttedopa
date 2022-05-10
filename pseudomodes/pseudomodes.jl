@@ -73,23 +73,42 @@ let
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   n_spin_sites_list = [p["number_of_spin_sites"]
                        for p ∈ parameter_lists]
-  oscdim_list = [p["oscillator_space_dimension"]
-                  for p ∈ parameter_lists]
   kappa_list = [p["oscillator_spin_interaction_coefficient"]
                 for p ∈ parameter_lists]
+  # I file dei parametri potrebbero avere `cold_...` e `hot_...` oppure soltanto
+  # `oscillator_space_dimension`. Devo differenziare i due casi.
+  # Se cerco di costruire la lista dei `cold_...` ma nei file non c'è questa
+  # chiave, Julia lancia un KeyError.
+  # Eseguo quindi in questo punto del codice quello che faccio poi con γ:
+  # controllo se esistono i due oscdim differenti, altrimenti prendo quello
+  # in comune e lo copio nei due valori. Se non c'è neanche quello, va bene che
+  # Julia lanci un errore: significa che i file di parametri sono malformati.
+  for p ∈ parameter_lists
+    if (!haskey(p, "hot_oscillator_space_dimension") &&
+        !haskey(p, "cold_oscillator_space_dimension"))
+      push!(p, "hot_oscillator_space_dimension" => p["oscillator_space_dimension"])
+      push!(p, "cold_oscillator_space_dimension" => p["oscillator_space_dimension"])
+    end
+  end
+  hotoscdim_list = [p["hot_oscillator_space_dimension"]
+                    for p ∈ parameter_lists]
+  coldoscdim_list = [p["cold_oscillator_space_dimension"]
+                    for p ∈ parameter_lists]
   if (allequal(n_spin_sites_list) &&
-      allequal(oscdim_list) &&
+      allequal(hotoscdim_list) &&
+      allequal(coldoscdim_list) &&
       allequal(kappa_list))
     preload = true
     n_spin_sites = first(n_spin_sites_list)
-    oscdim = first(oscdim_list)
+    hotoscdim = first(hotoscdim_list)
+    coldoscdim = first(coldoscdim_list)
     κ = first(kappa_list)
 
     spin_range = 1 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 1; dim=oscdim);
+    sites = [siteinds("HvOsc", 1; dim=hotoscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=oscdim)]
+             siteinds("HvOsc", 1; dim=coldoscdim)]
 
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
@@ -120,11 +139,11 @@ let
     osc_levels_projs_left = [embed_slice(sites,
                                          1:1,
                                          osc_levels_proj(sites[1], n))
-                             for n=0:oscdim-1]
+                             for n=0:hotoscdim-1]
     osc_levels_projs_right = [embed_slice(sites,
                                           n_spin_sites+2:n_spin_sites+2,
                                           osc_levels_proj(sites[end], n))
-                              for n=0:oscdim-1]
+                              for n=0:coldoscdim-1]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
     traceMPS = MPS(sites, "vecId")
@@ -157,7 +176,8 @@ let
     end
     ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
-    oscdim = parameters["oscillator_space_dimension"]
+    hotoscdim = parameters["hot_oscillator_space_dimension"]
+    coldoscdim = parameters["cold_oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -170,9 +190,9 @@ let
       n_spin_sites = parameters["number_of_spin_sites"] # deve essere un numero pari
       spin_range = 1 .+ (1:n_spin_sites)
 
-      sites = [siteinds("HvOsc", 1; dim=oscdim);
+      sites = [siteinds("HvOsc", 1; dim=hotoscdim);
                siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 1; dim=oscdim)]
+               siteinds("HvOsc", 1; dim=coldoscdim)]
     end
 
     #= Definizione degli operatori nell'equazione di Lindblad
@@ -229,11 +249,11 @@ let
       osc_levels_projs_left = [embed_slice(sites,
                                            1:1,
                                            osc_levels_proj(sites[1], n))
-                               for n=0:oscdim-1]
+                               for n=0:hotoscdim-1]
       osc_levels_projs_right = [embed_slice(sites,
                                             n_spin_sites+2:n_spin_sites+2,
                                             osc_levels_proj(sites[end], n))
-                                for n=0:oscdim-1]
+                                for n=0:coldoscdim-1]
 
       # - la normalizzazione (cioè la traccia) della matrice densità
       traceMPS = MPS(sites, "vecId")
@@ -366,15 +386,17 @@ let
     for (n, sym) ∈ enumerate(current_symbols)
         push!(dict, sym => current_allsites_list[:, n])
     end
-    for n ∈ 0:oscdim-1
+    for n ∈ 0:hotoscdim-1
       sym = Symbol("levels_left$n")
-      push!(dict, sym => osclevelsLlist[:, n])
+      push!(dict, sym => osclevelsLlist[:, n+1])
+    end
+    for n ∈ 0:coldoscdim-1
       sym = Symbol("levels_right$n")
-      push!(dict, sym => osclevelsRlist[:, n])
+      push!(dict, sym => osclevelsRlist[:, n+1])
     end
     for n ∈ 0:n_spin_sites
       sym = Symbol("levels_chain$n") 
-      push!(dict, sym => chainlevelslist[:, n])
+      push!(dict, sym => chainlevelslist[:, n+1])
     end
     for n ∈ 1:size(ranks, 2)
       sym = Symbol("bond_dim_$n/$(n+1)")

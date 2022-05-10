@@ -10,6 +10,20 @@ function categorise_parameters(parameter_lists)
   # caso e l'altro, suddividendoli tra "distinti" se almeno uno dei parametri
   # è diverso tra le simulazioni, e "ripetuti" se sono invece tutti uguali.
   distinct = String[]
+
+  # Devo controllare ciascuna lista di parametri per controllare se specifica
+  # le dimensioni degli oscillatori separatamente per quelli caldi e freddi
+  # o se dà solo una dimensione per entrambi.
+  # Nel secondo caso, modifico il dizionario per riportarlo al primo caso.
+  for dict in parameter_lists
+    if (haskey(dict, "oscillator_space_dimension") &&
+        !haskey(dict, "hot_oscillator_space_dimension") &&
+        !haskey(dict, "cold_oscillator_space_dimension"))
+      hotoscdim = pop!(dict, "oscillator_space_dimension")
+      coldoscdim = hotoscdim
+    end
+  end
+
   for key in keys(parameter_lists[begin])
     test_list = [p[key] for p in parameter_lists]
     if !allequal(test_list)

@@ -65,18 +65,39 @@ let
   # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
   n_spin_sites_list = [p["number_of_spin_sites"]
                        for p ∈ parameter_lists]
-  osc_dim_list = [p["oscillator_space_dimension"]
-                  for p ∈ parameter_lists]
-  if allequal(n_spin_sites_list) && allequal(osc_dim_list)
+  # I file dei parametri potrebbero avere `cold_...` e `hot_...` oppure soltanto
+  # `oscillator_space_dimension`. Devo differenziare i due casi.
+  # Se cerco di costruire la lista dei `cold_...` ma nei file non c'è questa
+  # chiave, Julia lancia un KeyError.
+  # Eseguo quindi in questo punto del codice quello che faccio poi con γ:
+  # controllo se esistono i due oscdim differenti, altrimenti prendo quello
+  # in comune e lo copio nei due valori. Se non c'è neanche quello, va bene che
+  # Julia lanci un errore: significa che i file di parametri sono malformati.
+  for p ∈ parameter_lists
+    if (!haskey(p, "hot_oscillator_space_dimension") &&
+        !haskey(p, "cold_oscillator_space_dimension"))
+      push!(p, "hot_oscillator_space_dimension" => p["oscillator_space_dimension"])
+      push!(p, "cold_oscillator_space_dimension" => p["oscillator_space_dimension"])
+    end
+  end
+  hotoscdim_list = [p["hot_oscillator_space_dimension"]
+                    for p ∈ parameter_lists]
+  coldoscdim_list = [p["cold_oscillator_space_dimension"]
+                    for p ∈ parameter_lists]
+
+  if (allequal(n_spin_sites_list) &&
+      allequal(hotoscdim_list) &&
+      allequal(coldscdim_list))
     preload = true
     n_spin_sites = first(n_spin_sites_list)
-    osc_dim = first(osc_dim_list)
+    hotoscdim = first(hotoscdim_list)
+    coldscdim = first(coldscdim_list)
 
     spin_range = 2 .+ (1:n_spin_sites)
 
-    sites = [siteinds("HvOsc", 2; dim=osc_dim);
+    sites = [siteinds("HvOsc", 2; dim=hotoscdim);
              siteinds("HvS=1/2", n_spin_sites);
-             siteinds("HvOsc", 1; dim=osc_dim)]
+             siteinds("HvOsc", 1; dim=coldoscdim)]
 
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
@@ -118,7 +139,8 @@ let
     #
     η = parameters["oscillators_interaction_coefficient"]
     T = parameters["temperature"]
-    oscdim = parameters["oscillator_space_dimension"]
+    hotoscdim = parameters["hot_oscillator_space_dimension"]
+    coldoscdim = parameters["cold_oscillator_space_dimension"]
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -131,9 +153,9 @@ let
       n_spin_sites = parameters["number_of_spin_sites"]
       spin_range = 2 .+ (1:n_spin_sites)
 
-      sites = [siteinds("HvOsc", 2; dim=osc_dim);
+      sites = [siteinds("HvOsc", 2; dim=hotoscdim);
                siteinds("HvS=1/2", n_spin_sites);
-               siteinds("HvOsc", 1; dim=osc_dim)]
+               siteinds("HvOsc", 1; dim=coldoscdim)]
     end
 
     # Definizione degli operatori nell'equazione di Lindblad
@@ -212,14 +234,14 @@ let
       # Lo stato iniziale della catena è dato da "chain_initial_state".
       # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
       # 1) Calcolo la matrice densità dello stato termico
-      HoscL = (ω̃₁ * num(osc_dim) ⊗ id(osc_dim) +
-               ω̃₂ * id(osc_dim) ⊗ num(osc_dim) +
-               κ̃₂ * (a⁺(osc_dim) ⊗ a⁻(osc_dim) +
-                     a⁻(osc_dim) ⊗ a⁺(osc_dim)))
+      HoscL = (ω̃₁ * num(hotoscdim) ⊗ id(hotoscdim) +
+               ω̃₂ * id(hotoscdim) ⊗ num(hotoscdim) +
+               κ̃₂ * (a⁺(hotoscdim) ⊗ a⁻(hotoscdim) +
+                     a⁻(hotoscdim) ⊗ a⁺(hotoscdim)))
       M = exp(-1/T * HoscL)
       M /= tr(M)
       # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(osc_dim), gellmannbasis(osc_dim))...]])
+      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(hotoscdim), gellmannbasis(hotoscdim))...]])
       # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
       iv = itensor(v, sites[1], sites[2])
       # 4) lo decompongo in due pezzi con una SVD
