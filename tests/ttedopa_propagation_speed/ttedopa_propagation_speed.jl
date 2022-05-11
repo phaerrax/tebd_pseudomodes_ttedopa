@@ -55,29 +55,26 @@ let
     nosc = parameters["number_of_oscillators_left"]
 
     # - parametri fisici
-    Ω = parameters["spectral_density_peak"]
+    Ω₀ = parameters["spectral_density_peak"]
     T = parameters["temperature"]
     γ = parameters["spectral_density_half_width"]
     κ = parameters["spectral_density_overall_factor"]
 
     # Calcolo dei coefficienti dalla densità spettrale
     Θ(x) = x ≥ 0 ? 1 : 0
-    thermf(T,ω) = T == 0 ? Θ(ω) : 0.5(coth(0.5ω/T) + 1)
-    J(T,ω) = thermf(T,ω) * κ^2 * 0.5γ/π * (1 / ((0.5γ)^2 + (ω-Ω)^2) - 1 / ((0.5γ)^2 + (ω+Ω)^2))
+    thermf(T,ω) = T == 0 ? Θ(ω) : 0.5*(coth(0.5ω/T) + 1)
+    J(T,ω) = thermf(T,ω) * κ^2 * 0.5γ/π * (hypot(0.5γ, ω-Ω₀)^(-2) - hypot(0.5γ, ω+Ω₀)^(-2))
     if T != 0
-      (Ω, κ, η) = chainmapcoefficients(ω -> J(T,ω),
-                                       (-ωc, 0, ωc),
-                                       nosc-1;
-                                       Nquad=nquad,
-                                       discretization=lanczos)
+      support = (-ωc, 0, ωc)
     else
-      (Ω, κ, η) = chainmapcoefficients(ω -> J(T,ω),
-                                       (0, ωc),
-                                       nosc-1;
-                                       Nquad=nquad,
-                                       discretization=lanczos)
+      support = (0, ωc)
     end
-    
+    (Ω, κ, η) = chainmapcoefficients(ω -> J(T,ω),
+                                     support,
+                                     nosc-1;
+                                     Nquad=nquad,
+                                     discretization=lanczos)
+
     push!(chainranges, 1:nosc)
     push!(frequencies, Ω)
     push!(couplingcoeffs, κ)
@@ -120,6 +117,12 @@ let
     push!(dict, :occn_asym2 => nasym2)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
+    CSV.write(filename, table)
+
+    dict = Dict(:freq => Ω)
+    push!(dict, :coupling => [η; κ])
+    table = DataFrame(dict)
+    filename = replace(parameters["filename"], ".json" => "_coeffs.dat")
     CSV.write(filename, table)
   end
 
