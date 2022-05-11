@@ -6,6 +6,7 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
+using QuadGK
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -71,7 +72,8 @@ let
     Ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
 
-    n(T,ω) = T == 0 ? 0.0 : (ℯ^(ω/T)-1)^(-1)
+    n(T,ω) = T == 0 ? 0.0 : 1/expm1(ω/T)
+    J(ω) = κ^2 * 0.5γₗ/π * (hypot(0.5γₗ, ω-Ω)^(-2) - hypot(0.5γₗ, ω+Ω)^(-2))
 
     # ITensors internal parameters
     max_err = parameters["MP_compression_error"]
@@ -143,7 +145,10 @@ let
                                     fout=[correlation_single])
     dict = Dict(:time => tout)
 
-    function cᴿ(κ, Ω, γ, T, t)
+    function c(t) # Funzione di correlazione esatta
+      quadgk(ω -> J(ω) * (ℯ^(-im*ω*t) * (1+n(T,ω)) + ℯ^(im*ω*t) * n(T,ω)), 0, Inf)[1]
+    end
+    function cᴿ(κ, Ω, γ, T, t) # Funzione di correlazione attesa per gli p.modi
       if T != 0
         κ^2 * (coth(0.5*Ω/T)*cos(Ω*t) - im*sin(Ω*t)) * ℯ^(-0.5γ*t)
       else
@@ -151,9 +156,14 @@ let
       end
     end
 
-    expXcorrelation = [cᴿ(κ,Ω,γₗ,T, t) for t ∈ tout]
-    push!(dict, :correlation_exp_re  => real.(expXcorrelation))
-    push!(dict, :correlation_exp_im  => imag.(expXcorrelation))
+    pmodeexpXcorrelation = [cᴿ(κ,Ω,γₗ,T, t) for t ∈ tout]
+    trueXcorrelation = c.(tout)
+
+    push!(dict, :correlation_true_re  => real.(trueXcorrelation))
+    push!(dict, :correlation_true_im  => imag.(trueXcorrelation))
+
+    push!(dict, :correlation_pmodeexp_re  => real.(pmodeexpXcorrelation))
+    push!(dict, :correlation_pmodeexp_im  => imag.(pmodeexpXcorrelation))
 
     push!(dict, :correlation_single_re => real.(singleXcorrelation))
     push!(dict, :correlation_single_im => imag.(singleXcorrelation))
@@ -277,8 +287,7 @@ let
     X₀ρ₀ = chain(MPS([f1, f2]),
                parse_init_state(sites[range_spins],
                                 parameters["chain_initial_state"]),
-               #MPS([state(sites[end-1], "0")]),
-               MPS([state(sites[end],   "0")]))
+               MPS([state(sites[end], "0")]))
 
     # Osservabili
     # -----------
@@ -314,7 +323,8 @@ let
     push!(timesteps_super, tout)
     push!(Xcorrelation_super, hcat(singleXcorrelation,
                                    splitXcorrelation,
-                                   expXcorrelation))
+                                   pmodeexpXcorrelation,
+                                   trueXcorrelation))
   end
 
   @info "Creazione dei grafici."
@@ -331,15 +341,11 @@ let
 
   # Grafico della funzione di correlazione
   # --------------------------------------
-  data = [[real.(Xcorrelation[:,1]);;
-           real.(Xcorrelation[:,2]);;
-           real.(Xcorrelation[:,3])]
-          for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
-                  data,
+                  real.(Xcorrelation_super),
                   parameter_lists;
-                  labels=["single p.mode" "split p.mode" "expected"],
-                  linestyles=[:solid :solid :dash],
+                  labels=["single p.mode" "split p.mode" "p.mode expected" "true"],
+                  linestyles=[:solid :solid :dash :dot],
                   commonxlabel=L"t",
                   commonylabel=L"\mathrm{Re}\,(\langle X(t)X(0)\rangle)",
                   plottitle="Funzione di correlazione (parte reale)",
@@ -347,15 +353,11 @@ let
 
   savefig(plt, "Xcorrelation_re.png")
 
-  data = [[imag.(Xcorrelation[:,1]);;
-           imag.(Xcorrelation[:,2]);;
-           imag.(Xcorrelation[:,3])]
-          for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
-                  data,
+                  imag.(Xcorrelation_super),
                   parameter_lists;
-                  labels=["single p.mode" "split p.mode" "expected"],
-                  linestyles=[:solid :solid :dash],
+                  labels=["single p.mode" "split p.mode" "p.mode expected" "true"],
+                  linestyles=[:solid :solid :dash :dot],
                   commonxlabel=L"t",
                   commonylabel=L"\mathrm{Im}\,(\langle X(t)X(0)\rangle)",
                   plottitle="Funzione di correlazione (parte immaginaria)",
@@ -373,7 +375,7 @@ let
                   linestyles=[:solid :dash],
                   commonxlabel=L"t",
                   commonylabel=L"\langle X(t)X(0)\rangle_\mathrm{single}-\langle X(t)X(0)\rangle_\mathrm{split}",
-                  plottitle="Diff. funzioni di correlazione",
+                  plottitle="Diff. funzioni di correlazione calcolate",
                   plotsize=plotsize)
 
   savefig(plt, "Xcorrelation_diff.png")

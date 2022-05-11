@@ -6,7 +6,7 @@ using ProgressMeter
 using Base.Filesystem
 using DataFrames
 using CSV
-using FFTW
+using QuadGK
 
 # Se lo script viene eseguito su Qtech, devo disabilitare l'output
 # grafico altrimenti il programma si schianta.
@@ -19,20 +19,20 @@ else
   # Se la chiave "GKSwstype" non esiste non succede niente.
 end
 
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/harmonic_oscillator_space.jl")
-include(lib_path * "/operators.jl")
+rootdirname = "simulazioni_tesi"
+sourcepath = Base.source_path()
+# Cartella base: determina il percorso assoluto del file in esecuzione, e
+# rimuovi tutto ciò che segue rootdirname.
+ind = findfirst(rootdirname, sourcepath)
+rootpath = sourcepath[begin:ind[end]]
+# `rootpath` è la cartella principale del progetto.
+libpath = joinpath(rootpath, "lib")
 
-# Questo programma calcola l'evoluzione della catena di spin
-# smorzata agli estremi, usando le tecniche dei MPS ed MPO.
-# In questo caso la catena è descritta dalla vettorizzazione della
-# matrice densità, la quale evolve nel tempo secondo l'equazione
-# di Lindblad.
+include(joinpath(libpath, "utils.jl"))
+include(joinpath(libpath, "plotting.jl"))
+include(joinpath(libpath, "spin_chain_space.jl"))
+include(joinpath(libpath, "harmonic_oscillator_space.jl"))
+include(joinpath(libpath, "operators.jl"))
 
 let  
   parameter_lists = load_parameters(ARGS)
@@ -51,7 +51,6 @@ let
   # lista di parametri fornita.
   timesteps_super = []
   Xcorrelation_super = []
-  #FT_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -75,9 +74,10 @@ let
     else
       throw(ErrorException("Oscillator damping coefficient not provided."))
     end
-    ω = parameters["oscillator_frequency"]
+    Ω = parameters["oscillator_frequency"]
     T = parameters["temperature"]
     osc_dim = parameters["oscillator_space_dimension"]
+    J(ω) = κ^2 * 0.5γₗ/π * (hypot(0.5γₗ, ω-Ω)^(-2) - hypot(0.5γₗ, ω+Ω)^(-2))
 
     # - intervallo temporale delle simulazioni
     time_step = parameters["simulation_time_step"]
@@ -93,26 +93,19 @@ let
              siteinds("HvS=1/2", n_spin_sites);
              siteinds("HvOsc", 1; dim=osc_dim)]
 
-    #= Definizione degli operatori nell'equazione di Lindblad
-    ======================================================
-    I siti del sistema sono numerati come segue:
-    | 1 | 2 | ... | n_spin_sites | n_spin_sites+1 | n_spin_sites+2 |
-      ↑   │                                │          ↑
-      │   └───────────┬────────────────────┘          │
-      │               │                               │
-      │        catena di spin                         │
-      oscillatore sx                               oscillatore dx
-    =#
-    localcfs = [ω; repeat([ε], n_spin_sites); ω]
-    interactioncfs = [0.0; repeat([1], n_spin_sites-1); 0.0]
+    # Definizione degli operatori nell'equazione di Lindblad
+    # ===================================================
+    localcfs = zeros(Float64, n_spin_sites+2)
+    localcfs[1] = Ω
+    interactioncfs = zeros(Float64, n_spin_sites+1)
     # Devo porre κ=0 in modo che l'evoluzione sia quella dello
     # pseudomodo isolato.
     ℓlist = twositeoperators(sites, localcfs, interactioncfs)
     # Aggiungo agli estremi della catena gli operatori di dissipazione
-    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=ω, T=T) *
+    ℓlist[begin] += γₗ * (op("Damping", sites[begin]; ω=Ω, T=T) *
                           op("Id", sites[begin+1]))
     ℓlist[end] += γᵣ * (op("Id", sites[end-1]) *
-                        op("Damping", sites[end]; ω=ω, T=0))
+                        op("Damping", sites[end]; ω=Ω, T=0))
     #
     function links_odd(τ)
       return [exp(τ * ℓ) for ℓ in ℓlist[1:2:end]]
@@ -137,7 +130,7 @@ let
     # Lo stato iniziale qui è X₀ρ₀ (vedi eq. sopra).
     # In ρ₀, l'oscillatore sx è in equilibrio termico, quello dx è vuoto.
     # Lo stato iniziale della catena è dato da "chain_initial_state".
-    X₀ρ₀ = chain(MPS([state(sites[1], "X⋅Therm"; ω=ω, T=T)]),
+    X₀ρ₀ = chain(MPS([state(sites[1], "X⋅Therm"; ω=Ω, T=T)]),
                  parse_init_state(sites[spin_range],
                                   parameters["chain_initial_state"]),
                  MPS([state(sites[end], "0")]))
@@ -160,43 +153,49 @@ let
                                     parameters["MP_compression_error"],
                                     parameters["MP_maximum_bond_dimension"];
                                     fout=[correlation])
-    #FT = rfft(correlationlist) 
-    ν(ω,T) = T == 0 ? 0.0 : (ℯ^(ω/T)-1)^(-1)
-    function cᴿ(κ, Ω, γ, T, t)
+
+    n(T,ω) = T == 0 ? 0.0 : 1/expm1(ω/T)
+    function c(t) # Funzione di correlazione esatta
+      quadgk(ω -> J(ω) * (ℯ^(-im*ω*t) * (1+n(T,ω)) + ℯ^(im*ω*t) * n(T,ω)), 0, Inf)[1]
+    end
+    function cᴿ(κ, Ω, γ, T, t) # Funzione di correlazione attesa per gli p.modi
       if T != 0
         κ^2 * (coth(0.5*Ω/T)*cos(Ω*t) - im*sin(Ω*t)) * ℯ^(-0.5γ*t)
       else
         κ^2 * ℯ^(-im*Ω*t - 0.5γ*t)
       end
     end
-    expXcorrelation = [cᴿ(κ,ω,γₗ,T, t) for t ∈ tout]
-    Xcorrelation = hcat(calcXcorrelation, expXcorrelation)
+    pmodeexpXcorrelation = [cᴿ(κ,Ω,γₗ,T, t) for t ∈ tout]
+    trueXcorrelation = c.(tout)
 
-    # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
+
+    push!(dict, :correlation_true_re  => real.(trueXcorrelation))
+    push!(dict, :correlation_true_im  => imag.(trueXcorrelation))
+
+    push!(dict, :correlation_pmodeexp_re  => real.(pmodeexpXcorrelation))
+    push!(dict, :correlation_pmodeexp_im  => imag.(pmodeexpXcorrelation))
+
     push!(dict, :correlation_calc_re => real.(calcXcorrelation))
     push!(dict, :correlation_calc_im => imag.(calcXcorrelation))
-    push!(dict, :correlation_exp_re  => real.(expXcorrelation))
-    push!(dict, :correlation_exp_im  => imag.(expXcorrelation))
-    #push!(dict, :spectraldensity => FT)
+
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
-    # Scrive la tabella su un file che ha la stessa estensione del file dei
-    # parametri, con estensione modificata.
     CSV.write(filename, table)
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
-    push!(Xcorrelation_super, Xcorrelation)
-    #push!(FT_super, correlationlist)
+    push!(Xcorrelation_super, hcat(calcXcorrelation,
+                                   pmodeexpXcorrelation,
+                                   trueXcorrelation))
   end
 
   #= Grafici
-  =======
-  Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-  ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-  la grandezza del font o con il colore quelli che cambiano da una
-  simulazione all'altra.
+     =======
+     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
+     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
+     la grandezza del font o con il colore quelli che cambiano da una
+     simulazione all'altra.
   =#
   plotsize = (600, 400)
 
@@ -204,13 +203,11 @@ let
 
   # Grafico della funzione di correlazione
   # --------------------------------------
-  data = [[real.(Xcorrelation[:,1])  real.(Xcorrelation[:,2])]
-          for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
-                  data,
+                  real.(Xcorrelation_super),
                   parameter_lists;
-                  labels=["calculated" "expected"],
-                  linestyles=[:solid :dash],
+                  labels=["calculated" "p.mode expected" "true"],
+                  linestyles=[:solid :dash :dot],
                   commonxlabel=L"t",
                   commonylabel=L"\mathrm{Re}\,(\langle X(t)X(0)\rangle)",
                   plottitle="Funzione di correlazione (parte reale)",
@@ -218,32 +215,17 @@ let
 
   savefig(plt, "Xcorrelation_re.png")
 
-  data = [[imag.(Xcorrelation[:,1])  imag.(Xcorrelation[:,2])]
-          for Xcorrelation ∈ Xcorrelation_super]
   plt = groupplot(timesteps_super,
-                  data,
+                  imag.(Xcorrelation_super),
                   parameter_lists;
-                  labels=["calculated" "expected"],
-                  linestyles=[:solid :dash],
+                  labels=["calculated" "p.mode expected" "true"],
+                  linestyles=[:solid :dash :dot],
                   commonxlabel=L"t",
                   commonylabel=L"\mathrm{Im}\,(\langle X(t)X(0)\rangle)",
                   plottitle="Funzione di correlazione (parte immaginaria)",
                   plotsize=plotsize)
 
   savefig(plt, "Xcorrelation_im.png")
-
-  ## Grafico della (supposta) densità spettrale
-  ## ------------------------------------------
-  #plt = unifiedplot(timesteps_super,
-  #                  FT_super,
-  #                  parameter_lists;
-  #                  linestyle=:solid,
-  #                  xlabel=L"\omega",
-  #                  ylabel=L"J(\omega)",
-  #                  plottitle="Densità spettrale?",
-  #                  plotsize=plotsize)
-
-  #savefig(plt, "Xcorrelation.png")
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
