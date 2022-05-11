@@ -114,7 +114,6 @@ let
     γ = parameters["spectral_density_half_width"]
     κ = parameters["spectral_density_overall_factor"]
     T = parameters["temperature"]
-    ωc = parameters["frequency_cutoff"]
     # La densità spettrale:
     J(ω) = κ^2/π * (0.5γ / ((0.5γ)^2 + (ω-Ω)^2) - 
                     0.5γ / ((0.5γ)^2 + (ω+Ω)^2))
@@ -123,7 +122,7 @@ let
     n(T,ω) = T == 0 ? 0 : (ℯ^(ω/T) - 1)^(-1)
     correlationf(t) = quadgk(ω -> J(ω) * (ℯ^(-im*ω*t)*(1+n(T,ω)) +
                                           ℯ^(im*ω*t)*n(T,ω) ),
-                             0, ωc)[begin]
+                             0, Inf)[begin]
 
     # Calcolo i parametri degli pseudomodi:
     w, λ = prony(correlationf, 0, 2, 0.1, 2)
