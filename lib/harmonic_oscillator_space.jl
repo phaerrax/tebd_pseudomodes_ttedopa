@@ -69,8 +69,8 @@ end
 
 ITensors.op(::OpName"a+", ::SiteType"Osc"; dim=2) = a⁺(dim)
 ITensors.op(::OpName"a-", ::SiteType"Osc"; dim=2) = a⁻(dim)
-ITensors.op(::OpName"+", st::SiteType"Osc"; kwargs...) = op(OpName("a+"), st; kwargs...)
-ITensors.op(::OpName"-", st::SiteType"Osc"; kwargs...) = op(OpName("a-"), st; kwargs...)
+ITensors.op(::OpName"plus", st::SiteType"Osc"; kwargs...) = ITensors.op(OpName("a+"), st; kwargs...)
+ITensors.op(::OpName"minus", st::SiteType"Osc"; kwargs...) = ITensors.op(OpName("a-"), st; kwargs...)
 
 ITensors.op(::OpName"Id", ::SiteType"Osc"; dim=2) = id(dim)
 ITensors.op(::OpName"N", ::SiteType"Osc"; dim=2) = num(dim)
@@ -175,10 +175,10 @@ function ITensors.state(::StateName"vecId", ::SiteType"vecOsc"; dim=2)
   return vec(id(dim), canonicalbasis(dim))
 end
 
-function ITensors.state(::StateName"vec+", st::SiteType"vecOsc"; kwargs...)
+function ITensors.state(::StateName"vecplus", st::SiteType"vecOsc"; kwargs...)
   return ITensors.state(StateName("veca+"), st; kwargs...)
 end
-function ITensors.state(::StateName"vec-", st::SiteType"vecOsc"; kwargs...)
+function ITensors.state(::StateName"vecminus", st::SiteType"vecOsc"; kwargs...)
   return ITensors.state(StateName("veca-"), st; kwargs...)
 end
 
@@ -282,10 +282,10 @@ function ITensors.state(::StateName"vecY", ::SiteType"HvOsc"; dim=2)
   return vec(im*(a⁻(dim) - a⁺(dim)), gellmannbasis(dim))
 end
 
-function ITensors.state(::StateName"vec+", st::SiteType"HvOsc"; kwargs...)
+function ITensors.state(::StateName"vecplus", st::SiteType"HvOsc"; kwargs...)
   return ITensors.state(StateName("veca+"), st; kwargs...)
 end
-function ITensors.state(::StateName"vec-", st::SiteType"HvOsc"; kwargs...)
+function ITensors.state(::StateName"vecminus", st::SiteType"HvOsc"; kwargs...)
   return ITensors.state(StateName("veca-"), st; kwargs...)
 end
 

@@ -202,14 +202,14 @@ function current(sites,
   n = rightsite - leftsite
   tags1 = repeat(["Id"], length(sites))
   tags2 = repeat(["Id"], length(sites))
-  tags1[leftsite] = "+"
-  tags2[leftsite] = "-"
+  tags1[leftsite] = "plus"
+  tags2[leftsite] = "minus"
   for l ∈ leftsite+1:rightsite-1
     tags1[l] = "Z"
     tags2[l] = "Z"
   end
-  tags1[rightsite] = "-"
-  tags2[rightsite] = "+"
+  tags1[rightsite] = "minus"
+  tags2[rightsite] = "plus"
 
   if (SiteType("S=1/2") ∈ sitetypes(first(sites)) ||
       SiteType("Osc") ∈ sitetypes(first(sites)))

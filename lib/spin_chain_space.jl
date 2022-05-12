@@ -30,8 +30,8 @@ ITensors.op(::OpName"0", ::SiteType"S=1/2") = zeros(2, 2)
 # Operatori di scala
 ITensors.op(::OpName"σ+", st::SiteType"S=1/2") = op(OpName("S+"), st)
 ITensors.op(::OpName"σ-", st::SiteType"S=1/2") = op(OpName("S-"), st)
-ITensors.op(::OpName"+", st::SiteType"S=1/2") = op(OpName("S+"), st)
-ITensors.op(::OpName"-", st::SiteType"S=1/2") = op(OpName("S-"), st)
+ITensors.op(::OpName"plus", st::SiteType"S=1/2") = op(OpName("S+"), st)
+ITensors.op(::OpName"minus", st::SiteType"S=1/2") = op(OpName("S-"), st)
 
 # Spazio degli spin vettorizzato
 # ==============================
@@ -73,10 +73,10 @@ function ITensors.state(::StateName"vecZ", st::SiteType"vecS=1/2")
   return ITensors.state(StateName("vecσz"), st)
 end
 
-function ITensors.state(::StateName"vec+", ::SiteType"vecS=1/2")
+function ITensors.state(::StateName"vecplus", ::SiteType"vecS=1/2")
   return vec(σ⁺, canonicalbasis(2))
 end
-function ITensors.state(::StateName"vec-", ::SiteType"vecS=1/2")
+function ITensors.state(::StateName"vecminus", ::SiteType"vecS=1/2")
   return vec(σ⁻, canonicalbasis(2))
 end
 
@@ -166,10 +166,10 @@ function ITensors.state(::StateName"vecZ", st::SiteType"HvS=1/2")
   return ITensors.state(StateName("vecσz"), st)
 end
 
-function ITensors.state(::StateName"vec+", ::SiteType"HvS=1/2")
+function ITensors.state(::StateName"vecplus", ::SiteType"HvS=1/2")
   return vec(σ⁺, gellmannbasis(2))
 end
-function ITensors.state(::StateName"vec-", ::SiteType"HvS=1/2")
+function ITensors.state(::StateName"vecminus", ::SiteType"HvS=1/2")
   return vec(σ⁻, gellmannbasis(2))
 end
 
