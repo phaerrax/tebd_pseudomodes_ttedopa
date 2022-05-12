@@ -353,8 +353,8 @@ let
   plt = groupplot(timesteps_super,
                   [occn[:, 3:end-2] for occn ∈ numeric_occn_super],
                   parameter_lists;
-                  labels=string.(1:N),
-                  linestyles=repeat([:solid], N),
+                  labels=reduce(hcat, string.(1:N)),
+                  linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (solo spin, sol. numerica)",

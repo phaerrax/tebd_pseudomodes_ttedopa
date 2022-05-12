@@ -50,7 +50,7 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   timesteps_super = []
-  occ_n_super = []
+  occn_super = []
   spin_current_super = []
   bond_dimensions_super = []
   spin_chain_levels_super = []
@@ -260,9 +260,9 @@ let
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([[Symbol("occ_n_left$n") for n∈n_osc_left:-1:1];
-                                [Symbol("occ_n_spin$n") for n∈1:n_spin_sites];
-                                [Symbol("occ_n_right$n") for n∈1:n_osc_right]])
+    for (j, name) in enumerate([[Symbol("occn_left$n") for n∈n_osc_left:-1:1];
+                                [Symbol("occn_spin$n") for n∈1:n_spin_sites];
+                                [Symbol("occn_right$n") for n∈1:n_osc_right]])
       push!(dict, name => occnlist[:,j])
     end
     for (j, name) in enumerate([Symbol("current_adjsites$n")
@@ -282,7 +282,7 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
-    push!(occ_n_super, occnlist)
+    push!(occn_super, occnlist)
     push!(spin_current_super, spincurrentlist)
     push!(bond_dimensions_super, ranks)
     push!(range_osc_left_super, range_osc_left)
@@ -307,79 +307,80 @@ let
   # --------------------------------------------------
   plt = groupplot(timesteps_super,
                   [mat[:, range]
-                   for (mat, range) ∈ zip(occ_n_super, range_osc_left_super)],
+                   for (mat, range) ∈ zip(occn_super, range_osc_left_super)],
                   parameter_lists;
-                  labels=[hcat(string.(reverse(range))...)
-                          for range in range_osc_left_super],
-                  linestyles=[hcat([:solid for i ∈ range]...)
-                          for range in range_osc_left_super],
-                  commonxlabel=L"\lambda\, t",
+                  labels=[reduce(hcat, string.("l", reverse(eachindex(range))))
+                          for range ∈ range_osc_left_super], # ["l1" ... "lN"]
+                  linestyles=[reduce(hcat, repeat([:solid], length(range)))
+                              for range ∈ range_osc_left_super],
+                  commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione "*
-                             "(oscillatori a sx)",
+                  plottitle="Numeri di occupazione (oscillatori a sx)",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_osc_left.png")
+  savefig(plt, "occn_osc_left.png")
 
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
   plt = groupplot(timesteps_super,
                   [mat[:, range]
-                   for (mat, range) ∈ zip(occ_n_super, range_spins_super)],
+                   for (mat, range) ∈ zip(occn_super, range_spins_super)],
                   parameter_lists;
-                  labels=[hcat(string.(range)...)
-                          for range in range_spins_super],
-                  linestyles=[hcat([:solid for i ∈ range]...)
-                              for range in range_spins_super],
-                  commonxlabel=L"\lambda\, t",
+                  labels=[reduce(hcat, string.("s", eachindex(range)))
+                          for range ∈ range_spins_super], # ["s1" ... "sN"]
+                  linestyles=[reduce(hcat, repeat([:solid], length(range)))
+                              for range ∈ range_spins_super],
+                  commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (spin)",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_spins.png")
+  savefig(plt, "occn_spins.png")
   
   # Grafico dei numeri di occupazione (oscillatori dx)
   # --------------------------------------------------
   plt = groupplot(timesteps_super,
                   [mat[:, range]
-                   for (mat, range) ∈ zip(occ_n_super, range_osc_right_super)],
+                   for (mat, range) ∈ zip(occn_super, range_osc_right_super)],
                   parameter_lists;
-                  labels=[hcat(string.(range)...)
-                          for range in range_osc_right_super],
-                  linestyles=[hcat([:solid for i ∈ range]...)
+                  labels=[reduce(hcat, string.("r", eachindex(range)))
+                          for range ∈ range_osc_right_super], # ["r1" ... "rN"]
+                  linestyles=[reduce(hcat, repeat([:solid], length(range)))
                               for range ∈ range_osc_right_super],
-                  commonxlabel=L"\lambda\, t",
+                  commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione "*
-                             "(oscillatori dx)",
+                  plottitle="Numeri di occupazione (oscillatori dx)",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_osc_right.png")
+  savefig(plt, "occn_osc_right.png")
 
   # Grafico dei numeri di occupazione (tot oscillatori + tot catena)
   # ----------------------------------------------------------------
-  sums = [[sum(mat[:, rangeL], dims=2) sum(mat[:, rangeS], dims=2) sum(mat[:, rangeR], dims=2) sum(mat, dims=2)]
-          for (mat, rangeL, rangeS, rangeR) in zip(occ_n_super,
-                                                   range_osc_left_super,
-                                                   range_spins_super,
-                                                   range_osc_right_super)]
+  sums = [[sum(mat[:, rangeL], dims=2);;
+           sum(mat[:, rangeS], dims=2);;
+           sum(mat[:, rangeR], dims=2);;
+           sum(mat, dims=2)]
+          for (mat, rangeL, rangeS, rangeR) ∈ zip(occn_super,
+                                                  range_osc_left_super,
+                                                  range_spins_super,
+                                                  range_osc_right_super)]
   plt = groupplot(timesteps_super,
                   sums,
                   parameter_lists;
                   labels=["osc. sx" "catena" "osc. dx" "tutti"],
-                  linestyles=hcat(repeat([:solid], 4)...),
-                  commonxlabel=L"\lambda\, t",
+                  linestyles=[:solid :solid :solid :dash],
+                  commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (sommati)",
                   plotsize=plotsize)
                   
-  savefig(plt, "occ_n_sums.png")
+  savefig(plt, "occn_sums.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
   ranklabels=[reduce(hcat, ["(l1,s1)";
                             ["(s$j,s$(j+1))" for j ∈ 1:size(v, 2)-3];
-                            "(s10,r1)";
+                            "(s$(size(v,2)-2),r1)";
                             "max"])
                           for v ∈ bond_dimensions_super]
   ranklinestyles = [reduce(hcat, [repeat([:solid], size(v, 2)-1);
@@ -391,7 +392,7 @@ let
                   parameter_lists;
                   labels=ranklabels,
                   linestyles=ranklinestyles,
-                  commonxlabel=L"\lambda\, t",
+                  commonxlabel=L"t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",
                   plotsize=plotsize)
@@ -409,7 +410,7 @@ let
                   linestyles=[reduce(hcat,
                                      repeat([:solid], size(c, 2)))
                               for c in spin_current_super],
-                  commonxlabel=L"\lambda\, t",
+                  commonxlabel=L"t",
                   commonylabel=L"j_{k,k+1}(t)",
                   plottitle="Corrente di spin",
                   plotsize=plotsize)
@@ -473,6 +474,7 @@ let
                     plotsize=plotsize)
 
   savefig(plt, "snapshot_spins.png")
+
   # Grafico della norma dello stato
   # -------------------------------
   # Questo serve per controllare che rimanga sempre pari a 1.
@@ -480,7 +482,7 @@ let
                     normalisation_super,
                     parameter_lists;
                     linestyle=:solid,
-                    xlabel=L"\lambda\, t",
+                    xlabel=L"t",
                     ylabel=L"\Vert\psi(t)\Vert",
                     plottitle="Norma dello stato",
                     plotsize=plotsize)
