@@ -202,7 +202,8 @@ let
     spin_current_ops = [-2ηₗ*current(sites,
                                      range_spins[1]-1,
                                      range_spins[1]);
-                        [current(sites, j, j+1) for j ∈ range_spins[1:end-1]];
+                        [current(sites, j, j+1)
+                         for j ∈ range_spins[1:end-1]];
                         -2ηᵣ*current(sites,
                                      range_spins[end],
                                      range_spins[end]+1)]
@@ -227,7 +228,7 @@ let
     # Osservabili da misurare
     # -----------------------
     occn(ψ) = real.(expect(ψ, "N")) ./ norm(ψ)^2
-    spincurrent(ψ) = real.([inner(ψ, j * ψ) for j in spin_current_ops]) ./ norm(ψ)^2
+    spincurrent(ψ) = real.([inner(ψ', j, ψ) for j ∈ spin_current_ops]) ./ norm(ψ)^2
     # Calcolo i ranghi tra tutti gli spin, più quelli tra gli spin e
     # i primi oscillatori, quelli appena attaccati alla catena.
     # Questo risolve anche il problema di come trattare questa funzione
