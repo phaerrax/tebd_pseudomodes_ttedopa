@@ -232,11 +232,11 @@ function forwardflux(sites,
   # Solo uno dei due termini di j_{k,k'}
   n = rightsite - leftsite
   tags1 = repeat(["Id"], length(sites))
-  tags1[leftsite] = "+"
+  tags1[leftsite] = "plus"
   for l ∈ leftsite+1:rightsite-1
     tags1[l] = "Z"
   end
-  tags1[rightsite] = "-"
+  tags1[rightsite] = "minus"
 
   if (SiteType("S=1/2") ∈ sitetypes(first(sites)) ||
       SiteType("Osc") ∈ sitetypes(first(sites)))
@@ -257,11 +257,11 @@ function backwardflux(sites,
   # L'altro termine
   n = rightsite - leftsite
   tags2 = repeat(["Id"], length(sites))
-  tags2[leftsite] = "-"
+  tags2[leftsite] = "minus"
   for l ∈ leftsite+1:rightsite-1
     tags2[l] = "Z"
   end
-  tags2[rightsite] = "+"
+  tags2[rightsite] = "plus"
 
   if (SiteType("S=1/2") ∈ sitetypes(first(sites)) ||
       SiteType("Osc") ∈ sitetypes(first(sites)))
