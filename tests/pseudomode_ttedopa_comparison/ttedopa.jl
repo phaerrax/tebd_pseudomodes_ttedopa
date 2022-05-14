@@ -58,6 +58,7 @@ let
   timesteps_super = []
   occn_TTEDOPA_super = []
   range_spins_super = []
+  range_osc_left_super = []
   normalisation_TTEDOPA_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
@@ -154,7 +155,7 @@ let
 
     # Osservabili da misurare
     # -----------------------
-    occn(ψ) = real.(expect(ψ, "N")[range_spins]) ./ norm(ψ)^2
+    occn(ψ) = real.(expect(ψ, "N")[1:range_spins[end]]) ./ norm(ψ)^2
 
     # Evoluzione temporale
     # --------------------
@@ -179,9 +180,11 @@ let
     outfilename = replace(parameters["filename"], ".json" => ".dat")
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time_TTEDOPA => tout)
-    for n ∈ eachindex(range_spins)
-      sym = Symbol("occn_spin_TTEDOPA_$n")
-      push!(dict, sym => occn_TTEDOPA[:, n])
+    sitelabels = [string.("L", reverse(range_osc_left));
+                  string.("S", eachindex(range_spins))]
+    for (j, label) ∈ enumerate(sitelabels)
+      push!(dict,
+            Symbol(string("occn_TTEDOPA_", label)) => occn_TTEDOPA[:, j])
     end
     push!(dict, :norm_TTEDOPA => normalisation_TTEDOPA)
     table = DataFrame(dict)
@@ -195,12 +198,12 @@ let
     push!(occn_TTEDOPA_super, occn_TTEDOPA)
     push!(normalisation_TTEDOPA_super, normalisation_TTEDOPA)
     push!(range_spins_super, range_spins)
+    push!(range_osc_left_super, range_osc_left)
   end
 
   # Grafici
   # =======
   plotsize = (600, 400)
-
 
   # Grafico della norma dello stato
   # -------------------------------
@@ -214,17 +217,32 @@ let
                     plotsize=plotsize)
   savefig(plt, "normalisation_TTEDOPA.png")
 
+  # Grafico dei numeri di occupazione (solo oscillatori sx)
+  # -------------------------------------------------------
+  plt = groupplot(timesteps_super,
+                  [occn[:, rn]
+                   for (rn, occn) ∈ zip(range_osc_left_super, occn_TTEDOPA_super)],
+                  parameter_lists;
+                  labels=[reduce(hcat, ["L$n" for n ∈ reverse(rn)])
+                          for rn ∈ range_osc_left_super],
+                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
+                              for rn ∈ range_osc_left_super],
+                  commonxlabel=L"t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione degli oscillatori sx, TTEDOPA",
+                  plotsize=plotsize)
+  savefig(plt, "occn_oscsx_TTEDOPA.png")
+
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
   plt = groupplot(timesteps_super,
-                  occn_TTEDOPA_super,
+                  [occn[:, rn]
+                   for (rn, occn) ∈ zip(range_spins_super, occn_TTEDOPA_super)],
                   parameter_lists;
-                  labels=[reduce(hcat,
-                                 ["S$n" for n ∈ eachindex(range_spins)])
-                          for range_spins ∈ range_spins_super],
-                  linestyles=[reduce(hcat,
-                                     repeat([:solid], length(range_spins)))
-                              for range_spins ∈ range_spins_super],
+                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
+                          for rn ∈ range_spins_super],
+                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
+                              for rn ∈ range_spins_super],
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione degli spin, TTEDOPA",

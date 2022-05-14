@@ -67,9 +67,9 @@ let
 
     time_PM = PMdata[:, :time]
     norm_PM = PMdata[:, :norm_PM]
-    range_spins = sort([parse(Int, split(str, "_")[end])
-                        for str ∈ names(PMdata, r"occn")])
-    occnlist = [PMdata[:, Symbol("occn_spin_PM_$n")]
+    range_spins = sort([parse(Int, split(str, "_S")[end])
+                        for str ∈ names(PMdata, r"occn_PM_S")])
+    occnlist = [PMdata[:, Symbol("occn_PM_S$n")]
                 for n ∈ eachindex(range_spins)]
     occn_PM = reduce(hcat, occnlist)
 
@@ -78,7 +78,7 @@ let
 
     time_TTEDOPA = TTEDOPAdata[:, :time_TTEDOPA]
     norm_TTEDOPA = TTEDOPAdata[:, :norm_TTEDOPA]
-    occnlist = [TTEDOPAdata[:, Symbol("occn_spin_TTEDOPA_$n")]
+    occnlist = [TTEDOPAdata[:, Symbol("occn_TTEDOPA_S$n")]
                 for n ∈ eachindex(range_spins)]
     occn_TTEDOPA = reduce(hcat, occnlist)
 
@@ -86,18 +86,11 @@ let
     outfilename = replace(parameters["filename"], ".json" => ".dat")
     @assert time_TTEDOPA == time_PM
     dict = Dict(:time => time_PM)
-    for n ∈ eachindex(range_spins)
-      sym = Symbol("occn_spin_TTEDOPA_$n")
-      push!(dict, sym => occn_TTEDOPA[:, n])
-    end
-    for n ∈ eachindex(range_spins)
-      sym = Symbol("occn_spin_PM_$n")
-      push!(dict, sym => occn_PM[:, n])
-    end
     abserr = occn_TTEDOPA .- occn_PM
     for n ∈ eachindex(range_spins)
-      sym = Symbol("occn_spin_abserr_$n")
-      push!(dict, sym => abserr[:, n])
+      push!(dict, Symbol("occn_TTEDOPA_S$n") => occn_TTEDOPA[:, n])
+      push!(dict, Symbol("occn_PM_S$n")      => occn_PM[:, n])
+      push!(dict, Symbol("occn_abserr_S$n")  => abserr[:, n])
     end
     push!(dict, :norm_TTEDOPA => norm_TTEDOPA)
     push!(dict, :norm_PM => norm_PM)
@@ -120,12 +113,10 @@ let
   plt = groupplot(timesteps_super,
                   occn_abserr_super,
                   parameter_lists;
-                  labels=[reduce(hcat,
-                                 ["S$n" for n ∈ eachindex(range_spins)])
-                          for range_spins ∈ range_spins_super],
-                  linestyles=[reduce(hcat,
-                                     repeat([:solid], length(range_spins)))
-                              for range_spins ∈ range_spins_super],
+                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
+                          for rn ∈ range_spins_super],
+                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
+                              for rn ∈ range_spins_super],
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle_\rm{TTEDOPA}-\langle n_i(t)\rangle_\rm{PM}",
                   plottitle="Differenza numeri di occupazione spin (TTEDOPA - p.modi)",
@@ -136,12 +127,10 @@ let
                   occn_relerr_super,
                   parameter_lists;
                   maxyrange=(-100, 100),
-                  labels=[reduce(hcat,
-                                 ["S$n" for n ∈ eachindex(range_spins)])
-                          for range_spins ∈ range_spins_super],
-                  linestyles=[reduce(hcat,
-                                     repeat([:solid], length(range_spins)))
-                              for range_spins ∈ range_spins_super],
+                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
+                          for rn ∈ range_spins_super],
+                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
+                              for rn ∈ range_spins_super],
                   commonxlabel=L"t",
                   commonylabel=L"1-\langle n_i(t)\rangle_\rm{TTEDOPA}/\langle n_i(t)\rangle_\rm{PM})",
                   plottitle="Err. relativo numeri di occupazione spin (TTEDOPA - p.modi)/TTEDOPA",

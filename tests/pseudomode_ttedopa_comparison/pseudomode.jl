@@ -127,8 +127,8 @@ let
     # =======================
     # - i numeri di occupazione
     num_op_list = [MPS(sites,
-                       [i == n ? "vecN" : "vecId" for i ∈ 1:length(sites)])
-                   for n ∈ range_spins]
+                       [i == n ? "vecN" : "vecId" for i ∈ eachindex(sites)])
+                   for n ∈ eachindex(sites)]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
     full_trace = MPS(sites, "vecId")
@@ -174,9 +174,10 @@ let
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for n ∈ eachindex(range_spins)
-      sym = Symbol("occn_spin_PM_$n")
-      push!(dict, sym => occn_PM[:, n])
+    sitelabels = ["L"; string.("S", eachindex(range_spins))]
+    for (j, label) ∈ enumerate(sitelabels)
+      push!(dict,
+            Symbol(string("occn_PM_", label)) => occn_PM[:, j])
     end
     push!(dict, :norm_PM => normalisation)
     table = DataFrame(dict)
@@ -193,17 +194,33 @@ let
   # =======
   plotsize = (600, 400)
 
-  # Grafico dei numeri di occupazione (solo spin)
-  # ---------------------------------------------
+  # Grafico dei numeri di occupazione
+  # ---------------------------------
   plt = groupplot(timesteps_super,
                   occn_PM_super,
                   parameter_lists;
                   labels=[reduce(hcat,
-                                 ["S$n" for n ∈ eachindex(range_spins)])
-                          for range_spins ∈ range_spins_super],
+                                 ["L"; ["S$n" for n ∈ eachindex(rn)]; "R"])
+                          for rn ∈ range_spins_super],
                   linestyles=[reduce(hcat,
-                                     repeat([:solid], length(range_spins)))
-                              for range_spins ∈ range_spins_super],
+                                     repeat([:solid], length(rn)+2))
+                              for rn ∈ range_spins_super],
+                  commonxlabel=L"t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione (pseudomodi)",
+                  plotsize=plotsize)
+  savefig(plt, "occn_PM.png")
+
+  # Grafico dei numeri di occupazione (solo spin)
+  # ---------------------------------------------
+  plt = groupplot(timesteps_super,
+                  [occn[:, rn] for (rn, occn) ∈ zip(range_spins_super,
+                                                 occn_PM_super)],
+                  parameter_lists;
+                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
+                          for rn ∈ range_spins_super],
+                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
+                              for rn ∈ range_spins_super],
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione degli spin (pseudomodi)",
@@ -217,7 +234,7 @@ let
                     parameter_lists;
                     linestyle=:solid,
                     xlabel=L"t",
-                    ylabel=L"\tr\rho(t)",
+                    ylabel=L"\mathrm{tr}\rho(t)",
                     plottitle="Norma dello stato (pseudomodi)",
                     plotsize=plotsize)
   savefig(plt, "normalisation_PM.png")
