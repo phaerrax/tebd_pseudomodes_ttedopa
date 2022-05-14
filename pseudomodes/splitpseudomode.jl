@@ -351,6 +351,7 @@ let
   plt = groupplot(timesteps_super,
                   occn_super,
                   parameter_lists;
+                  rescale=false,
                   labels=["L2" "L1" string.(1:N-3)... "R"],
                   linestyles=[:dash :dash repeat([:solid], N-3)... :dash],
                   commonxlabel=L"\lambda\, t",
@@ -366,6 +367,7 @@ let
   plt = groupplot(timesteps_super,
                   spinsonly,
                   parameter_lists;
+                  rescale=false,
                   labels=reduce(hcat, string.(1:N-3)),
                   linestyles=reduce(hcat, repeat([:solid], N-3)),
                   commonxlabel=L"\lambda\, t",
@@ -403,6 +405,7 @@ let
   plt = groupplot(timesteps_super,
                   sums,
                   parameter_lists;
+                  rescale=false,
                   labels=["L1+L2" "spin" "R"],
                   linestyles=[:solid :dot :solid],
                   commonxlabel=L"\lambda\, t",

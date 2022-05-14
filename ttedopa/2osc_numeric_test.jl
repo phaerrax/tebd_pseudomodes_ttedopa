@@ -232,7 +232,6 @@ let
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (sol. numerica)",
                   plotsize=plotsize)
-
   savefig(plt, "occn_numeric.png")
 
   # Norma dello stato
@@ -252,6 +251,7 @@ let
   plt = groupplot(timesteps_super,
                   [occn[:, 3:end-2] for occn ∈ numeric_occn_super],
                   parameter_lists;
+                  rescale=false,
                   labels=reduce(hcat, string.("S", 1:N)),
                   linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"t",
@@ -269,6 +269,7 @@ let
   plt = groupplot(timesteps_super,
                   data,
                   parameter_lists;
+                  rescale=false,
                   labels=["L2" "L1" "L1+L2"],
                   linestyles=[:solid :solid :dash],
                   commonxlabel=L"t",
@@ -286,6 +287,7 @@ let
   plt = groupplot(timesteps_super,
                   data,
                   parameter_lists;
+                  rescale=false,
                   labels=["R1" "R2" "R1+R2"],
                   linestyles=[:solid :solid :dash],
                   commonxlabel=L"t",

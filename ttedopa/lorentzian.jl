@@ -309,6 +309,7 @@ let
                   [mat[:, range]
                    for (mat, range) ∈ zip(occn_super, range_osc_left_super)],
                   parameter_lists;
+                  rescale=false,
                   labels=[reduce(hcat, string.("l", reverse(eachindex(range))))
                           for range ∈ range_osc_left_super], # ["l1" ... "lN"]
                   linestyles=[reduce(hcat, repeat([:solid], length(range)))
@@ -327,6 +328,7 @@ let
                   [mat[:, range]
                    for (mat, range) ∈ zip(occn_super, range_spins_super)],
                   parameter_lists;
+                  rescale=false,
                   labels=[reduce(hcat, string.("s", eachindex(range)))
                           for range ∈ range_spins_super], # ["s1" ... "sN"]
                   linestyles=[reduce(hcat, repeat([:solid], length(range)))
@@ -344,6 +346,7 @@ let
                   [mat[:, range]
                    for (mat, range) ∈ zip(occn_super, range_osc_right_super)],
                   parameter_lists;
+                  rescale=false,
                   labels=[reduce(hcat, string.("s", eachindex(range)))
                           for range ∈ range_osc_right_super], # ["s1" ... "sN"]
                   linestyles=[reduce(hcat, repeat([:solid], length(range)))
