@@ -377,11 +377,13 @@ let
 
   # Grafico dei numeri di occupazione pre-trasformazione
   # ----------------------------------------------------
-  data = [[d[:, 1] d[:, 2] d[:, 1]./d[:, 2]] for d ∈ originaloccn_super]
+  data = [[d[:, 1] d[:, 2] (1 .+ d[:, 1])./d[:, 2]] for d ∈ originaloccn_super]
   plt = groupplot(timesteps_super,
                   data,
                   parameter_lists;
-                  labels=[L"n_{-\Omega}" L"n_{\Omega}" L"n_{-\Omega}/n_{\Omega}"],
+                  rescale=false,
+                  labels=["n₊" "n₋" "(1 + n₊)/n₋"],
+                  maxyrange=0:2,
                   linestyles=[:solid :solid :dash],
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
