@@ -89,6 +89,7 @@ function groupplot(x_super,
     y_super,
     parameter_super;
     maxyrange = nothing,
+    rescale = true,
     labels,
     linestyles,
     commonxlabel,
@@ -132,23 +133,35 @@ function groupplot(x_super,
      
      · `maxyrange`: minimo e massimo valore delle ordinate da mostrare (per tutti) 
 
+     · `rescale`: se è impostato su vero, tutti i grafici vengono disegnati con
+       una scala comune, in modo che tutti gli assi delle ordinate (nel gruppo)
+       siano uguali
+
      · `plottitle`: titolo grande del grafico
 
      · `plotsize`: una Pair che indica la dimensione dei singoli grafici
   =#
-  # Per poter meglio confrontare a vista i dati, imposto una scala delle
-  # ordinate uguale per tutti i grafici.
-  yminima = minimum.(y_super)
-  ymaxima = maximum.(y_super)
-  ylimits = (minimum(yminima), maximum(ymaxima))
-  # Limito l'asse y a maxyrange _solo_ se i grafici non ci stanno già
+  if rescale
+    # Per poter meglio confrontare a vista i dati, imposto una scala delle
+    # ordinate uguale per tutti i grafici.
+    yminima = minimum.(y_super)
+    ymaxima = maximum.(y_super)
+    ylimits = (minimum(yminima), maximum(ymaxima))
+    ylimits_super = repeat([ylimits], length(y_super))
+  else
+    ylimits_super = extrema.(y_super)
+  end
+
+  # Limito l'asse y a maxyrange 𝑠𝑜𝑙𝑜 se i grafici non ci stanno già
   # dentro da soli.
   if maxyrange != nothing
-    if ylimits[begin] < maxyrange[begin]
-      ylimits = (maxyrange[begin], ylimits[end])
-    end
-    if maxyrange[end] < ylimits[end]
-      ylimits = (ylimits[begin], maxyrange[end])
+    for i ∈ eachindex(ylimits_super)
+      if first(ylimits_super[i]) < maxyrange[begin]
+        ylimits_super[i] = (maxyrange[begin], last(ylimits_super[i]))
+      end
+      if maxyrange[end] < last(ylimits_super[i])
+        ylimits_super[i] = (first(ylimits_super[i]), maxyrange[end])
+      end
     end
   end
 
@@ -185,11 +198,12 @@ function groupplot(x_super,
                    left_margin=5mm,
                    bottom_margin=5mm,
                    size=figuresize)
-              for (X, Y, lab, lst, p) in zip(x_super,
-                                             y_super,
-                                             labels,
-                                             linestyles,
-                                             parameter_super)]
+              for (X, Y, lab, lst, ylimits, p) ∈ zip(x_super,
+                                                     y_super,
+                                                     labels,
+                                                     linestyles,
+                                                     ylimits_super,
+                                                     parameter_super)]
   # I grafici saranno disposti in una griglia con due colonne; se ho un numero
   # dispari di grafici, ne creo uno vuoto in modo da riempire il buco che
   # si crea (altrimenti mi becco un errore).
