@@ -109,12 +109,6 @@ let
                                         2;
                                         Nquad=nquad,
                                         discretization=lanczos)
-    #(Ωₗ, κₗ, ηₗ) = ([2.455, -2.186],
-    #                [9.717],
-    #                sqrt(quadgk(Jtherm, -ωc, 0, ωc)[1]))
-    #(Ωᵣ, κᵣ, ηᵣ) = ([10.051],
-    #                [1.375],
-    #                sqrt(quadgk(Jzero, 0, ωc)[1]))
 
     @info "Simulazione $current_sim_n di $tot_sim_n: calcolo della soluzione dell'equazione di Schrödinger."
     bosc = FockBasis(oscdim)
@@ -200,114 +194,20 @@ let
     output = mapreduce(permutedims, vcat, output)
     numeric_occn = output[:, 1:end-1]
     statenorm = output[:, end]
-#=
-    # Simulazione
-    # ===========
-    # Stato iniziale
-    # --------------
-    # Gli oscillatori partono tutti dallo stato vuoto; mi riservo di decidere
-    # volta per volta come inizializzare l'oscillatore più a destra nella
-    # catena a sinistra, per motivi di diagnostica.
-    osc_sx_init_state = chain(MPS(sites[1:n_osc_left-1], "0"),
-                              parse_init_state_osc(
-                                    sites[n_osc_left],
-                                    parameters["left_oscillator_initial_state"]
-                                   ))
-    spin_init_state = parse_init_state(sites[range_spins],
-                                       parameters["chain_initial_state"])
-    osc_dx_init_state = MPS(sites[range_osc_right], "0")
-    current_state = chain(osc_sx_init_state,
-                          spin_init_state,
-                          osc_dx_init_state)
-
-    # Osservabili sullo stato iniziale
-    # --------------------------------
-    occn = [expect(current_state, "N")]
-    bond_dimensions = [linkdims(current_state)]
-    spin_current = [[real(inner(current_state, j * current_state))
-                     for j in spin_current_ops]]
-    spin_chain_levels = [levels(num_eigenspace_projs,
-                                current_state)]
-
-    # Evoluzione temporale
-    # --------------------
-    message = "Simulazione $current_sim_n di $tot_sim_n:"
-    progress = Progress(length(time_step_list), 1, message, 30)
-    skip_count = 1
-    for _ in time_step_list[2:end]
-      current_state = apply(evo,
-                            current_state;
-                            cutoff=max_err,
-                            maxdim=max_dim)
-      if skip_count % skip_steps == 0
-        push!(occn,
-              expect(current_state, "N"))
-        push!(spin_current,
-              [real(inner(current_state, j * current_state))
-               for j in spin_current_ops])
-        push!(spin_chain_levels,
-              levels(num_eigenspace_projs, current_state))
-        push!(bond_dimensions,
-              linkdims(current_state))
-      end
-      next!(progress)
-      skip_count += 1
-    end
-
-    snapshot = occn[end]
-
-    # Creo una tabella con i dati rilevanti da scrivere nel file di output
-    dict = Dict(:time => time_step_list[1:skip_steps:end])
-    tmp_list = hcat(occn...)
-    for (j, name) in enumerate([[Symbol("occn_left$n") for n∈n_osc_left:-1:1];
-                                [Symbol("occn_spin$n") for n∈1:n_spin_sites];
-                                [Symbol("occn_right$n") for n∈1:n_osc_right]])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(spin_current...)
-    for (j, name) in enumerate([Symbol("spin_current$n")
-                                for n = 1:n_spin_sites-1])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(spin_chain_levels...)
-    for (j, name) in enumerate([Symbol("levels_chain$n") for n = 0:n_spin_sites])
-      push!(dict, name => tmp_list[j,:])
-    end
-    tmp_list = hcat(bond_dimensions...)
-    len = n_osc_left + n_spin_sites + n_osc_right
-    for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 1:len-1])
-      push!(dict, name => tmp_list[j,:])
-    end
-    table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
-    # Scrive la tabella su un file che ha la stessa estensione del file dei
-    # parametri, con estensione modificata.
-    CSV.write(filename, table)
-    =#
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
     push!(numeric_occn_super, numeric_occn)
     push!(norm_super, statenorm)
-    #push!(occn_super,
-    #      permutedims(hcat(occn...)))
-    #push!(spin_current_super,
-    #      permutedims(hcat(spin_current...)))
-    #push!(spin_chain_levels_super,
-    #      permutedims(hcat(spin_chain_levels...)))
-    #push!(bond_dimensions_super,
-    #      permutedims(hcat(bond_dimensions...)))
-    #push!(range_osc_left_super,
-    #      range_osc_left)
-    #push!(range_spins_super,
-    #      range_spins)
-    #push!(range_osc_right_super,
-    #      range_osc_right)
-    #push!(osc_chain_coefficients_left_super,
-    #      osc_chain_coefficients_left)
-    #push!(osc_chain_coefficients_right_super,
-    #      osc_chain_coefficients_right)
-    #push!(snapshot_super, snapshot)
+
+    dict = Dict(:time => tout)
+    sitelabels = ["L2"; "L1"; string.("S", 1:n_spin_sites); "R1"; "R2"]
+    for (j, label) ∈ enumerate(sitelabels)
+      push!(dict, Symbol(string("occn_", label)) => numeric_occn[:,j])
+    end
+    table = DataFrame(dict)
+    filename = replace(parameters["filename"], ".json" => "_numeric.dat")
+    CSV.write(filename, table)
   end
 
   @info "Creazione dei grafici con i risultati."
@@ -345,7 +245,6 @@ let
                     ylabel=L"\Vert\psi(t)\Vert",
                     plottitle="Norma dello stato",
                     plotsize=plotsize)
-
   savefig(plt, "norm_numeric.png")
 
   # Numeri di occupazione (solo spin)
@@ -353,29 +252,47 @@ let
   plt = groupplot(timesteps_super,
                   [occn[:, 3:end-2] for occn ∈ numeric_occn_super],
                   parameter_lists;
-                  labels=reduce(hcat, string.(1:N)),
+                  labels=reduce(hcat, string.("S", 1:N)),
                   linestyles=reduce(hcat, repeat([:solid], N)),
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (solo spin, sol. numerica)",
                   plotsize=plotsize)
   savefig(plt, "occn_spins_numeric.png")
-  
-  # Grafico della corrente di spin
-  # ------------------------------
-  #plt = groupplot(timesteps_super,
-  #                spin_current_super,
-  #                parameter_lists;
-  #                labels=[hcat(["($j,$(j+1))" for j ∈ 1:size(c, 2)]...)
-  #                        for c in spin_current_super],
-  #                linestyles=[hcat(repeat([:solid], size(c, 2))...)
-  #                            for c in spin_current_super],
-  #                commonxlabel=L"t",
-  #                commonylabel=L"j_{k,k+1}(t)",
-  #                plottitle="Corrente di spin",
-  #                plotsize=plotsize)
 
-  #savefig(plt, "spin_current.png")
+  # Numeri di occupazione (oscillatori sx)
+  # --------------------------------------
+  data = [[occn[:, 1];;
+           occn[:, 2];;
+           occn[:, 1] .+ occn[: ,2]]
+           for occn ∈ numeric_occn_super]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=["L2" "L1" "L1+L2"],
+                  linestyles=[:solid :solid :dash],
+                  commonxlabel=L"t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione (osc sx, sol. numerica)",
+                  plotsize=plotsize)
+  savefig(plt, "occn_oscsx_numeric.png")
+  
+  # Numeri di occupazione (oscillatori dx)
+  # --------------------------------------
+  data = [[occn[:, end-1];;
+           occn[:, end];;
+           occn[:, end-1] .+ occn[:, end]]
+           for occn ∈ numeric_occn_super]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=["R1" "R2" "R1+R2"],
+                  linestyles=[:solid :solid :dash],
+                  commonxlabel=L"t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione (osc dx, sol. numerica)",
+                  plotsize=plotsize)
+  savefig(plt, "occn_oscdx_numeric.png")
  
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
