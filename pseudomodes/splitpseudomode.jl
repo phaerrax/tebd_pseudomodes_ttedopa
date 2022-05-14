@@ -50,13 +50,12 @@ let
   # Le seguenti liste conterranno i risultati della simulazione per ciascuna
   # lista di parametri fornita.
   timesteps_super = []
-  occ_n_super = []
-  current_allsites_super = []
+  occn_super = []
+  originaloccn_super = []
   current_adjsites_super = []
   bond_dimensions_super = []
-  chain_levels_super = []
-  osc_levels_left_super = []
-  osc_levels_right_super = []
+  osclevelsL1_super = []
+  osclevelsL2_super = []
   normalisation_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
@@ -187,6 +186,11 @@ let
     current_adjsites_ops = [current(sites, j, j+1)
                             for j ∈ range_spins[1:end-1]]
 
+    osclevels_projs_L1 = [embed_slice(sites, 2:2, osc_levels_proj(sites[2], n))
+                           for n ∈ 0:hotoscdim-1]
+    osclevels_projs_L2 = [embed_slice(sites, 1:1, osc_levels_proj(sites[1], n))
+                           for n ∈ 0:hotoscdim-1]
+
     # Simulazione
     # ===========
     # Stato iniziale
@@ -232,6 +236,29 @@ let
     occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
     current_adjsites(ρ) = real.([inner(j, ρ)
                                  for j ∈ current_adjsites_ops]) ./ trace(ρ)
+    osclevelsL1(ρ) = real.(levels(osclevels_projs_L1, trace(ρ)^(-1) * ρ))
+    osclevelsL2(ρ) = real.(levels(osclevels_projs_L2, trace(ρ)^(-1) * ρ))
+
+    # Ricorda che la numerazione degli oscillatori a sx è invertita: b₁ sta
+    # al posto 2, e b₂ sta al posto 1
+    b2⁺b1 = MPS(sites, ["veca+"; "veca-"; repeat(["vecId"], length(sites)-2)])
+    b1⁺b2 = MPS(sites, ["veca-"; "veca+"; repeat(["vecId"], length(sites)-2)])
+    function originaloccn(ρ)
+      trρ = trace(ρ)
+      avgb1⁺b1 = inner(num_op_list[2], ρ) / trρ
+      avgb2⁺b2 = inner(num_op_list[1], ρ) / trρ
+      avgb2⁺b1 = inner(b2⁺b1, ρ) ./ trρ
+      avgb1⁺b2 = inner(b1⁺b2, ρ) ./ trρ
+      cosθ = κ₁ / hypot(κ₁, κ₂)
+      sinθ = κ₂ / hypot(κ₁, κ₂)
+      return [real(cosθ^2 * avgb1⁺b1 + sinθ^2 * avgb2⁺b2 -
+                   sinθ*cosθ * (avgb2⁺b1+avgb1⁺b2)),
+              real(sinθ^2 * avgb1⁺b1 + cosθ^2 * avgb2⁺b2 +
+                   sinθ*cosθ * (avgb2⁺b1+avgb1⁺b2))]
+              # Il primo è il # di occ dell'oscillatore con il picco a Ω,
+              # l'altro a -Ω. Impongo `real` perché so che il risultato deve
+              # essere un numero reale.
+    end
 
     # Evoluzione temporale
     # --------------------
@@ -242,23 +269,32 @@ let
       normalisation,
       occnlist,
       current_adjsites_list,
-      ranks =  evolve(ρ₀,
-                      time_step_list,
-                      parameters["skip_steps"],
-                      parameters["TS_expansion_order"],
-                      links_odd,
-                      links_even,
-                      parameters["MP_compression_error"],
-                      parameters["MP_maximum_bond_dimension"];
-                      fout=[trace,
-                            occn,
-                            current_adjsites,
-                            linkdims])
+      ranks,
+      osclevelsL1list,
+      osclevelsL2list,
+      originaloccnlist = evolve(ρ₀,
+                                time_step_list,
+                                parameters["skip_steps"],
+                                parameters["TS_expansion_order"],
+                                links_odd,
+                                links_even,
+                                parameters["MP_compression_error"],
+                                parameters["MP_maximum_bond_dimension"];
+                                fout=[trace,
+                                      occn,
+                                      current_adjsites,
+                                      linkdims,
+                                      osclevelsL1,
+                                      osclevelsL2,
+                                      originaloccn])
     end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
+    originaloccnlist = mapreduce(permutedims, vcat, originaloccnlist)
+    osclevelsL1list = mapreduce(permutedims, vcat, osclevelsL1list)
+    osclevelsL2list = mapreduce(permutedims, vcat, osclevelsL2list)
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
     ranks = mapreduce(permutedims, vcat, ranks)
 
@@ -288,10 +324,13 @@ let
 
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
-    push!(occ_n_super, occnlist)
+    push!(occn_super, occnlist)
+    push!(originaloccn_super, originaloccnlist)
     push!(current_adjsites_super, current_adjsites_list)
     push!(bond_dimensions_super, ranks)
     push!(normalisation_super, normalisation)
+    push!(osclevelsL1_super, osclevelsL1list)
+    push!(osclevelsL2_super, osclevelsL2list)
   end
 
   #= Grafici
@@ -308,9 +347,9 @@ let
 
   # Grafico dei numeri di occupazione (tutti i siti)
   # ------------------------------------------------
-  N = size(occ_n_super[begin], 2)
+  N = size(occn_super[begin], 2)
   plt = groupplot(timesteps_super,
-                  occ_n_super,
+                  occn_super,
                   parameter_lists;
                   labels=["L2" "L1" string.(1:N-3)... "R"],
                   linestyles=[:dash :dash repeat([:solid], N-3)... :dash],
@@ -319,11 +358,11 @@ let
                   plottitle="Numeri di occupazione",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_all.png")
+  savefig(plt, "occn_all.png")
 
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
-  spinsonly = [mat[:, 3:end-1] for mat in occ_n_super]
+  spinsonly = [mat[:, 3:end-1] for mat in occn_super]
   plt = groupplot(timesteps_super,
                   spinsonly,
                   parameter_lists;
@@ -334,7 +373,22 @@ let
                   plottitle="Numeri di occupazione (solo spin)",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_spins_only.png")
+  savefig(plt, "occn_spins_only.png")
+
+  # Grafico dei numeri di occupazione pre-trasformazione
+  # ----------------------------------------------------
+  data = [[d[:, 1] d[:, 2] d[:, 1]./d[:, 2]] for d ∈ originaloccn_super]
+  plt = groupplot(timesteps_super,
+                  data,
+                  parameter_lists;
+                  labels=[L"n_{-\Omega}" L"n_{\Omega}" L"n_{-\Omega}/n_{\Omega}"],
+                  linestyles=[:solid :solid :dash],
+                  commonxlabel=L"t",
+                  commonylabel=L"\langle n_i(t)\rangle",
+                  plottitle="Numeri di occupazione degli oscillatori originali",
+                  plotsize=plotsize)
+
+  savefig(plt, "original_oscillators_occn.png")
 
   # Grafico dei numeri di occupazione (oscillatori + totale catena)
   # ---------------------------------------------------------------
@@ -343,7 +397,7 @@ let
   sums = [hcat(sum(mat[:, 1:2], dims=2),
                sum(mat[:, 3:end-1], dims=2),
                mat[:, end])
-          for mat ∈ occ_n_super]
+          for mat ∈ occn_super]
   plt = groupplot(timesteps_super,
                   sums,
                   parameter_lists;
@@ -354,7 +408,7 @@ let
                   plottitle="Numeri di occupazione (oscillatori + totale catena)",
                   plotsize=plotsize)
 
-  savefig(plt, "occ_n_sums.png")
+  savefig(plt, "occn_sums.png")
 
   # Grafico dei ranghi del MPS
   # --------------------------
@@ -406,20 +460,24 @@ let
 
   savefig(plt, "current_btw_adjacent_sites.png")
 
-  #max_n_spins = maximum([p["number_of_spin_sites"] for p in parameter_lists])
-  #data = [table[:, 1:p["number_of_spin_sites"]]
-  #        for (p, table) in zip(parameter_lists, current_allsites_super)]
-  #plt = groupplot(timesteps_super,
-  #                data,
-  #                parameter_lists;
-  #                labels=reduce(hcat, ["l=$l" for l ∈ 1:max_n_spins]),
-  #                linestyles=reduce(hcat, repeat([:solid], max_n_spins)),
-  #                commonxlabel=L"\lambda\, t",
-  #                commonylabel=L"\langle j_{1,l}\rangle",
-  #                plottitle="Corrente tra spin (dal 1° spin)",
-  #                plotsize=plotsize)
+  # Grafico dell'occupazione dei livelli degli oscillatori
+  # ------------------------------------------------------
+  for (list, site) in zip([osclevelsL2_super, osclevelsL1_super],
+                         ["L2", "L1"])
+    N = size(list[begin], 2) - 1
+    plt = groupplot(timesteps_super,
+                    list,
+                    parameter_lists;
+                    labels=reduce(hcat, [string.(0:N-1); "total"]),
+                    linestyles=reduce(hcat, [repeat([:solid], N); :dash]),
+                    commonxlabel=L"t",
+                    commonylabel=L"n",
+                    plottitle="Occupazione degli autospazi "
+                    * "dell'oscillatore $site",
+                    plotsize=plotsize)
 
-  #savefig(plt, "spin_current_fromsite1.png")
+    savefig(plt, "osclevels_$site.png")
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
