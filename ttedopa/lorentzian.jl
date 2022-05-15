@@ -260,22 +260,25 @@ let
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([[Symbol("occn_left$n") for n∈n_osc_left:-1:1];
-                                [Symbol("occn_spin$n") for n∈1:n_spin_sites];
-                                [Symbol("occn_right$n") for n∈1:n_osc_right]])
-      push!(dict, name => occnlist[:,j])
+    sitelabels = [string.("L", n_osc_left:-1:1);
+                  string.("S", 1:n_spin_sites);
+                  string.("R", 1:n_osc_right)]
+    for (n, label) ∈ enumerate(sitelabels)
+      push!(dict, Symbol(string("occn_", label)) => occnlist[:, n])
     end
-    for (j, name) in enumerate([Symbol("current_adjsites$n")
-                                for n = 1:n_spin_sites-1])
-      push!(dict, name => spincurrentlist[:,j])
+    for n ∈ -1:n_spin_sites-1
+      from = sitelabels[range_spins[begin] + n]
+      to   = sitelabels[range_spins[begin] + n+1]
+      sym  = "current_adjsites_$from/$to"
+      push!(dict, Symbol(sym) => spincurrentlist[:, n+2])
+      sym  = "rank_$from/$to"
+      push!(dict, Symbol(sym) => ranks[:, n+2])
     end
-    len = n_spin_sites
-    for (j, name) in enumerate([Symbol("bond_dim$n") for n ∈ 0:len])
-      push!(dict, name => ranks[:,j])
-    end
+    push!(dict, :maxrank => ranks[:, end])
     push!(dict, :norm => normalisation)
+
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
