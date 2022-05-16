@@ -141,6 +141,27 @@ function groupplot(x_super,
 
      · `plotsize`: una Pair che indica la dimensione dei singoli grafici
   =#
+  # Se `labels` è un vettore di vettori riga di stringhe, significa che
+  # ogni sottografico ha già il suo insieme di etichette: sono a posto.
+  # Se invece `labels` è solo un vettore riga di stringhe, significa che
+  # quelle etichette sono da usare per tutti i grafici: allora creo in
+  # questo momento il vettore di vettori riga di stringhe ripetendo quello
+  # fornito come argomento.
+  if labels isa Matrix{String}
+    newlabels = repeat([labels], length(parameter_super))
+    labels = newlabels
+  end
+  # Ripeto lo stesso trattamento per `linestyles`...
+  if linestyles isa Matrix{Symbol}
+    newlinestyles = repeat([linestyles], length(parameter_super))
+    linestyles = newlinestyles
+  end
+  # ...e per `maxyrange`
+  if !isnothing(maxyrange) && !isa(maxyrange, Vector)
+    newmaxyrange = repeat([maxyrange], length(parameter_super))
+    maxyrange = newmaxyrange
+  end
+
   if rescale
     # Per poter meglio confrontare a vista i dati, imposto una scala delle
     # ordinate uguale per tutti i grafici.
@@ -154,13 +175,15 @@ function groupplot(x_super,
 
   # Limito l'asse y a maxyrange 𝑠𝑜𝑙𝑜 se i grafici non ci stanno già
   # dentro da soli.
-  if maxyrange != nothing
-    for i ∈ eachindex(ylimits_super)
-      if first(ylimits_super[i]) < maxyrange[begin]
-        ylimits_super[i] = (maxyrange[begin], last(ylimits_super[i]))
+  # Forse qui si potrebbe semplificare il tutto con `clamp`, se solo
+  # trovassi il modo di farla funzionare con le tuple...
+  if !isnothing(maxyrange)
+    for (i, maxrn) ∈ zip(eachindex(ylimits_super), maxyrange)
+      if first(ylimits_super[i]) < maxrn[begin]
+        ylimits_super[i] = (maxrn[begin], last(ylimits_super[i]))
       end
-      if maxyrange[end] < last(ylimits_super[i])
-        ylimits_super[i] = (first(ylimits_super[i]), maxyrange[end])
+      if maxrn[end] < last(ylimits_super[i])
+        ylimits_super[i] = (first(ylimits_super[i]), maxrn[end])
       end
     end
   end
@@ -169,21 +192,6 @@ function groupplot(x_super,
   distinct_parameters, _ = categorise_parameters(parameter_super)
   # Calcolo la grandezza totale dell'immagine a partire da quella dei grafici.
   figuresize = (2, Int(ceil(length(x_super)/2))+0.5) .* plotsize
-  # Se `labels` è un vettore di vettori riga di stringhe, significa che
-  # ogni sottografico ha già il suo insieme di etichette: sono a posto.
-  # Se invece `labels` è solo un vettore riga di stringhe, significa che
-  # quelle etichette sono da usare per tutti i grafici: allora creo in
-  # questo momento il vettore di vettori riga di stringhe ripetendo quello
-  # fornito come argomento.
-  if labels isa Matrix{String}
-    newlabels = repeat([labels], length(parameter_super))
-    labels = newlabels
-  end
-  # Ripeto lo stesso trattamento per `linestyles`.
-  if linestyles isa Matrix{Symbol}
-    newlinestyles = repeat([linestyles], length(parameter_super))
-    linestyles = newlinestyles
-  end
 
   # Creo i singoli grafici.
   subplots = [plot(X,
