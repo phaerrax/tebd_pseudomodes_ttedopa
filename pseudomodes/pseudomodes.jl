@@ -315,9 +315,9 @@ let
       mat .-= transpose(mat)
       return Base.vec(mat')
     end
-    chainlevels(ρ) = real.(levels(num_eigenspace_projs, trace(ρ)^(-1) * ρ))
-    osclevelsL(ρ) = real.(levels(osc_levels_projs_left, trace(ρ)^(-1) * ρ))
-    osclevelsR(ρ) = real.(levels(osc_levels_projs_right, trace(ρ)^(-1) * ρ))
+    chainlevels(ρ) = real.(inner.(Ref(ρ), num_eigenspace_projs)) ./ trace(ρ)
+    osclevelsL(ρ) = real.(inner.(Ref(ρ), osc_levels_projs_left)) ./ trace(ρ)
+    osclevelsR(ρ) = real.(inner.(Ref(ρ), osc_levels_projs_right)) ./ trace(ρ)
 
     # Evoluzione temporale
     # --------------------

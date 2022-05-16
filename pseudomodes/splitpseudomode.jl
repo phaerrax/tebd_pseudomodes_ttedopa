@@ -236,8 +236,8 @@ let
     occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
     current_adjsites(ρ) = real.([inner(j, ρ)
                                  for j ∈ current_adjsites_ops]) ./ trace(ρ)
-    osclevelsL1(ρ) = real.(levels(osclevels_projs_L1, trace(ρ)^(-1) * ρ))
-    osclevelsL2(ρ) = real.(levels(osclevels_projs_L2, trace(ρ)^(-1) * ρ))
+    osclevelsL1(ρ) = real.(inner.(Ref(ρ), osclevels_projs_L1)) ./ trace(ρ)
+    osclevelsL2(ρ) = real.(inner.(Ref(ρ), osclevels_projs_L2)) ./ trace(ρ)
 
     # Ricorda che la numerazione degli oscillatori a sx è invertita: b₁ sta
     # al posto 2, e b₂ sta al posto 1
