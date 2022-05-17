@@ -52,6 +52,7 @@ let
   timesteps_super = []
   occn_super = []
   originaloccn_super = []
+  originaloccn_yrange_super = []
   current_adjsites_super = []
   bond_dimensions_super = []
   osclevelsL1_super = []
@@ -292,11 +293,15 @@ let
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
-    originaloccnlist = mapreduce(permutedims, vcat, originaloccnlist)
     osclevelsL1list = mapreduce(permutedims, vcat, osclevelsL1list)
     osclevelsL2list = mapreduce(permutedims, vcat, osclevelsL2list)
     current_adjsites_list = mapreduce(permutedims, vcat, current_adjsites_list)
     ranks = mapreduce(permutedims, vcat, ranks)
+
+    n⁺, n⁻ = originaloccnlist[end]
+    dbratio = (1+n⁺) / n⁻
+    dbrange = (dbratio-0.5, dbratio+0.5)
+    originaloccnlist = mapreduce(permutedims, vcat, originaloccnlist)
 
     @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
@@ -326,6 +331,7 @@ let
     push!(timesteps_super, tout)
     push!(occn_super, occnlist)
     push!(originaloccn_super, originaloccnlist)
+    push!(originaloccn_yrange_super, dbrange)
     push!(current_adjsites_super, current_adjsites_list)
     push!(bond_dimensions_super, ranks)
     push!(normalisation_super, normalisation)
@@ -384,8 +390,11 @@ let
                   data,
                   parameter_lists;
                   rescale=false,
-                  labels=["n₊" "n₋" "(1 + n₊)/n₋"],
-                  maxyrange=0:2,
+                  labels=["n(Ω)" "n(-Ω)" "[1 + n(Ω)] / n(-Ω)"],
+                  maxyrange=originaloccn_yrange_super,
+                  # Conviene impostare l'intervallo di ordinate attorno al valore
+                  # del rapporto del bilancio dettagliato che ci si aspetta,
+                  # altrimenti non si vede niente...
                   linestyles=[:solid :solid :dash],
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
