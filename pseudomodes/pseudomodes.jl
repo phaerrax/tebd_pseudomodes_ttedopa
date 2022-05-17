@@ -440,6 +440,7 @@ let
   plt = groupplot(timesteps_super,
                   occ_n_super,
                   parameter_lists;
+                  rescale=false,
                   labels=["L" string.(1:N-2)... "R"],
                   linestyles=[:dash repeat([:solid], N-2)... :dash],
                   commonxlabel=L"\lambda\, t",
@@ -470,6 +471,7 @@ let
   plt = groupplot(timesteps_super,
                   spinsonly,
                   parameter_lists;
+                  rescale=false,
                   labels=hcat(string.(1:N-2)...),
                   linestyles=hcat(repeat([:solid], N-2)...),
                   commonxlabel=L"\lambda\, t",
@@ -488,6 +490,7 @@ let
   plt = groupplot(timesteps_super,
                   sums,
                   parameter_lists;
+                  rescale=false,
                   labels=["L" "catena" "R"],
                   linestyles=[:solid :dot :solid],
                   commonxlabel=L"\lambda\, t",
