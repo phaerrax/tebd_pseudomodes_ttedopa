@@ -306,20 +306,22 @@ let
     @info "($current_sim_n di $tot_sim_n) Creazione delle tabelle di output."
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([:occn_l2;
-                                :occn_l1;
-                                [Symbol("occn_s$n") for n = 1:n_spin_sites];
-                                :occn_r1])
-      push!(dict, name => occnlist[:,j])
+    sitelabels = ["L2"; "L1"; string.("S", 1:n_spin_sites); "R"]
+    for (j, label) ∈ enumerate(sitelabels)
+      sym = Symbol(string("occn_", label))
+      push!(dict, sym => occnlist[:,j])
     end
     for coln ∈ eachindex(current_adjsites_ops)
-      s = Symbol("current_$coln/$(coln+1)")
+      s = Symbol("current_S$coln/S$(coln+1)")
       push!(dict, s => current_adjsites_list[:, coln])
     end
-    for j ∈ 1:size(ranks, 2)
-      s = Symbol("bond_dim$j")
-      push!(dict, s => ranks[:,j])
+    for j ∈ eachindex(sitelabels)[1:end-1]
+      s = Symbol("bond_dim$(sitelabels[j])/$(sitelabels[j+1])")
+      push!(dict, s => ranks[:, j])
     end
+    push!(dict, :orig_occn_1 =>  originaloccnlist[:, 1])
+    push!(dict, :orig_occn_2 =>  originaloccnlist[:, 2])
+    push!(dict, :dbratio => (1 .+ originaloccnlist[:, 1]) ./ originaloccnlist[:, 2])
     push!(dict, :trace => normalisation)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".dat")
