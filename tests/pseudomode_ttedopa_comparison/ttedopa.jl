@@ -60,6 +60,7 @@ let
   range_spins_super = []
   range_osc_left_super = []
   normalisation_TTEDOPA_super = []
+  bond_dimensions_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Costruzione della catena
@@ -156,13 +157,15 @@ let
     # Osservabili da misurare
     # -----------------------
     occn(ψ) = real.(expect(ψ, "N")[1:range_spins[end]]) ./ norm(ψ)^2
+    spinlinkdims(ψ) = [linkdims(ψ)[range_osc_left[end] : range_spins[end]];
+                       maxlinkdim(ψ)]
 
     # Evoluzione temporale
     # --------------------
     @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
     @time begin
-      tout, normalisation_TTEDOPA, occnlist = evolve(ψ₀,
+      tout, normalisation_TTEDOPA, occnlist, ranks = evolve(ψ₀,
                              time_step_list,
                              parameters["skip_steps"],
                              parameters["TS_expansion_order"],
@@ -170,25 +173,33 @@ let
                              links_even,
                              parameters["MP_compression_error"],
                              parameters["MP_maximum_bond_dimension"];
-                             fout=[norm, occn])
+                             fout=[norm, occn, spinlinkdims])
     end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occn_TTEDOPA = mapreduce(permutedims, vcat, occnlist)
+    ranks = mapreduce(permutedims, vcat, ranks)
 
-    outfilename = replace(parameters["filename"], ".json" => ".dat")
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time_TTEDOPA => tout)
     sitelabels = [string.("L", reverse(range_osc_left));
-                  string.("S", eachindex(range_spins))]
-    for (j, label) ∈ enumerate(sitelabels)
-      push!(dict,
-            Symbol(string("occn_TTEDOPA_", label)) => occn_TTEDOPA[:, j])
+                  string.("S", eachindex(range_spins));
+                  string.("R", eachindex(range_osc_right))]
+    for coln ∈ 1:size(occn_TTEDOPA, 2)
+      sym = "occn_TTEDOPA_" * sitelabels[coln]
+      push!(dict, Symbol(sym) => occn_TTEDOPA[:, coln])
     end
+    for n ∈ -1:n_spin_sites-1
+      from = sitelabels[range_spins[begin] + n]
+      to   = sitelabels[range_spins[begin] + n+1]
+      sym  = "rank_TTEDOPA_$from/$to"
+      push!(dict, Symbol(sym) => ranks[:, n+2])
+    end
+    push!(dict, :maxrank_TTEDOPA => ranks[:, end])
     push!(dict, :norm_TTEDOPA => normalisation_TTEDOPA)
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => ".dat~2")
+    filename = replace(parameters["filename"], ".json" => ".TTEDOPA.dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
@@ -199,6 +210,7 @@ let
     push!(normalisation_TTEDOPA_super, normalisation_TTEDOPA)
     push!(range_spins_super, range_spins)
     push!(range_osc_left_super, range_osc_left)
+    push!(bond_dimensions_super, ranks)
   end
 
   # Grafici
@@ -216,6 +228,29 @@ let
                     plottitle="Norma dello stato (TTEDOPA)",
                     plotsize=plotsize)
   savefig(plt, "normalisation_TTEDOPA.png")
+
+  # Grafico dei ranghi del MPS
+  # --------------------------
+  ranklabels=[reduce(hcat, ["(L1,S1)";
+                            ["(S$j,S$(j+1))" for j ∈ 1:size(v, 2)-3];
+                            "(S10,R1)";
+                            "max"])
+                          for v ∈ bond_dimensions_super]
+  ranklinestyles = [reduce(hcat, [repeat([:solid], size(v, 2)-1);
+                                  :dash])
+                    for v ∈ bond_dimensions_super]
+
+  plt = groupplot(timesteps_super,
+                  bond_dimensions_super,
+                  parameter_lists;
+                  labels=ranklabels,
+                  linestyles=ranklinestyles,
+                  commonxlabel=L"t",
+                  commonylabel=L"\chi_{k,k+1}(t)",
+                  plottitle="Ranghi del MPS",
+                  plotsize=plotsize)
+
+  savefig(plt, "bond_dimensions_TTEDOPA.png")
 
   # Grafico dei numeri di occupazione (solo oscillatori sx)
   # -------------------------------------------------------

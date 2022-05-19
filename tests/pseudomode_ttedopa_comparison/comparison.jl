@@ -62,7 +62,7 @@ let
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Leggo dai file temporanei i dati prodotti dagli script.
-    tmpfilename = replace(parameters["filename"], ".json" => ".dat~1")
+    tmpfilename = replace(parameters["filename"], ".json" => ".PM.dat")
     PMdata = DataFrame(CSV.File(tmpfilename))
 
     time_PM = PMdata[:, :time]
@@ -73,7 +73,7 @@ let
                 for n ∈ eachindex(range_spins)]
     occn_PM = reduce(hcat, occnlist)
 
-    tmpfilename = replace(parameters["filename"], ".json" => ".dat~2")
+    tmpfilename = replace(parameters["filename"], ".json" => ".TTEDOPA.dat")
     TTEDOPAdata = DataFrame(CSV.File(tmpfilename))
 
     time_TTEDOPA = TTEDOPAdata[:, :time_TTEDOPA]

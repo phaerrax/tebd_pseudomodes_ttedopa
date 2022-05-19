@@ -56,6 +56,7 @@ let
   occn_PM_super = []
   normalisation_PM_super = []
   range_spins_super = []
+  bond_dimensions_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Impostazione dei parametri
@@ -147,6 +148,7 @@ let
     # -----------
     trace(ρ) = real(inner(full_trace, ρ))
     occn(ρ) = real.([inner(N, ρ) for N in num_op_list]) ./ trace(ρ)
+    spinlinkdims(ρ) = [linkdims(ρ); maxlinkdim(ρ)]
 
     # Evoluzione temporale
     # --------------------
@@ -164,7 +166,7 @@ let
                      links_even,
                      parameters["MP_compression_error"],
                      parameters["MP_maximum_bond_dimension"];
-                     fout=[trace, occn, linkdims])
+                     fout=[trace, occn, spinlinkdims])
     end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
@@ -174,20 +176,27 @@ let
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    sitelabels = ["L"; string.("S", eachindex(range_spins))]
+    sitelabels = ["L"; string.("S", eachindex(range_spins)); "R"]
     for (j, label) ∈ enumerate(sitelabels)
-      push!(dict,
-            Symbol(string("occn_PM_", label)) => occn_PM[:, j])
+      push!(dict, Symbol("occn_PM_" * label) => occn_PM[:, j])
+    end
+    for n ∈ eachindex(sitelabels)[1:end-1]
+      from = sitelabels[n]
+      to   = sitelabels[n+1]
+      sym  = "rank_PM_$from/$to"
+      push!(dict, Symbol(sym) => ranks[:, n])
     end
     push!(dict, :norm_PM => normalisation)
+    push!(dict, :maxrank_PM => ranks[:, end])
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => ".dat~1")
+    filename = replace(parameters["filename"], ".json" => ".PM.dat")
     CSV.write(filename, table)
 
     push!(timesteps_super, tout)
     push!(occn_PM_super, occn_PM)
     push!(normalisation_PM_super, normalisation)
     push!(range_spins_super, range_spins)
+    push!(bond_dimensions_super, ranks)
   end
 
   # Grafici
@@ -210,6 +219,29 @@ let
                   plottitle="Numeri di occupazione (pseudomodi)",
                   plotsize=plotsize)
   savefig(plt, "occn_PM.png")
+
+  # Grafico dei ranghi del MPS
+  # --------------------------
+  ranklabels=[reduce(hcat, ["(L1,S1)";
+                            ["(S$j,S$(j+1))" for j ∈ 1:size(v, 2)-3];
+                            "(S10,R1)";
+                            "max"])
+                          for v ∈ bond_dimensions_super]
+  ranklinestyles = [reduce(hcat, [repeat([:solid], size(v, 2)-1);
+                                  :dash])
+                    for v ∈ bond_dimensions_super]
+
+  plt = groupplot(timesteps_super,
+                  bond_dimensions_super,
+                  parameter_lists;
+                  labels=ranklabels,
+                  linestyles=ranklinestyles,
+                  commonxlabel=L"t",
+                  commonylabel=L"\chi_{k,k+1}(t)",
+                  plottitle="Ranghi del MPS",
+                  plotsize=plotsize)
+
+  savefig(plt, "bond_dimensions_PM.png")
 
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
