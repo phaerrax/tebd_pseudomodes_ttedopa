@@ -254,11 +254,12 @@ let
 
   # Grafico dei numeri di occupazione (solo oscillatori sx)
   # -------------------------------------------------------
+  Nlines = 10
   plt = groupplot(timesteps_super,
-                  [occn[:, rn]
+                  [occn[:, rn[end:-1:end-Nlines+1]]
                    for (rn, occn) ∈ zip(range_osc_left_super, occn_TTEDOPA_super)],
                   parameter_lists;
-                  labels=[reduce(hcat, ["L$n" for n ∈ reverse(rn)])
+                  labels=[reduce(hcat, string.("L", 1:Nlines))
                           for rn ∈ range_osc_left_super],
                   linestyles=[reduce(hcat, repeat([:solid], length(rn)))
                               for rn ∈ range_osc_left_super],

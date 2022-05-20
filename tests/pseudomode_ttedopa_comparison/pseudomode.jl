@@ -212,7 +212,9 @@ let
                                  ["L"; ["S$n" for n ∈ eachindex(rn)]; "R"])
                           for rn ∈ range_spins_super],
                   linestyles=[reduce(hcat,
-                                     repeat([:solid], length(rn)+2))
+                                     [:dash;
+                                      repeat([:solid], length(rn));
+                                      :dash])
                               for rn ∈ range_spins_super],
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
