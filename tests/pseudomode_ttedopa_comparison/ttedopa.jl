@@ -61,6 +61,7 @@ let
   range_osc_left_super = []
   normalisation_TTEDOPA_super = []
   bond_dimensions_super = []
+  oscmaxlevels_super = []
 
   for (current_sim_n, parameters) in enumerate(parameter_lists)
     # Costruzione della catena
@@ -159,13 +160,28 @@ let
     occn(ψ) = real.(expect(ψ, "N")[1:range_spins[end]]) ./ norm(ψ)^2
     spinlinkdims(ψ) = [linkdims(ψ)[range_osc_left[end] : range_spins[end]];
                        maxlinkdim(ψ)]
+    function oscmaxlevel(ψ)
+      # Monitoro il livello massimo dell'operatore numero per i primi
+      # quattro oscillatori della catena. Per farlo, prendo |⟨d-1ⁱ∣ψ⟩|², dove
+      # ∣d-1ⁱ⟩ è lo stato più alto dell'oscillatore all'i° sito.
+      nlev = []
+      for ind ∈ last(range_osc_left, 4)
+        ground = [repeat(["0"], n_osc_left);
+                  repeat(["Dn"], n_spin_sites);
+                  repeat(["0"], n_osc_right)]
+        ground[ind] = string(ITensors.dim(sites[ind])-1)
+        push!(nlev, ground)
+      end
+      maxn = [MPS(sites, l) for l ∈ nlev]
+      return [abs2(inner(m, ψ)) for m ∈ maxn] ./ norm(ψ)^2
+    end
 
     # Evoluzione temporale
     # --------------------
     @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
 
     @time begin
-      tout, normalisation_TTEDOPA, occnlist, ranks = evolve(ψ₀,
+      tout, normalisation_TTEDOPA, occnlist, maxlevs, ranks = evolve(ψ₀,
                              time_step_list,
                              parameters["skip_steps"],
                              parameters["TS_expansion_order"],
@@ -173,12 +189,13 @@ let
                              links_even,
                              parameters["MP_compression_error"],
                              parameters["MP_maximum_bond_dimension"];
-                             fout=[norm, occn, spinlinkdims])
+                             fout=[norm, occn, oscmaxlevel, spinlinkdims])
     end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occn_TTEDOPA = mapreduce(permutedims, vcat, occnlist)
+    oscmaxlevels = mapreduce(permutedims, vcat, maxlevs)
     ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
@@ -200,7 +217,7 @@ let
     push!(dict, :norm_TTEDOPA => normalisation_TTEDOPA)
     table = DataFrame(dict)
     filename = replace(parameters["filename"], ".json" => ".TTEDOPA.dat")
-    # Scrive la tabella su un file che ha la stessa estensione del file dei
+    # Scrive la tabella su un file che ha la stessa estensione del file deITensors.i
     # parametri, con estensione modificata.
     CSV.write(filename, table)
 
@@ -211,6 +228,7 @@ let
     push!(range_spins_super, range_spins)
     push!(range_osc_left_super, range_osc_left)
     push!(bond_dimensions_super, ranks)
+    push!(oscmaxlevels_super, oscmaxlevels)
   end
 
   # Grafici
@@ -269,12 +287,27 @@ let
                   plotsize=plotsize)
   savefig(plt, "occn_oscsx_TTEDOPA.png")
 
+  # Grafico dei numeri di occupazione (solo oscillatori sx)
+  # -------------------------------------------------------
+  Nlines = 4
+  plt = groupplot(timesteps_super,
+                  oscmaxlevels_super,
+                  parameter_lists;
+                  labels=reduce(hcat, string.("L", 1:Nlines)),
+                  linestyles=reduce(hcat, repeat([:solid], 4)),
+                  commonxlabel=L"t",
+                  commonylabel=L"\langle n^{(i)}_{{d_i}-1}(t)\rangle",
+                  plottitle="Occ. del livello max degli oscillatori sx, TTEDOPA",
+                  plotsize=plotsize)
+  savefig(plt, "maxlevels_oscsx_TTEDOPA.png")
+
   # Grafico dei numeri di occupazione (solo spin)
   # ---------------------------------------------
   plt = groupplot(timesteps_super,
                   [occn[:, rn]
                    for (rn, occn) ∈ zip(range_spins_super, occn_TTEDOPA_super)],
                   parameter_lists;
+                  rescale=false,
                   labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
                           for rn ∈ range_spins_super],
                   linestyles=[reduce(hcat, repeat([:solid], length(rn)))
@@ -284,7 +317,7 @@ let
                   plottitle="Numeri di occupazione degli spin, TTEDOPA",
                   plotsize=plotsize)
   savefig(plt, "occn_spins_TTEDOPA.png")
-  
+
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
 end

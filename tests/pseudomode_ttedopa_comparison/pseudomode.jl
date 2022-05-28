@@ -251,6 +251,7 @@ let
                   [occn[:, rn] for (rn, occn) ∈ zip(range_spins_super,
                                                  occn_PM_super)],
                   parameter_lists;
+                  rescale=false,
                   labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
                           for rn ∈ range_spins_super],
                   linestyles=[reduce(hcat, repeat([:solid], length(rn)))
