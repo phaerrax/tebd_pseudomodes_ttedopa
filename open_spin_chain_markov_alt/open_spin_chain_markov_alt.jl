@@ -18,13 +18,19 @@ else
   # Se la chiave "GKSwstype" non esiste non succede niente.
 end
 
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/operators.jl")
+rootdirname = "simulazioni_tesi"
+sourcepath = Base.source_path()
+# Cartella base: determina il percorso assoluto del file in esecuzione, e
+# rimuovi tutto ciò che segue rootdirname.
+ind = findfirst(rootdirname, sourcepath)
+rootpath = sourcepath[begin:ind[end]]
+# `rootpath` è la cartella principale del progetto.
+libpath = joinpath(rootpath, "lib")
+
+include(joinpath(libpath, "utils.jl"))
+include(joinpath(libpath, "plotting.jl"))
+include(joinpath(libpath, "spin_chain_space.jl"))
+include(joinpath(libpath, "operators.jl"))
 
 # Questo programma calcola l'evoluzione della catena di spin
 # smorzata agli estremi, usando le tecniche dei MPS ed MPO.
@@ -102,16 +108,16 @@ let
     # Osservabili da misurare
     # =======================
     # - la corrente di spin
-    current_adjsitesops = [-0.5*current(sites, j, j+1)
-                      for j ∈ eachindex(sites)[1:end-1]]
+    current_adjsitesops = [current(sites, j, j+1)
+                           for j ∈ eachindex(sites)[1:end-1]]
                     
     # - la traccia di ρ
     full_trace = MPS(sites, "vecId")
 
     trace(ρ) = real(inner(full_trace, ρ))
-    occn(ρ) = real.([inner(N, ρ) / trace(ρ) for N in num_op_list])
-    current(ρ) = real.([inner(j, ρ) / trace(ρ)
-                        for j in current_adjsitesops])
+    occn(ρ) = real.([inner(N, ρ) for N ∈ num_op_list]) ./ trace(ρ)
+    spincurrent(ρ) = real.([inner(j, ρ)
+                        for j ∈ current_adjsitesops]) ./ trace(ρ)
 
     # Simulazione
     # ===========
@@ -137,32 +143,33 @@ let
                      parameters["MP_maximum_bond_dimension"];
                      fout=[trace,
                            occn,
-                           current,
+                           spincurrent,
                            linkdims])
     end
 
     # A partire dai risultati costruisco delle matrici da dare poi in pasto
     # alle funzioni per i grafici e le tabelle di output
     occnlist = mapreduce(permutedims, vcat, occnlist)
-    current_adjsiteslist = mapreduce(permutedims, vcat, current_adjsiteslist)
+    spincurrentlist = mapreduce(permutedims, vcat, current_adjsiteslist)
     ranks = mapreduce(permutedims, vcat, ranks)
 
     # Creo una tabella con i dati rilevanti da scrivere nel file di output
     dict = Dict(:time => tout)
-    for (j, name) in enumerate([Symbol("occ_n_spin$n") for n = 1:n_spin_sites])
-      push!(dict, name => occnlist[:,j])
+    sitelabels = string.("S", 1:n_spin_sites)
+    for (n, label) ∈ enumerate(sitelabels)
+      push!(dict, Symbol(string("occn_", label)) => occnlist[:, n])
     end
-    for (j, name) in enumerate([Symbol("near_current$n")
-                                for n ∈ 1:size(current_adjsiteslist, 2)])
-      push!(dict, name => current_adjsiteslist[:,j])
+    for n ∈ 1:n_spin_sites-1
+      from = sitelabels[n]
+      to   = sitelabels[n + 1]
+      sym  = "current_adjsites_$from/$to"
+      push!(dict, Symbol(sym) => spincurrentlist[:, n])
+      sym  = "rank_$from/$to"
+      push!(dict, Symbol(sym) => ranks[:, n])
     end
-    for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:n_spin_sites-1])
-      push!(dict, name => ranks[:,j])
-    end
-    push!(dict, :full_trace => normalisation)
+    push!(dict, :norm => normalisation)
     table = DataFrame(dict)
-    filename = replace(parameters["filename"], ".json" => "") * ".dat"
+    filename = replace(parameters["filename"], ".json" => ".dat")
     # Scrive la tabella su un file che ha la stessa estensione del file dei
     # parametri, con estensione modificata.
     CSV.write(filename, table)
@@ -170,7 +177,7 @@ let
     # Salvo i risultati nei grandi contenitori
     push!(timesteps_super, tout)
     push!(occ_n_super, occnlist)
-    push!(current_adjsites_super, current_adjsiteslist)
+    push!(current_adjsites_super, spincurrentlist)
     push!(bond_dimensions_super, ranks)
     push!(normalisation_super, normalisation)
   end
