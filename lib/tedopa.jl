@@ -1,6 +1,12 @@
 using PolyChaos
 using QuadGK
 
+"""
+    thermalisedJ(J::Function, ω::Real, T::Real)
+
+Creates a thermalised spectral function, starting from an already antisymmetric
+function `J`, at the temperature `T`, then return its value at `ω`.
+"""
 function thermalisedJ(J::Function,
                       ω::Real,
                       T::Real)
@@ -20,41 +26,47 @@ function thermalisedJ(J::Function,
   return f * J(ω)
 end
 
-function chainmapcoefficients(J::Function,
-                              support,
-                              L::Int;
-                              kwargs...)
+"""
+    chainmapcoefficients(J::Function, support, L::Int; <keyword arguments>)
+
+Compute the first `L` coefficients of the chain-map Hamiltonian obtained from
+the spectral density `J` defined over `support`.
+
+# Arguments
+- `J::Function`: non-negative function defined (at least) on `support`.
+- `support`: support of `J`; it can be a pair of real numbers, denoting an
+  interval, but can be more generally a list of increasing real numbers `[a1, 
+  a2, a3, …, aN]``, that will be interpreted as ``(a1,a2) ∪ (a2,a3) ∪ ⋯ ∪ 
+  (aN-1,aN)``.
+  The subdivision is ignored for the calculation of the chain coefficients, but
+  it can become useful to compute the integral of `J` over `support`, since the
+  numerical integration algorithm may need to exclude some intermediate points
+  from the domain to work (e.g. if they are singularities).
+- `L::Int`: number of oscillators in the chain.
+- `Nquad::Int`: a parameter passed to OrthoPoly, which determines the number of
+  nodes used for the quadrature method when numerical integration is performed.
+
+Keyword arguments are passed on to the OrthoPoly constructor of the set of
+orthogonal polynomials.
+
+It returns the tuple `(Ω,κ,η)` containing
+- the single-site energies `Ω`,
+- the coupling coefficients `κ` between oscillators,
+- the coupling coefficient `η` between the first oscillator and the system.
+
+The spectral function `J` is associated to the recursion coefficients ``αₙ`` and
+``βₙ`` which make up the recursion formula ``x πₙ(x) = πₙ₊₁(x) + αₙ πₙ(x) +
+βₙ πₙ₋₁(x)`` for the monic orthogonal polynomials ``{πₙ}ₙ``, ``n ∈ ℕ``
+determined by `J`. In the formula, π₋₁ is the null polynomial.
+The chain coefficients are then given by
+- ``Ωᵢ = αᵢ``, with ``i ∈ {1,…,L}``,
+- ``κᵢ = sqrt(βᵢ₊₁)``, with ``i ∈ {1,…,L-1}``,
+while `η` is the integral of `J` over its support.
+"""
+function chainmapcoefficients(J::Function, support, L::Int; kwargs...)
+  measure = PolyChaos.Measure("measure", J, (support[begin], support[end]), false, Dict())
+  poly = PolyChaos.OrthoPoly("poly", L, measure; kwargs...)
   #=
-  Calcola i coefficienti dell'Hamiltoniana ottenuta dalla "chain map", a
-  partire da una data funzione spettrale.
-
-  Argomenti
-  ---------
-  · `J::Function`: una funzione dall'intervallo specificato in `support` a 
-    valori non negativi.
-
-  · `support`: il supporto della funzione; al minimo è una coppia di numeri
-    reali, ma può anche essere una lista di numeri reali (in ordine
-    crescente), in tal caso il supporto è interpretato come l'unione degli
-    intervalli con estremi i numeri dati. Ad esempio (0,2,3,4) individua il
-    supporto (0,2)∪(2,3)∪(3,4). Questa suddivisione del supporto è del
-    tutto ignorata per calcolare i coefficienti di ricorsione, ma può
-    tornare utile per calcolare l'integrale di J, dato che a volte
-    l'algoritmo di integrazione ha bisogno di questi punti intermedi per
-    funzionare.
-
-  · `L::Int`: la lunghezza della serie di oscillatori che si desidera
-    costruire, nel senso del numero di oscillatori presenti.
-
-  · `Nquad::Int`: un parametro da passare ad OrthoPoly, che specifica il numero
-    di nodi usati nel metodo delle quadrature per calcolare gli integrali. Per
-    modificare la precisione dei risultati, modificare questo parametro.
-
-  I valori αₙ e βₙ sono i coefficienti nella formula di ricorsione
-  x πₙ(x) = πₙ₊₁(x) + αₙ πₙ(x) + βₙ πₙ₋₁(x)
-  dove {πₙ}ₙ, con n ∈ ℕ è la sequenza di polinomi ortogonali monici
-  associata alla funzione J; π₋₁ è il polinomio nullo.
-  
   Per costruire una serie di L oscillatori, servono i coefficienti αᵢ e βᵢ da
   i=0 a i=L-1: siccome però gli array sono indicizzati partendo da 1 in Julia,
   mi serviranno α[1:L] e β[1:L].
@@ -69,8 +81,6 @@ function chainmapcoefficients(J::Function,
   Rimane il coefficiente η di interazione tra oscillatore e spin, che calcolo
   come l'integrale di J sul supporto dato.
   =#
-  measure = PolyChaos.Measure("measure", J, (support[begin], support[end]), false, Dict())
-  poly = PolyChaos.OrthoPoly("poly", L, measure; kwargs...)
   α = coeffs(poly)[:,1]
   β = coeffs(poly)[:,2]
   Ω = α

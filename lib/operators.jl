@@ -1,24 +1,33 @@
 using ITensors
 
 # Costruzione della lista di operatori 2-locali
+@doc raw"""
+    twositeoperators(sites::Vector{Index{Int64}}, localcfs::Vector{<:Real}, interactioncfs::Vector{<:Real})
+
+Return a list of ITensor operators representing the two-site-gates
+decomposition of the Hamiltonian or Lindbladian of the system.
+
+The element `list[j]` is the operator ``hⱼ,ⱼ₊₁`` (or ``ℓⱼ,ⱼ₊₁``, depending on
+the notation) in the expansion
+```math
+H=\sum_{j=1}^{N}h_{j,j+1}.
+```
+
+# Arguments
+- `sites::Vector{Index}`: the sites making up the system
+- `localcfs::Vector{Index}`: coefficients of one-site operators
+- `interactioncfs::Vector{Index}`: coefficients of two-site operators
+
+Index convention: the `j`-th element refers to the ``hⱼ,ⱼ₊₁``/``ℓⱼ,ⱼ₊₁`` term.
+
+# Usage
+This function is extremely specialised to our use-case: the function
+automatically chooses some operators representing local and interaction terms,
+but their OpNames are currently hardcoded (see `localop` and `interactionop`).
+"""
 function twositeoperators(sites::Vector{Index{Int64}},
     localcfs::Vector{<:Real},
     interactioncfs::Vector{<:Real})
-  # Restituisce la lista di termini (che dovranno essere poi esponenziati nel
-  # modo consono alla simulazione) dell'Hamiltoniano o del “Lindbladiano” che
-  # agiscono sulle coppie di siti adiacenti della catena.
-  # L'elemento list[j] è l'operatore hⱼ,ⱼ₊₁ (o ℓⱼ,ⱼ₊₁, a seconda della notazione)
-  #
-  # Argomenti
-  # ---------
-  # · `sites::Vector{Index}`: un vettore di N elementi, contenente gli Index
-  #   che rappresentano i siti del sistema;
-  # · `localcfs::Vector{Index}`: un vettore di N elementi contenente i
-  #   coefficienti che moltiplicano i termini locali dell'Hamiltoniano o del
-  #   Lindbladiano
-  # · `interactioncfs::Vector{Index}`: un vettore di N-1 elementi contenente i
-  #   coefficienti che moltiplicano i termini di interazione tra siti adiacenti,
-  #   con la convenzione che l'elemento j è riferito al termine hⱼ,ⱼ₊₁/ℓⱼ,ⱼ₊₁.
   list = ITensor[]
   localcfs[begin] *= 2
   localcfs[end] *= 2
@@ -37,6 +46,15 @@ function twositeoperators(sites::Vector{Index{Int64}},
 end
 
 # Operatori locali
+"""
+    localop(s::Index)
+
+Return the local ITensor operator associated to `s`'s SiteType.
+
+# Usage
+Currently this is just a way to simplify code, the user doesn't really have a
+say in which operator is used, it is just hardcoded.
+"""
 function localop(s::Index)
   if SiteType("S=1/2") ∈ sitetypes(s)
     t = 0.5op("σz", s)
@@ -57,6 +75,15 @@ function localop(s::Index)
 end
 
 # Operatori di interazione
+"""
+    interactionop(s1::Index, s2::Index)
+
+Return the ITensor local operator associated to the SiteTypes of `s1` and `s2`.
+
+# Usage
+Currently this is just a way to simplify code, the user doesn't really have a
+say in which operator is used, it is just hardcoded.
+"""
 function interactionop(s1::Index, s2::Index)
   if SiteType("S=1/2") ∈ sitetypes(s1) && SiteType("S=1/2") ∈ sitetypes(s2)
     t = -0.5 * (op("σ-", s1) * op("σ+", s2) +
@@ -113,6 +140,35 @@ function interactionop(s1::Index, s2::Index)
   return t
 end
 
+"""
+    evolve(initialstate, timesteplist, nskip, STorder, linksodd, linkseven, maxerr, maxrank; fout)
+
+Evolves the initial state in time using the TEBD algorithm.
+Return a list of the values of the functions passed within `fout` at each time
+instant, together with a list of such instants.
+
+# Arguments
+- `initialstate` → MPS of the initial state
+- `timesteplist` → list of the time steps at which the state is evolved
+- `nskip`        → number of time steps to be skipped between each evaluation
+  of the output functions
+- `STorder`      → order of Suzuki-Trotter expansion
+- `linksodd`     → two-site gates on odd sites
+- `linkseven`    → two-site gates on even sites
+- `maxerr`       → maximum truncation error of the MPS during evolution
+- `maxrank`      → maximum allowed rank of the MPS during evolution
+- `fout`         → list of functions which take an MPS as their only argument
+
+The state is evolved through each of the instants specified in `timesteplist`,
+but functions in `fout` are evaluated only after `nskip` steps each time. This
+could save some computation time if a fine-grained output is not needed.
+
+# Example
+If `fout = [a1, a2]`, the function returns the tuple `(ts, b1, b2)` where
+`b1` and `b2` are the result of applying `a1` and `a2` on the state for each
+time instant in `ts`, that is `b1[j]` is equal to `a1` applied to the state at
+`ts[j]`.
+"""
 function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
     linkseven, maxerr, maxrank; fout)
   @info "Calcolo della decomposizione di Suzuki-Trotter dell'operatore di evoluzione."
@@ -187,6 +243,17 @@ end
 
 # Corrente tra due oscillatori
 # ----------------------------
+"""
+    current(sites, leftsite::Int, rightsite::Int)
+
+Return the current operator from site `leftsite` to `rightside` in `sites`.
+
+# Usage
+The sites (strictly) between the given sites are assigned the ITensor operator
+with OpName "Z"; `sites(leftsite)` and `sites(rightsite)` are assigned "plus"
+and "minus", and other sites are assigned "Id" operators. All these operators
+thus must be correctly defined in order to use this function.
+"""
 function current(sites,
     leftsite::Int,
     rightsite::Int)

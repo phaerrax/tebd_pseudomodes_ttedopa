@@ -22,10 +22,16 @@ a⁺(dim::Int) = diagm(-1 => [sqrt(j) for j = 1:dim-1])
 num(dim::Int) = a⁺(dim) * a⁻(dim)
 id(dim::Int) = Matrix{Int}(I, dim, dim)
 
+"""
+	oscdimensions(N, basedim, decay)
+
+Compute a decreasing sequence of length `N` where the first two elements are
+equal to `basedim` and the following ones are given by
+floor(2 + basedim * ℯ^(-decay * n).
+
+Useful to determine the dimensions of oscillator sites in a TEDOPA chain.
+"""
 function oscdimensions(length, basedim, decay)
-  # Restituisce una sequenza decrescente da `basedim` a 2, da assegnare come
-  # dimensione dello spazio di Hilbert della catena di oscillatori, in modo
-  # che quelli più in profondità della catena non siano inutilmente grandi.
   f(j) = 2 + basedim * ℯ^(-decay * j)
   return [basedim; basedim; (Int ∘ floor ∘ f).(3:length)]
 end
@@ -129,7 +135,6 @@ che venga saltata.
 =#
 ITensors.state(sn::StateName, st::SiteType, s::Index; kwargs...) = nothing
 
-# Gli stati della base canonica (êₙ:êₙ) ≡ êₙ ⊗ êₙ
 function ITensors.state(::StateName{N}, ::SiteType"vecOsc"; dim=2) where {N}
   n = parse(Int, String(N))
   v = zeros(dim)
@@ -137,8 +142,7 @@ function ITensors.state(::StateName{N}, ::SiteType"vecOsc"; dim=2) where {N}
   return v ⊗ v
 end
 
-# Lo stato di equilibrio termico Z⁻¹vec(exp(-βH)) = Z⁻¹vec(exp(-ω/T N))
-function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; dim=2, ω, T)
+function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; dim=2, ω::Real, T::Real)
   if T == 0
     v = state(StateName("0"), st; dim=dim)
   else
@@ -149,9 +153,7 @@ function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; dim=2, ω, T
   return v
 end
 
-# Stati del tipo êⱼ ⊗ êₖ (servono ad esempio per poter calcolare, tramite una
-# proiezione su di essi, la componente j,k di una matrice definita su un sito
-# di tipo "vecOsc").
+# TODO: fix the signature of the function (j and k should be mandatory args).
 function ITensors.state(::StateName"mat_comp", ::SiteType"vecOsc"; dim=2, j::Int, k::Int)
   êⱼ = zeros(dim)
   êₖ = zeros(dim)
@@ -384,9 +386,11 @@ function mixedlindbladminus(s1::Index{Int64}, s2::Index{Int64})
           0.5*(op("⋅a-", s1) * op("⋅a+", s2) +
                op("⋅a-", s2) * op("⋅a+", s1)))
 end
+
 # Proiezione sugli autostati dell'operatore numero
 # ------------------------------------------------
 # Il sito è uno solo quindi basta usare i vettori della base canonica
+# TODO: check if this function really has a point
 function osc_levels_proj(site::Index{Int64}, level::Int)
   st = state(site, "$level")
   return MPS([st])
@@ -394,13 +398,21 @@ end
 
 # Scelta dello stato iniziale dell'oscillatore
 # --------------------------------------------
-# Con un'apposita stringa nei parametri è possibile scegliere lo stato da cui
-# far partire l'oscillatore. La seguente funzione traduce la stringa
-# nell'MPS desiderato, in modo case-insensitive. Le opzioni sono:
-# · "thermal": stato di equilibrio termico
-# · "fockN": autostato dell'operatore numero con N quanti di eccitazione
-# · "empty": alias per "fock0"
+"""
+    parse_init_state_osc(site::Index{Int64}, statename::String; <keyword arguments>)
+
+Return an MPS representing a particular state of a harmonic oscillator, given
+by the string `statename`:
+
+- "thermal" → thermal equilibrium state
+- "fockN"   → `N`-th eigenstate of the number operator (element of Fock basis)
+- "empty"   → alias for "fock0"
+
+The string is case-insensitive. Other parameters required to build the state
+may be supplied as keyword arguments.
+"""
 function parse_init_state_osc(site::Index{Int64}, statename::String; kwargs...)
+  # TODO: maybe remove "init" from title? It is a generic state, after all.
   statename = lowercase(statename)
   if statename == "thermal"
     s = state(site, "ThermEq"; kwargs...)

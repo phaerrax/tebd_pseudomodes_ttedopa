@@ -14,13 +14,33 @@ using LinearAlgebra
 # queste formule di vettorizzazione abbiano senso solo quando la base scelta
 # è ortonormale rispetto a tale prodotto interno: vanno bene ad esempio la
 # base canonica o quella di Gell-Mann.
+"""
+    vec(A::Matrix, basis::Vector)
+
+Compute the vector of coefficients of the matrix `A` wrt the basis `basis`.
+"""
 function vec(A::Matrix, basis::Vector)
   return [tr(b' * A) for b ∈ basis]
 end
+"""
+    vec(L::Function, basis::Vector)
+
+Compute the matrix of coefficients of the linear map `L` wrt the basis `basis`.
+The linearity of the map is not checked, so using this function with non-linear
+functions leads to undefined results.
+"""
 function vec(L::Function, basis::Vector)
   return [tr(bi' * L(bj)) for (bi, bj) ∈ Base.product(basis, basis)]
 end
 
+"""
+    partialtrace(sites::Vector{Index{Int64}}, v::MPS, j::Int)
+
+Compute the partial trace, on the `j`-th site of `sites`, of the matrix
+represented, as vectorised, by the MPS `v`.
+The result is a `Vector` containing the coordinates of the partial trace
+(which is a matrix).
+"""
 function partialtrace(sites::Vector{Index{Int64}}, v::MPS, j::Int)
   # Calcola la traccia parziale della matrice rappresentata (tramite
   # vettorizzazione) dal MPS `v` nel j° sito.
@@ -48,16 +68,22 @@ end
 
 # Matrici di Gell-Mann generalizzate
 # ==================================
-# Le matrici sono qui indicizzate come segue:
-# · se j > k restituisce le matrici simmetriche con diagonale nulla,
-# · se j < k restituisce le matrici antisimmetriche,
-# · se j = k restituisce le matrici diagonali.
-# Gli interi j e k determinano anche le componenti che non sono nulle.
-# Il totale delle matrici di Gell-Mann generalizzate è dim²-1 come richiesto;
-# aggiungo alla fine (per il caso j = k = dim) la matrice identità, e completo
-# la base per Mat(ℂᵈⁱᵐ).
-# Le matrici sono normalizzate in modo da essere ortonormali rispetto al
-# prodotto interno (A,B) = tr(A†B)
+"""
+    gellmannmatrix(j, k, dim)
+
+Return the `(j,k)` generalised Gell-Mann matrix of dimension `dim`, normalised
+wrt the Hilbert-Schmidt inner product ``(A,B) = tr(A†B)``.
+The matrices are indexed as follows:
+
+    * if ``j > k`` the matrix is symmetric and traceless;
+    * if ``j < k`` the matrix is antisymmetric;
+    * if ``j = k`` the matrix is diagonal.
+
+In particular, ``j = k = dim`` gives a matrix proportional to the identity.
+The two indices `j` and `k` determine the non-zero coefficients of the matrix.
+The whole set of (different) Gell-Mann matrices that can be generated with this
+function is a basis of ``Mat(ℂᵈⁱᵐ)``.
+"""
 function gellmannmatrix(j, k, dim)
   if j > dim || k > dim || j < 0 || k < 0
     throw(DomainError)
@@ -83,6 +109,12 @@ function gellmannmatrix(j, k, dim)
   return m
 end
 
+"""
+    gellmannbasis(dim)
+
+Return a list containing the "Hermitian basis" of ``Mat(ℂᵈⁱᵐ)``, i.e. composed
+of the ``dim²`` generalised Gell-Mann matrices.
+"""
 function gellmannbasis(dim)
   return [gellmannmatrix(j, k, dim)
           for (j, k) ∈ [Base.product(1:dim, 1:dim)...]]
@@ -90,19 +122,30 @@ function gellmannbasis(dim)
   # sia una lista di matrici (un Vector, per la precisione) e non una Matrix.
 end
 
-# Inserisco anche una definizione della base canonica di Mat(ℂᵈⁱᵐ): non mi serve
-# tanto perché è una costruzione difficile, ma perché voglio impostare l'ordine
-# in cui appaiono gli elementi della base. Nel modo in cui lo faccio sotto,
-# l'ordine corrisponde a come si fa la vettorizzazione delle matrici, cioè
-# canonicalbasis(dim)[j] = canonicalmatrix((j-1)%dim + 1, (j-1)÷dim + 1, dim)
-# con j ∈ {1,…,dim²}. Di conseguenza, se A ∈ Mat(ℂᵈⁱᵐ), vale
-# vec(A)ᵢ = tr(canonicalbasis(dim)[j]' * A).
+"""
+    canonicalmatrix(i, j, dim)
+
+Return the (`i`,`j`) element of the canonical basis of ``Mat(ℂᵈⁱᵐ)``, i.e. a
+`dim`×`dim` matrix whose element on the `i`-th row and `j`-th column is ``1``,
+and zero elsewhere.
+"""
 function canonicalmatrix(i, j, dim)
   m = zeros(ComplexF64, dim, dim)
   m[i,j] = 1
   return m
 end
 
+"""
+    canonicalbasis(dim)
+
+Return a list of the matrices in the canonical basis of ``Mat(ℂᵈⁱᵐ)``. 
+The list is ordered corresponding to column-based vectorisation, i.e.
+
+    canonicalbasis(dim)[j] = canonicalmatrix((j-1)%dim + 1, (j-1)÷dim + 1, dim)
+
+with ``j ∈ {1,…,dim²}``. With this ordering,
+``vec(A)ⱼ = tr(canonicalbasis(dim)[j]' * A)``.
+"""
 function canonicalbasis(dim)
   return [canonicalmatrix(i, j, dim)
           for (i, j) ∈ [Base.product(1:dim, 1:dim)...]]
@@ -110,9 +153,14 @@ end
 
 # Entropia (di Von Neumann)
 # =========================
+"""
+    vonneumannentropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
+
+Compute the entanglement entropy of the biparition ``(1,…,n)|(n+1,…,N)`` of
+the system in state described by the MPS `ψ` (defined on the sites `sites`),
+using its Schmidt decomposition.
+"""
 function vonneumannentropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
-  # Calcola l'entropia di entanglement della bipartizione (1,…,n)|(n+1,…,N)
-  # del sistema nello stato ψ usando la decomposizione di Schmidt.
   orthogonalize!(ψ, n)
   # Decomponi ψ[n] nei suoi valori singolari, trattando il Link tra il sito
   # n-1 e il sito n e l'indice fisico come "indici di riga"; il Link tra il
@@ -124,37 +172,69 @@ function vonneumannentropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
   return -sum(p -> p * log(p), sqdiagS; init=0.0)
 end
 
-# Chop da Mathematica
-# ===================
-# Imitazione della funzione "Chop" di Mathematica. Tronca l'argomento a zero
-# se è al di sotto di una data soglia.
+# Chop (da Mathematica)
+# =====================
+# Imitazione della funzione "Chop" di Mathematica.
+"""
+    chop(x::Real; tolerance=1e-10)
+
+Truncates `x` to zero if it is less than `tolerance`.
+"""
 function chop(x::Real; tolerance=1e-10)
   return abs(x) > tolerance ? x : zero(x)
 end
 
+"""
+    chop(x::Complex; tolerance=1e-10)
+
+Truncates the real and/or the imaginary part of `x` to zero if they are less
+than `tolerance`.
+"""
 function chop(x::Complex; tolerance=1e-10)
   return Complex(chop(real(x)), chop(imag(x)))
 end
 
 # Manipolazione dei dati di oggetti di ITensors
 # =============================================
+"""
+    sitetypes(s::Index)
+
+Return the ITensor tags of `s` as SiteTypes. 
+
+This function is already defined in the ITensor library, but it is not publicly
+accessible.
+"""
 function sitetypes(s::Index)
-  # Questa funzione estrae i tag dell'oggetto Index fornito, e costruisce per
-  # ciascuno un oggetto SiteType. Questi SiteType possono poi essere interpretati
-  # da una funzione che riceve l'Index come argomento per capire come comportarsi.
-  # [La funzione è già presente nella libreria ITensors, ma è solo interna, quindi
-  # devo ricopiarla qui per poterla utilizzare.]
+  # Questi SiteType possono poi essere interpretati da una funzione che riceve
+  # l'Index come argomento per capire come comportarsi.
   ts = tags(s)
   return SiteType[SiteType(ts.data[n]) for n in 1:length(ts)]
 end
 
 # Lettura dei parametri della simulazione
 # =======================================
+"""
+    isjson(filename::String)
+
+Check if `filename` ends in ".json".
+
+By design, filenames consisting of only ".json" return `false`.
+"""
 function isjson(filename::String)
   return length(filename) > 5 && filename[end-4:end] == ".json"
   # Volutamente, un file che di nome fa solo ".json" viene ignorato.
 end
 
+"""
+    load_parameters(file_list)
+
+Load the JSON files contained in `file_list` into dictionaries, returning a
+list of dictionaries, one for each file.
+
+If `file_list` is a filename, then the list will contain just one dictionary;
+if `file_list` is a directory, every JSON file within it is loaded and a
+dictionary is created for each one of them.
+"""
 function load_parameters(file_list)
   if isempty(file_list)
     throw(ErrorException("Non è stato fornito alcun file di parametri."))
@@ -196,10 +276,15 @@ end
 
 # Costruzione della lista di istanti di tempo per la simulazione
 # ==============================================================
+"""
+    construct_step_list(parameters)
+
+Return a list of time instants at which the time evolution will be evaluated.
+
+The values run from zero up to ``parameters["simulation_end_time"]``, with a
+step size equal to ``parameters["simulation_time_step"]``.
+"""
 function construct_step_list(parameters)
-  # Restituisce la lista degli istanti di tempo attraversati dalla
-  # simulazione. Se "simulation_time_step" è un multiplo (intero) di
-  # "simulation_end_time", la lista comprenderà anche l'estremo finale.
   τ = parameters["simulation_time_step"]
   end_time = parameters["simulation_end_time"]
   return collect(range(0, end_time; step=τ))
@@ -209,6 +294,9 @@ end
 # =============================================
 # Per calcolare gli autostati dell'operatore numero: calcolo anche la somma
 # di tutti i coefficienti (così da verificare che sia pari a 1).
+# TODO: these two functions are probably outdated. Anyway they are not
+# specific to the occupation levels, so they should have a more general
+# description.
 function levels(projs::Vector{MPO}, state::MPS)
   lev = [real(inner(state, p * state)) for p in projs]
   return [lev; sum(lev)]
@@ -219,12 +307,22 @@ function levels(projs::Vector{MPS}, state::MPS)
 end
 
 # Rilevazione della dimensione dei legami tra i siti degli MPS o MPO
+"""
+    linkdims(m::Union{MPS, MPO})
+
+Return a list of the bond dimensions of `m`.
+"""
 function linkdims(m::Union{MPS, MPO})
   return [ITensors.dim(linkind(m, j)) for j ∈ 1:length(m)-1]
 end
 
 # Composizione di MPS e MPO
 # =========================
+"""
+    chain(left::MPS, right::MPS)
+
+Concatenate `left` and `right`, returning `left` ``⊗`` `right`.
+"""
 function chain(left::MPS, right::MPS)
   # Questa funzione dovrebbe essere l'analogo di `chain` di mpnum: prende
   # due MPS e ne crea uno che ne è la concatenazione.
@@ -260,6 +358,11 @@ function chain(left::MPS, right::MPS)
   return M
 end
 
+"""
+    chain(left::MPO, right::MPO)
+
+Concatenate `left` and `right`, returning `left` ``⊗`` `right`.
+"""
 function chain(left::MPO, right::MPO)
   # Come sopra, ma per due MPO.
   midN = length(left) # È l'indice a cui si troverà il "buco"
@@ -286,27 +389,39 @@ function chain(left::MPO, right::MPO)
 end
 
 # Variante a numero di argomenti libero
+"""
+    chain(a::MPS, b...)
+
+Concatenate the given MPSs into a longer MPS, returning their tensor product.
+"""
 chain(a::MPS, b...) = chain(a, chain(b...))
+"""
+    chain(a::MPO, b...)
+
+Concatenate the given MPOs into a longer MPO, returning their tensor product.
+"""
 chain(a::MPO, b...) = chain(a, chain(b...))
 
+"""
+    embed_slice(sites::Array{Index{Int64}}, range::UnitRange{Int}, slice::MPO)
+
+Embed `slice`, defined on a subset `range` of `sites`, into a MPO which covers
+the whole `sites`.
+
+The MPO is extended by filling the empty spots with an "Id" operator, therefore
+an operator with OpName "Id" is required to be defined for the SiteTypes of the
+remaining sites.
+
+# Arguments
+- `sites::Array{Index{Int64}}`: the sites of the whole system.
+- `range::UnitRange{Int}`: the range spanned by `slice`.
+- `slice::MPO`: the MPO to be extended.
+"""
 function embed_slice(sites::Array{Index{Int64}},
                      range::UnitRange{Int},
                      slice::MPO)
-  #=
-  Prende un MPO definito solo su una fetta dei siti e lo estende con operatori
-  identità per creare un MPO definito su tutti i siti.
-  È richiesto che per i SiteType degli elementi di sites non compresi nella
-  fetta data sia definito un operatore di nome "Id".
-
-  Argomenti
-  ---------
-  · `sites::Array{Index{Int64}}`: l'array di siti dell'intero sistema.
-
-  · `range::UnitRange{Int}`: un intervallo che indica il sito iniziale e il
-    sito finale del MPO fornito che deve essere esteso.
-
-  · `slice::Array{ITensors}`: il MPO da estendere.
-  =#
+  # TODO: compute automatically on which sites the MPO is defined, without
+  # having to supply the range explicitly as an argument.
   # Controllo dei parametri
   if length(slice) != length(range)
     throw(DimensionMismatch("Le dimensioni di slice e range non combaciano."))
@@ -331,23 +446,24 @@ function embed_slice(sites::Array{Index{Int64}},
   return mpo
 end
 
+"""
+    embed_slice(sites::Array{Index{Int64}}, range::UnitRange{Int}, slice::MPS)
+
+Embed `slice`, defined on a subset `range` of `sites`, into a MPS which covers
+the whole `sites` (to be interpreted as a vectorised operator).
+
+The MPS is extended by filling the empty spots with a "vecId" operator,
+therefore an operator with OpName "vecId" is required to be defined for the
+SiteTypes of the remaining sites.
+
+# Arguments
+- `sites::Array{Index{Int64}}`: the sites of the whole system.
+- `range::UnitRange{Int}`: the range spanned by `slice`.
+- `slice::MPS`: the MPS to be extended.
+"""
 function embed_slice(sites::Array{Index{Int64}},
                      range::UnitRange{Int},
                      slice::MPS)
-  #=
-  Lo stesso di `embed_slice` per gli MPO, ma per gli MPS (e con "vecId" al
-  posto di "Id"). Utile per gli stati vettorizzati che rappresentano
-  osservabili da misurare.
-
-  Argomenti
-  ---------
-  · `sites::Array{Index{Int64}}`: l'array di siti dell'intero sistema.
-
-  · `range::UnitRange{Int}`: un intervallo che indica il sito iniziale e il
-    sito finale del MPO fornito che deve essere esteso.
-
-  · `slice::Array{ITensors}`: il MPS da estendere.
-  =#
   # Controllo dei parametri
   if length(slice) != length(range)
     throw(DimensionMismatch("Le dimensioni di slice e range non combaciano."))

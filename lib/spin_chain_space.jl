@@ -214,10 +214,8 @@ end
 
 # Operatori della corrente di spin
 # ================================
-# Jₖ,ₖ₊₁ = -λ/2 (σˣ₍ₖ₎σʸ₍ₖ₊₁₎ - σʸ₍ₖ₎σˣ₍ₖ₊₁₎)
 function J⁺tag(::SiteType"S=1/2", left_site::Int, i::Int)
-  # Questa funzione restituisce i nomi degli operatori da assegnare al
-  # sito i-esimo per la parte σˣ⊗σʸ di Jₖ,ₖ₊₁ (k ≡ left_site)
+  # TODO: still useful?
   if i == left_site
     str = "σx"
   elseif i == left_site + 1
@@ -307,9 +305,15 @@ La seguente funzione restituisce i nomi per costruire i MPS degli
 stati della base dell'intero spazio della catena (suddivisi per
 numero di occupazione complessivo).
 =#
-function chain_basis_states(n_sites::Int, level::Int)
+"""
+    chain_basis_states(n::Int, level::Int)
+
+Return a list of strings which can be used to build the MPS of all states in
+the ``ℂ²ⁿ`` basis that contain `level` "Up" spins.
+"""
+function chain_basis_states(n::Int, level::Int)
   return unique(permutations([repeat(["Up"], level);
-                              repeat(["Dn"], n_sites - level)]))
+                              repeat(["Dn"], n - level)]))
 end
 
 # La seguente funzione crea un proiettore su ciascun sottospazio con
@@ -317,16 +321,21 @@ end
 # Metodo "crudo": prendo tutti i vettori della base ortonormale di
 # ciascun autospazio, ne creo i proiettori ortogonali e li sommo tutti.
 # Forse poco efficiente, ma funziona.
-function level_subspace_proj(sites::Vector{Index{Int64}}, level::Int)
+"""
+    level_subspace_proj(sites::Vector{Index{Int64}}, l::Int)
+
+Return the projector on the subspace with `l` "Up" spins.
+"""
+function level_subspace_proj(sites::Vector{Index{Int64}}, l::Int)
   N = length(sites)
   # Controllo che i siti forniti siano degli spin ½.
   if all(x -> SiteType("S=1/2") in x, sitetypes.(sites))
     projs = [projector(MPS(sites, names); normalize=false)
-             for names in chain_basis_states(N, level)]
+             for names in chain_basis_states(N, l)]
   elseif all(x -> SiteType("vecS=1/2") in x, sitetypes.(sites)) ||
          all(x -> SiteType("HvS=1/2") in x, sitetypes.(sites))
     projs = [MPS(sites, names)
-             for names in chain_basis_states(N, level)]
+             for names in chain_basis_states(N, l)]
   else
     throw(ArgumentError("spin_current_op_list è disponibile per siti di tipo "*
                         "\"S=1/2\", \"vecS=1/2\" oppure \"HvS=1/2\"."))
@@ -356,6 +365,11 @@ end
 # 0 0 0 0 … ε
 # che ha come autostati vⱼ= ∑ₖ sin(kjπ /(N+1)) sₖ, con j=1:N.
 # Attenzione poi a normalizzarli: ‖vⱼ‖² = (N+1)/2.
+"""
+    single_ex_state(sites::Vector{Index{Int64}}, k::Int)
+
+Return the MPS of a state with a single excitation on the `k`-th site.
+"""
 function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
   N = length(sites)
   if k ∈ 1:N
@@ -369,7 +383,16 @@ function single_ex_state(sites::Vector{Index{Int64}}, k::Int)
   return MPS(sites, states)
 end
 
+"""
+    chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
+
+Return the `j`-th eigenstate of the chain Hamiltonian in the single-excitation
+subspace.
+"""
 function chain_L1_state(sites::Vector{Index{Int64}}, j::Int)
+  # FIXME: as of now this function covers only the vectorised case...
+  # and silently gives the wrong result if used on S=1/2 SiteTypes.
+  #
   # Occhio ai coefficienti: questo, come sopra, non è il vettore vⱼ ma è
   # vec(vₖ⊗vₖᵀ) = vₖ⊗vₖ: di conseguenza i coefficienti della combinazione
   # lineare qui sopra devono essere usati al quadrato.
@@ -399,6 +422,19 @@ end
 # · "empty": stato vuoto
 # · "1locM": stato con una (sola) eccitazione localizzata nel sito M ∈ {1,…,N}
 # · "1eigM": autostato del primo livello con M ∈ {0,…,N-1} nodi
+"""
+    parse_init_state(sites::Vector{Index{Int64}}, state::String)
+
+Return an MPS representing a particular state of the spin chain, given
+by the string `state`:
+
+  * "empty" -> empty state (aka the ground state of the chain Hamiltonian)
+  * "1locM" -> state with a single excitation at site `M` (``M ∈ {1,…,N}``)
+  * "1eigM" -> single-excitation eigenstate of the chain Hamiltonian with `M` nodes (``M ∈ {0,…,N-1}``)
+
+The string is case-insensitive. The length `N` of the chain is computed
+from `sites`. 
+"""
 function parse_init_state(sites::Vector{Index{Int64}}, state::String)
   state = lowercase(state)
   if state == "empty"
@@ -418,7 +454,16 @@ function parse_init_state(sites::Vector{Index{Int64}}, state::String)
   return v
 end
 
-# La seguente funzione è come quella sopra, ma per uno spin solo.
+"""
+    parse_spin_state(site::Index{Int64}, state::String)
+
+Return the MPS of a single spin site representing a particular state, given
+by the string `state`:
+
+- "empty", "dn", "down" → spin-down state
+- "up"                  → spin-up state
+- "x+"                  → ``1/√2 ( |+⟩ + |-⟩ )`` state
+"""
 function parse_spin_state(site::Index{Int64}, state::String)
   state = lowercase(state)
   if state == "empty" || state == "dn" || state == "down"

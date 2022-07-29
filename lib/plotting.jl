@@ -5,10 +5,15 @@ using JSON
 
 # Grafici
 # =======
+"""
+    categorise_parameters(parameter_lists)
+
+Parse the lists in `parameter_lists` and splits them in two list according
+whether they are unique or repeated.
+
+Returns two lists, `unique` and `repeated`, packed into a tuple.
+"""
 function categorise_parameters(parameter_lists)
-  # Analizzo l'array dei parametri e individuo quali parametri variano tra un
-  # caso e l'altro, suddividendoli tra "distinti" se almeno uno dei parametri
-  # è diverso tra le simulazioni, e "ripetuti" se sono invece tutti uguali.
   distinct = String[]
 
   # Devo controllare ciascuna lista di parametri per controllare se specifica
@@ -34,10 +39,13 @@ function categorise_parameters(parameter_lists)
   return distinct, repeated
 end
 
+"""
+    subplot_title(values_dict, keys)
+
+Create a custom title for each subplot in a group, displaying the parameters
+which have different values among the subplots.
+"""
 function subplot_title(values_dict, keys)
-  # Questa funzione costruisce il titolo personalizzato per ciascun sottografico,
-  # che indica solo i parametri che cambiano da una simulazione all'altra
-  #
   rootdirname = "simulazioni_tesi"
   sourcepath = Base.source_path()
   ind = findfirst(rootdirname, sourcepath)
@@ -53,15 +61,21 @@ function subplot_title(values_dict, keys)
               ", ")
 end
 
+"""
+    shared_title_fake_plot(subject::String, parameters)
+    
+Create a fake plot containing only a string, which acts as the title of a
+group of other subplots.
+
+Since Plots.jl does not yet provide a mean to assign a title to a plot group,
+we make do with this function.
+The title will contain the parameters which are common to all subplots.
+"""
 function shared_title_fake_plot(subject::String, parameters)
-  #= Siccome Plots.jl non ha ancora, che io sappia, un modo per dare un titolo
-     a un gruppo di grafici, mi arrangio con questa soluzione trovata su
-     StackOverflow, che consiste nel creare un grafico vuoto che contiene il
-     titolo voluto come annotazione.
-     Il titolone contiene i parametri comuni a tutte le simulazioni (perciò
-     posso prendere senza problemi uno degli elementi di parameter_lists
-     qualunque) e lo uso come titolo del gruppo di grafici.
-  =#
+  # Siccome l titolone contiene i parametri comuni a tutte le simulazioni,
+  # posso prendere senza problemi uno degli elementi di parameter_lists
+  # qualunque) e lo uso come titolo del gruppo di grafici.
+  #
   # Inserire in questo array i parametri che non si vuole che appaiano nel
   # titolo:
   hidden_parameters = ["simulation_end_time", "skip_steps", "filename"]
@@ -81,10 +95,37 @@ function shared_title_fake_plot(subject::String, parameters)
                        for k in setdiff(repeated_parameters, hidden_parameters)],
                       ", ")
   y = ones(3) # Dati falsi per far apparire un grafico
-  title_fake_plot = Plots.scatter(y, marker=0, markeralpha=0, ticks=nothing, annotations=(2, y[2], text(subject * "\n" * shared_title)), axis=false, grid=false, leg=false, bottom_margin=2cm, size=(200,100))
+  title_fake_plot = Plots.scatter(y, marker=0, markeralpha=0, ticks=nothing, annotations=(2, y[2], Plots.text(subject * "\n" * shared_title)), axis=false, grid=false, leg=false, bottom_margin=2cm, size=(200,100))
   return title_fake_plot
 end
 
+"""
+    groupplot(x_super, y_super, parameter_super; maxyrange = nothing, rescale = true, labels, linestyles, commonxlabel, commonylabel, plottitle, plotsize)
+
+Create an image which groups the plots of each ``(X,Y) ∈ x_super × y_super``;
+on top of the plots, a title is created which lists the common parameters among
+the subplots; parameters which differ among the plots are instead displayed
+above each subplot.
+
+# Arguments
+- `x_super` → list of lists, each one representing the x-axis of a subplot..
+- `y_super` → list of lists, corresponding to the relative element in `x_super`.
+  It tries to mimic the Plots.jl syntax, i.e. when the elements in `y_super`
+  are matrices, they are split by columns.
+- `parameter_lists` → list of dictionaries, containing the parameters
+  associated to each element in `x_super`.
+- `labels`::Union{Matrix{String},Vector{Matrix{String}}} → array of labels for
+  the lines in each subplot. If it is a Vector, it is split among the subplots,
+  else it is repeated for each one of them.
+- `linestyles` → just like `labels`, but for line styles.
+- `commonxlabel` → x-axis label (common to all subplots).
+- `commonylabel` → y-axis label (common to all subplots).
+- `maxyrange` → y-axis range at which the subplots may be clipped
+- `rescale` → if `true`, all subplots are rescaled so that they have the same
+  y-axis.
+- `plottitle` → title of the plot group.
+- `plotsize` → a Pair denoting the size of the individual subplots.
+"""
 function groupplot(x_super,
     y_super,
     parameter_super;
@@ -96,50 +137,15 @@ function groupplot(x_super,
     commonylabel,
     plottitle,
     plotsize)
-  #= Crea un'immagine che raggruppa i grafici dei dati delle coppie
-     (X,Y) ∈ x_super × y_super; in alto viene posto un titolo, grande, che
-     elenca anche i parametri usati nelle simulazioni e comuni a tutti i
-     grafici; ad ogni grafico invece viene assegnato un titolo che contiene
-     i parametri diversi tra una simulazione e l'altra.
-
-     Argomenti
-     ---------
-     · `x_super`: un array, ogni elemento del quale è una lista di numeri
-       che rappresentano le ascisse del grafico, ad esempio istanti di tempo,
-       numeri dei siti, eccetera.
-
-     · `y_super`: un array, ogni elemento del quale è quello che si passerebbe
-       alla funzione Plots.plot insieme al rispettivo elemento Xᵢ ∈ x_super
-       per disegnarne il grafico. Questo significa che ogni Yᵢ ∈ y_super è una 
-       matrice M×N con M = length(Xᵢ); N è il numero di colonne, e ogni
-       colonna rappresenta una serie di dati da graficare. Ad esempio, per
-       graficare tutti assieme i numeri di occupazione di 10 siti si può
-       creare una matrice di 10 colonne: ogni riga della matrice conterrà
-       i numeri di occupazione dei siti a un certo istante di tempo.
-
-     · `parameter_lists`: un array di dizionari, ciascuno contenente i
-       parametri che definiscono la simulazione dei dati degli elementi di
-       x_super e y_super.
-
-     · `labels`::Matrix{String} oppure Vector{Matrix{String}}: un array di
-       che contiene le etichette da assegnare alla linea di ciascuna quantità
-       da disegnare.
-
-     · `linestyles`: come `labels`, ma per gli stili delle linee.
-
-     · `commonxlabel`: etichetta delle ascisse (comune a tutti)
-
-     · `commonylabel`: etichetta delle ordinate (comune a tutti)
-     
-     · `maxyrange`: minimo e massimo valore delle ordinate da mostrare (per tutti) 
-
-     · `rescale`: se è impostato su vero, tutti i grafici vengono disegnati con
-       una scala comune, in modo che tutti gli assi delle ordinate (nel gruppo)
-       siano uguali
-
-     · `plottitle`: titolo grande del grafico
-
-     · `plotsize`: una Pair che indica la dimensione dei singoli grafici
+  #=
+  `y_super` è un array, ogni elemento del quale è quello che si passerebbe
+  alla funzione Plots.plot insieme al rispettivo elemento Xᵢ ∈ x_super
+  per disegnarne il grafico. Questo significa che ogni Yᵢ ∈ y_super è una 
+  matrice M×N con M = length(Xᵢ); N è il numero di colonne, e ogni
+  colonna rappresenta una serie di dati da graficare. Ad esempio, per
+  graficare tutti assieme i numeri di occupazione di 10 siti si può
+  creare una matrice di 10 colonne: ogni riga della matrice conterrà
+  i numeri di occupazione dei siti a un certo istante di tempo.
   =#
   # Se `labels` è un vettore di vettori riga di stringhe, significa che
   # ogni sottografico ha già il suo insieme di etichette: sono a posto.
@@ -194,18 +200,18 @@ function groupplot(x_super,
   figuresize = (2, Int(ceil(length(x_super)/2))+0.5) .* plotsize
 
   # Creo i singoli grafici.
-  subplots = [plot(X,
-                   Y,
-                   ylim=ylimits,
-                   label=lab,
-                   linestyle=lst,
-                   legend=:outerright,
-                   xlabel=commonxlabel,
-                   ylabel=commonylabel,
-                   title=subplot_title(p, distinct_parameters),
-                   left_margin=5mm,
-                   bottom_margin=5mm,
-                   size=figuresize)
+  subplots = [Plots.plot(X,
+                         Y,
+                         ylim=ylimits,
+                         label=lab,
+                         linestyle=lst,
+                         legend=:outerright,
+                         xlabel=commonxlabel,
+                         ylabel=commonylabel,
+                         title=subplot_title(p, distinct_parameters),
+                         left_margin=5mm,
+                         bottom_margin=5mm,
+                         size=figuresize)
               for (X, Y, lab, lst, ylimits, p) ∈ zip(x_super,
                                                      y_super,
                                                      labels,
@@ -230,39 +236,30 @@ function groupplot(x_super,
   group = Plots.plot(shared_title_fake_plot(plottitle, parameter_super),
                      Plots.plot(subplots..., layout=(length(subplots)÷2, 2)),
                      # Usa ÷ e non /, in modo da ottenere un Int!
-                     layout=grid(2, 1, heights=[0.1, 0.9]))
+                     layout=Plots.grid(2, 1, heights=[0.1, 0.9]))
   return group
 end
 
+"""
+    unifiedplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
+
+Create a plot where all data series (X,Y) in `x_super` × `y_super` are drawn
+together. A title is shown on top, which lists the common parameters among the
+subplots; parameters which differ among the plots are instead displayed
+in the label of each series.
+
+# Arguments
+- `x_super` → list of lists, each one representing the x-axis of a subplot..
+- `y_super` → list of lists, corresponding to the relative element in `x_super`.
+- `parameter_lists` → list of dictionaries, containing the parameters
+  associated to each element in `x_super`.
+- `linestyle` → line styles of the plots
+- `xlabel` → x-axis label.
+- `ylabel` → y-axis label.
+- `plottitle` → title of the plot.
+- `plotsize` → a Pair representing the plot size (in pixels).
+"""
 function unifiedplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
-  #= Crea un grafico delle coppie di serie di dati (X,Y) ∈ x_super × y_super,
-     tutte assieme.
-     In alto viene posto un titolo, grande, che elenca anche i parametri usati
-     nelle simulazioni e comuni a tutti i grafici; le etichette di ciascuna
-     serie del grafico contengono invece i parametri che differiscono tra una
-     simulazione e l'altra.
-
-     Argomenti
-     ---------
-     · `x_super`: un array ogni elemento del quale è una lista di ascisse.
-
-     · `y_super`: un array, ogni elemento del quale è una lista di ordinate
-       associate a `x` da rappresentare nel grafico.
-
-     · `parameter_lists`: un array di dizionari, ciascuno contenente i
-       parametri che definiscono la simulazione dei dati degli elementi di
-       ciascun elemento di y_super.
-
-     · `linestyles`: come `labels`, ma per gli stili delle linee.
-
-     · `xlabel`: etichetta delle ascisse
-
-     · `ylabel`: etichetta delle ordinate
-
-     · `plottitle`: titolo del grafico
-
-     · `plotsize`: una Pair che indica la dimensione del grafico
-  =#
   # Smisto i parametri in ripetuti e non, per creare le etichette dei grafici.
   distinct_parameters, _ = categorise_parameters(parameter_super)
   # Imposto la dimensione della figura (con un po' di spazio per il titolo).
@@ -282,41 +279,17 @@ function unifiedplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabe
   return plt
 end
 
+"""
+    unifiedlogplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
+
+Create a plot where all data series (X,Y) in `x_super` × `y_super` are drawn
+together, with the y-axis in logarithmic scale.
+See `unifiedplot` for more details on the arguments.
+
+Note that no check is performed whether the arguments of the logarithm are
+positive.
+"""
 function unifiedlogplot(x_super, y_super, parameter_super; linestyle, xlabel, ylabel, plottitle, plotsize)
-  #= Crea un grafico delle coppie di serie di dati (X,Y) ∈ x_super × y_super,
-     tutte assieme, con asse y logaritmico
-     In alto viene posto un titolo, grande, che elenca anche i parametri usati
-     nelle simulazioni e comuni a tutti i grafici; le etichette di ciascuna
-     serie del grafico contengono invece i parametri che differiscono tra una
-     simulazione e l'altra.
-     In pratica, la funzione applica il logaritmo ai dati sull'asse delle
-     ordinate e poi passa tutto a `unifiedplot`, in modo da non duplicare
-     il codice.
-     Non controllo che le ordinate siano positive: lascio l'onere di
-     controllare che il grafico logaritmico si possa effettivamente fare
-     a chi chiama la funzione.
-
-     Argomenti
-     ---------
-     · `x_super`: un array ogni elemento del quale è una lista di ascisse.
-
-     · `y_super`: un array, ogni elemento del quale è una lista di ordinate
-       associate a `x` da rappresentare nel grafico.
-
-     · `parameter_lists`: un array di dizionari, ciascuno contenente i
-       parametri che definiscono la simulazione dei dati degli elementi di
-       ciascun elemento di y_super.
-
-     · `linestyles`: come `labels`, ma per gli stili delle linee.
-
-     · `xlabel`: etichetta delle ascisse
-
-     · `ylabel`: etichetta delle ordinate
-
-     · `plottitle`: titolo del grafico
-
-     · `plotsize`: una Pair che indica la dimensione del grafico
-  =#
   return unifiedplot(x_super,
                      [log.(Y) for Y ∈ y_super],
                      parameter_super;

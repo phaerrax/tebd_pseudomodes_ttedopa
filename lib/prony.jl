@@ -2,14 +2,19 @@
 
 using PolynomialRoots, LinearAlgebra
 
+"""
+    predictionmatrix(samples::AbstractVector, p::Int)
+
+Return the "forward linear prediction matrix"
+
+    ⎛ y[p]    y[p-1]  ⋯  y[1]   ⎞
+    ⎜ y[p+1]  y[p]    ⋯  y[2]   ⎟
+    ⎜  ⋮       ⋮      ⋱   ⋮     ⎟
+    ⎝ y[N-1]  y[N-2]  ⋯  y[N-p] ⎠
+
+with `y = samples`.
+"""  
 function predictionmatrix(samples::AbstractVector, p::Int)
-  # Construct the "forward linear prediction matrix"
-  #
-  #   ⎛ y[p]    y[p-1]  ⋯  y[1]   ⎞
-  #   ⎜ y[p+1]  y[p]    ⋯  y[2]   ⎟ .
-  #   ⎜  ⋮       ⋮      ⋱   ⋮     ⎟
-  #   ⎝ y[N-1]  y[N-2]  ⋯  y[N-p] ⎠
-  #
   N = length(samples)
   mat = zeros(eltype(samples), N-p, p)
   for rown ∈ 1:N-p, coln ∈ 1:p
@@ -18,14 +23,19 @@ function predictionmatrix(samples::AbstractVector, p::Int)
   return mat
 end
 
+"""
+    observationvector(samples::AbstractVector, p::Int)
+
+Construct the observation vector
+
+     ⎛ y[p+1] ⎞
+    -⎜ y[p+2] ⎟
+     ⎜  ⋮     ⎟
+     ⎝ y[N]   ⎠
+
+with `y = samples`.
+"""
 function observationvector(samples::AbstractVector, p::Int)
-  # Construct the observation vector
-  #
-  #    ⎛ y[p+1] ⎞
-  #   -⎜ y[p+2] ⎟ .
-  #    ⎜  ⋮     ⎟
-  #    ⎝ y[N]   ⎠
-  #
   N = length(samples)
   v = zeros(eltype(samples), N-p)
   for i ∈ 1:N-p
@@ -34,19 +44,22 @@ function observationvector(samples::AbstractVector, p::Int)
   return v
 end
 
+"""
+    cproots(samples::AbstractVector, p::Int)
+
+Find the coefficients ``aₖ``, ``k∈{1,…,p}`` of the characteristic polynomial
+``ϕ(z) = ∏ₖ₌₁ᵖ (z-zₖ) = ∑ₖ₌₀ᵖ aₖzᵖ⁻ᵏ``.
+
+They are the (approximate) solution to the linear system (`y = samples`)
+
+    ⎛ y[p]    y[p-1]  ⋯  y[1]   ⎞ ⎛ a[1] ⎞    ⎛ y[p+1] ⎞  
+    ⎜ y[p+1]  y[p]    ⋯  y[2]   ⎟ ⎜ a[2] ⎟ ≈ -⎜ y[p+2] ⎟ ;
+    ⎜  ⋮       ⋮      ⋱   ⋮     ⎟ ⎜  ⋮   ⎟    ⎜ ⋮      ⎟ 
+    ⎝ y[N-1]  y[N-2]  ⋯  y[N-p] ⎠ ⎝ a[p] ⎠    ⎝ y[N]   ⎠ 
+
+`a[0]` is always 1.
+"""
 function cproots(samples::AbstractVector, p::Int)
-  # Find the coefficients aₖ, k∈{1,…,p} of the characteristic polynomial
-  #
-  #   ϕ(z) = ∏ₖ₌₁ᵖ (z-zₖ) = ∑ₖ₌₀ᵖ aₖzᵖ⁻ᵏ.
-  #
-  # They are the (approximate) solution to the linear system
-  #
-  #   ⎛ y[p]    y[p-1]  ⋯  y[1]   ⎞ ⎛ a[1] ⎞    ⎛ y[p+1] ⎞  
-  #   ⎜ y[p+1]  y[p]    ⋯  y[2]   ⎟ ⎜ a[2] ⎟ ≈ -⎜ y[p+2] ⎟ ;
-  #   ⎜  ⋮       ⋮      ⋱   ⋮     ⎟ ⎜  ⋮   ⎟    ⎜ ⋮      ⎟ 
-  #   ⎝ y[N-1]  y[N-2]  ⋯  y[N-p] ⎠ ⎝ a[p] ⎠    ⎝ y[N]   ⎠ 
-  #
-  # a[0] is always 1.
   # A \ b returns the exact solution of Ax=b if A is square. For rectangular A
   # the result is the minimum-norm least squares solution.
   a = predictionmatrix(samples, p) \ observationvector(samples, p)
@@ -82,6 +95,15 @@ function amplitudes(roots::AbstractVector, samples::AbstractVector)
   return Z \ samples
 end
 
+"""
+    prony(f::Function, xstart::Real, xend::Real, xstep::Real, p::Int)
+
+Apply Prony's algorithm to find the linear combination ``x ↦ ∑ⱼ₌₁ᵖ hⱼ exp(λⱼx)``
+that best approximates `f` on [`xstart`, `xend`], sampled with step size
+`xstep`.
+
+Returns a Pair `(h,λ)` of lists that contain the coefficients.
+"""
 function prony(f::Function, xstart::Real, xend::Real, xstep::Real, p::Int)
   X = xstart:xstep:xend
   Y = f.(X)
@@ -108,7 +130,7 @@ function prony(f::Function, xstart::Real, xend::Real, xstep::Real, p::Int)
   #
   #   y(xₙ) = ∑ₖ₌₁ᵖ hₖ exp(λₖxₙ/τ).
   #
-  # The coefficient we want are then hₖ and λₖ/τ. It's okay that one of them
+  # The coefficients we want are then hₖ and λₖ/τ. It's okay that one of them
   # depends on τ: after all this parameter determines which values yₙ are
   # picked up by the algorithm. Hopefully the final result doesn't depend
   # on the particular choice of τ (it seems like it doesn't...).
