@@ -4,26 +4,23 @@ using QuadGK
 """
     thermalisedJ(J::Function, ω::Real, T::Real)
 
-Creates a thermalised spectral function, starting from an already antisymmetric
-function `J`, at the temperature `T`, then return its value at `ω`.
+Create a thermalised spectral function from `J`, at the temperature
+`T`, then return its value at `ω`.
 """
 function thermalisedJ(J::Function,
                       ω::Real,
                       T::Real)
-  # Questa funzione restituisce la densità spettrale termalizzata, a partire da
-  # una J(ω) già antisimmetrica attorno a ω=0 (se non lo è, è necessario farlo
-  # prima di chiamare questa funzione).
-  #
-  # Calcolo il "fattore termico" con cui moltiplicare J; se T=0, per evitare
-  # divisioni per zero, scrivo a parte il fattore: lim T->0 coth(x/T)=Θ(x).
-  # Si potrebbe anche scrivere f=1 e basta, assumendo che chi chiama la funzione
-  # abbia usato un supporto che escluda già (-∞,0), ma così almeno sto sicuro.
+  # Per evitare divisioni per zero, scrivo a parte il fattore:
+  # lim T->0 coth(x/T)=Θ(x).
+  # Si potrebbe anche scrivere f=1 e basta, assumendo che chi chiama
+  # la funzione abbia usato un supporto che escluda già (-∞,0), ma
+  # così almeno sto sicuro.
   if T == 0
-    f = 0.5(1 + sign(ω))
+    f = ω > 0 ? one(ω) : zero(ω)
   else
     f = 0.5(1 + coth(0.5 * ω / T))
   end
-  return f * J(ω)
+  return f * sign(ω) * J(abs(ω))
 end
 
 """
