@@ -54,5 +54,7 @@
   "original_oscillator_spin_interaction_coefficient": "κₒᵣ",
   "original_oscillator_damping_coefficient": "γₒᵣ",
   "original_oscillator_frequency": "ωₒᵣ",
-  "original_temperature": "Tₒᵣ"
+  "original_temperature": "Tₒᵣ",
+  "left_chain_coefficients_file": "left cf. file",
+  "right_chain_coefficients_file": "right cf. file"
 }
