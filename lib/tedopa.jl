@@ -2,6 +2,77 @@ using PolyChaos
 using QuadGK
 
 """
+    getchaincoefficients(envparameters)
+
+Return the Ω, η, κ coefficients of the T-TEDOPA chain, from the information given
+in the `envparameters` dictionary.
+"""
+function getchaincoefficients(envparameters)
+  n_osc = envparameters["number_of_oscillators"]
+  #=
+  Parametri delle catene di oscillatori
+  Ci sono due casi qui, in base a cosa viene specificato nel JSON:
+  1) viene indicato un file alla voce "X_chain_coefficients_file"
+     dove X è "left" o "right". In questo caso, prendo i
+     coefficienti da quel file.
+  2) viene descritta una densità spettrale, con i suoi parametri,
+     alle voci "spectral_density_parameters" e "…_function". In
+     questo caso, calcolo i coefficienti con le funzioni del
+     T-TEDOPA come sempre.
+  In ogni caso, la temperatura dell'ambiente è completamente
+  inserita nei coefficienti, così come la frequenza di taglio,
+  quindi non verranno specificati.
+  È ammessa pure una situazione mista, in cui una catena è data
+  tramite i coefficienti e l'altra tramite una funzione.
+  Ciò che non è ammesso è dare contemporaneamente funzione e
+  coefficienti per il medesimo ambiente: qui lancio un errore.
+  =#
+  if (haskey(envparameters, "chain_coefficients_file") &&
+      !haskey(envparameters, "spectral_density_function"))
+    ccoeffs = DataFrame(CSV.File(envparameters["chain_coefficients_file"]))
+    if size(ccoeffs, 1) ≥ n_osc
+      # TODO: studiare il caso particolare n_osc == 1
+      # Se è >, allora i coefficienti in eccesso vengono ignorati;
+      # se è =, allora tutto combacia e tutti i coefficienti sono
+      # considerati.
+      Ω = ccoeffs[1:n_osc, :loc]
+      η = ccoeffs[1,       :int]
+      κ = ccoeffs[2:n_osc, :int]
+    else
+      error("File $(envparameters["chain_coefficients_file"]) does "*
+            "not contain enough coefficients.")
+    end
+  elseif (!haskey(envparameters, "chain_coefficients_file") &&
+          haskey(envparameters, "spectral_density_function"))
+    # Codice per creare la funzione a partire dalla stringa tratto da
+    # https://stackoverflow.com/a/53134127/4160978 
+    fn = envparameters["spectral_density_function"]
+    tmp = eval(Meta.parse("(a, x) -> " * fn))
+    sdf = x -> Base.invokelatest(tmp,
+                                 envparameters["spectral_density_parameters"], x)
+
+    ωc = envparameters["frequency_cutoff"]
+    T = envparameters["temperature"]
+
+    if T == 0
+      Ω, κ, η = chainmapcoefficients(sdf,
+                                          (0, ωc),
+                                          n_osc-1;
+                                          Nquad=envparameters["PolyChaos_nquad"],
+                                          discretization=lanczos)
+    else
+      sdf_thermalised = ω -> thermalisedJ(sdf, ω, T)
+      Ω, κ, η = chainmapcoefficients(sdf_thermalised,
+                                          (-ωc, 0, ωc),
+                                          n_osc-1;
+                                          Nquad=envparameters["PolyChaos_nquad"],
+                                          discretization=lanczos)
+    end
+  end
+  return Ω, κ, η
+end
+
+"""
     thermalisedJ(J::Function, ω::Real, T::Real)
 
 Create a thermalised spectral function from `J`, at the temperature

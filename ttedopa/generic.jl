@@ -102,102 +102,8 @@ let
     ε = parameters["spin_excitation_energy"]
     # λ = 1
     
-    # Parametri delle catene di oscillatori
-    # Ci sono due casi qui, in base a cosa viene specificato nel JSON:
-    # 1) viene indicato un file alla voce "X_chain_coefficients_file"
-    #    dove X è "left" o "right". In questo caso, prendo i
-    #    coefficienti da quel file.
-    # 2) viene descritta una densità spettrale, con i suoi parametri,
-    #    alle voci "spectral_density_parameters" e "…_function". In
-    #    questo caso, calcolo i coefficienti con le funzioni del
-    #    T-TEDOPA come sempre.
-    # In ogni caso, la temperatura dell'ambiente è completamente
-    # inserita nei coefficienti, così come la frequenza di taglio,
-    # quindi non verranno specificati.
-    # È ammessa pure una situazione mista, in cui una catena è data
-    # tramite i coefficienti e l'altra tramite una funzione.
-    # Ciò che non è ammesso è dare contemporaneamente funzione e
-    # coefficienti per il medesimo ambiente: qui lancio un errore.
-    leftp = parameters["left_bath"]
-    if (haskey(leftp, "chain_coefficients_file") &&
-        !haskey(leftp, "spectral_density_function"))
-      ccoeffs = DataFrame(CSV.File(leftp["chain_coefficients_file"]))
-      if size(ccoeffs, 1) ≥ n_osc_left
-        # Se è >, allora i coefficienti in eccesso vengono ignorati;
-        # se è =, allora tutto combacia e tutti i coefficienti sono
-        # considerati.
-        Ωₗ = ccoeffs[1:n_osc_left, :loc]
-        ηₗ = ccoeffs[1,            :int]
-        κₗ = ccoeffs[2:n_osc_left, :int]
-      else
-        error("File $(leftp["chain_coefficients_file"]) does "*
-              "not contain enough coefficients.")
-      end
-    elseif (!haskey(leftp, "chain_coefficients_file") &&
-            haskey(leftp, "spectral_density_function"))
-      fn = leftp["spectral_density_function"]
-      tmp = eval(Meta.parse("(a, x) -> " * fn))
-      sdf = x -> tmp(leftp["spectral_density_parameters"], x)
-
-      ωc = leftp["frequency_cutoff"]
-      T = leftp["temperature"]
-
-      if T == 0
-        (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(sdf,
-                                            (0, ωc),
-                                            n_osc_left-1;
-                                            Nquad=leftp["PolyChaos_nquad"],
-                                            discretization=lanczos)
-      else
-        sdf_thermalised = ω -> thermalisedJ(sdf, ω, T)
-        (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(sdf_thermalised,
-                                            (-ωc, 0, ωc),
-                                            n_osc_left-1;
-                                            Nquad=leftp["PolyChaos_nquad"],
-                                            discretization=lanczos)
-      end
-    end
-
-    # Ora lo stesso, ma con l'ambiente di destra...
-    rightp = parameters["right_bath"]
-    if (haskey(rightp, "chain_coefficients_file") &&
-        !haskey(rightp, "spectral_density_function"))
-      ccoeffs = DataFrame(CSV.File(rightp["chain_coefficients_file"]))
-      if size(ccoeffs, 1) ≥ n_osc_right
-        # Se è >, allora i coefficienti in eccesso vengono ignorati;
-        # se è =, allora tutto combacia e tutti i coefficienti sono
-        # considerati.
-        Ωᵣ = ccoeffs[1:n_osc_right, :loc]
-        ηᵣ = ccoeffs[1,             :int]
-        κᵣ = ccoeffs[2:n_osc_right, :int]
-      else
-        error("File $(rightp["chain_coefficients_file"]) does "*
-              "not contain enough coefficients.")
-      end
-    elseif (!haskey(rightp, "chain_coefficients_file") &&
-            haskey(rightp, "spectral_density_function"))
-      fn = rightp["spectral_density_function"]
-      tmp = eval(Meta.parse("(a, x) -> " * fn))
-      sdf = x -> tmp(rightp["spectral_density_parameters"], x)
-
-      ωc = rightp["frequency_cutoff"]
-      T = rightp["temperature"]
-
-      if T == 0
-        (Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(sdf,
-                                            (0, ωc),
-                                            n_osc_right-1;
-                                            Nquad=rightp["PolyChaos_nquad"],
-                                            discretization=lanczos)
-      else
-        sdf_thermalised = ω -> thermalisedJ(sdf, ω, T)
-        (Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(sdf_thermalised,
-                                            (-ωc, 0, ωc),
-                                            n_osc_right-1;
-                                            Nquad=rightp["PolyChaos_nquad"],
-                                            discretization=lanczos)
-      end
-    end
+    (Ωₗ, κₗ, ηₗ) = getchaincoefficients(parameters["left_bath"])
+    (Ωᵣ, κᵣ, ηᵣ) = getchaincoefficients(parameters["right_bath"])
 
     # Raccolgo i coefficienti in due array (uno per quelli a sx, l'altro per
     # quelli a dx) per poterli disegnare assieme nei grafici.
@@ -205,8 +111,6 @@ let
     # inserendo uno zero all'inizio dei κ…)
     osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
     osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
-    # Adesso che ho i coefficienti, posso anche dimenticarmi di tutti i
-    # parametri usati per costruire gli ambienti.
 
     #= Definizione degli operatori nell'Hamiltoniana
        =============================================
