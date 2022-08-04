@@ -1,0 +1,29 @@
+{
+  "left_bath": {
+    "chain_coefficients_file": "examples/asym_lorentzian_hot.ttedopa.dat",
+    "number_of_oscillators": 30,
+    "maximum_oscillator_space_dimension": 5,
+    "oscillator_space_dimensions_decay": 1,
+    "frequency_cutoff": 10,
+    "temperature": 5
+  },
+  "right_bath": {
+    "spectral_density_function": "x * (x/a[1])^(a[2]) * exp(-x/a[1])",
+    "spectral_density_parameters": [1, 2],
+    "PolyChaos_nquad": 5000,
+    "number_of_oscillators": 20,
+    "maximum_oscillator_space_dimension": 5,
+    "oscillator_space_dimensions_decay": 1,
+    "frequency_cutoff": 10,
+    "temperature": 0
+  },
+  "spin_excitation_energy": 10,
+  "number_of_spin_sites": 10,
+  "simulation_end_time": 1,
+  "simulation_time_step": 0.02,
+  "skip_steps": 10,
+  "chain_initial_state": "empty",
+  "MP_maximum_bond_dimension": 50,
+  "MP_compression_error": 1e-10,
+  "TS_expansion_order": 2
+}

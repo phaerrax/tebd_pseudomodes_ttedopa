@@ -18,37 +18,37 @@ else
   # Se la chiave "GKSwstype" non esiste non succede niente.
 end
 
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/harmonic_oscillator_space.jl")
-include(lib_path * "/tedopa.jl")
-include(lib_path * "/operators.jl")
+rootdirname = "simulazioni_tesi"
+sourcepath = Base.source_path()
+# Cartella base: determina il percorso assoluto del file in esecuzione, e
+# rimuovi tutto ciò che segue rootdirname.
+ind = findfirst(rootdirname, sourcepath)
+rootpath = sourcepath[begin:ind[end]]
+# `rootpath` è la cartella principale del progetto.
+libpath = joinpath(rootpath, "lib")
 
-# Questo programma calcola l'evoluzione della catena di spin
-# smorzata agli estremi, usando le tecniche dei MPS ed MPO.
-# In questo caso la catena è descritta dalla vettorizzazione della
-# matrice densità, la quale evolve nel tempo secondo l'equazione
-# di Lindblad.
+include(joinpath(libpath, "utils.jl"))
+include(joinpath(libpath, "plotting.jl"))
+include(joinpath(libpath, "spin_chain_space.jl"))
+include(joinpath(libpath, "harmonic_oscillator_space.jl"))
+include(joinpath(libpath, "operators.jl"))
+include(joinpath(libpath, "tedopa.jl"))
 
 let
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
 
-  # Se il primo argomento da riga di comando è una cartella (che dovrebbe
-  # contenere i file dei parametri), mi sposto subito in tale posizione in modo
-  # che i file di output, come grafici e tabelle, siano salvati insieme ai file
-  # di parametri.
+  # Se il primo argomento da riga di comando è una cartella (che 
+  # dovrebbe contenere i file dei parametri), mi sposto subito in tale
+  # posizione in modo che i file di output, come grafici e tabelle,
+  # siano salvati insieme ai file di parametri.
   prev_dir = pwd()
   if isdir(ARGS[1])
     cd(ARGS[1])
   end
 
-  # Le seguenti liste conterranno i risultati della simulazione per ciascuna
-  # lista di parametri fornita.
+  # Le seguenti liste conterranno i risultati della simulazione
+  # per ciascuna lista di parametri fornita.
   timesteps_super = []
   occn_super = []
   spin_current_super = []
@@ -62,30 +62,24 @@ let
   snapshot_super = []
   normalisation_super = []
 
-  # Precaricamento
-  # ==============
-  # Se in tutte le liste di parametri il numero di siti è lo stesso, posso
-  # definire qui una volta per tutte alcuni elementi "pesanti" che servono dopo.
-  S_sites_list        = [p["number_of_spin_sites"] for p in parameter_lists]
-  max_osc_dim_list    = [p["maximum_oscillator_space_dimension"] for p in parameter_lists]
-  osc_dims_decay_list = [p["oscillator_space_dimensions_decay"] for p in parameter_lists]
-  L_sites_list        = [p["number_of_oscillators_left"] for p in parameter_lists]
-  R_sites_list        = [p["number_of_oscillators_right"] for p in parameter_lists]
-  if (allequal(S_sites_list) &&
-      allequal(max_osc_dim_list) &&
-      allequal(osc_dims_decay_list) &&
-      allequal(L_sites_list) &&
-      allequal(R_sites_list))
-    preload = true
-    n_spin_sites   = first(S_sites_list)
-    max_osc_dim    = first(max_osc_dim_list)
-    osc_dims_decay = first(osc_dims_decay_list)
-    n_osc_left     = first(L_sites_list)
-    n_osc_right    = first(R_sites_list)
+  for (current_sim_n, parameters) in enumerate(parameter_lists)
+    # Impostazione dei parametri
+    # ==========================
+    # Numero di siti e dimensioni
+    n_spin_sites = parameters["number_of_spin_sites"]
+
+    n_osc_left = parameters["left_bath"]["number_of_oscillators"]
+    max_osc_dim_left = parameters["left_bath"]["maximum_oscillator_space_dimension"]
+    osc_dims_decay_left = parameters["left_bath"]["oscillator_space_dimensions_decay"]
+
+    n_osc_right = parameters["right_bath"]["number_of_oscillators"]
+    max_osc_dim_right = parameters["right_bath"]["maximum_oscillator_space_dimension"]
+    osc_dims_decay_right = parameters["right_bath"]["oscillator_space_dimensions_decay"]
+
     sites = [
-             reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, osc_dims_decay)]);
+             reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim_left, osc_dims_decay_left)]);
              repeat([siteind("S=1/2")], n_spin_sites);
-             [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, osc_dims_decay)]
+             [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim_right, osc_dims_decay_right)]
             ]
     for n ∈ eachindex(sites)
       sites[n] = addtags(sites[n], "n=$n")
@@ -95,63 +89,124 @@ let
     range_spins = n_osc_left .+ (1:n_spin_sites)
     range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
 
-    # - l'occupazione degli autospazi dell'operatore numero
-    # Ad ogni istante proietto lo stato corrente sugli autostati
-    # dell'operatore numero della catena di spin, vale a dire calcolo
-    # (ψ,Pₙψ) dove ψ è lo stato corrente e Pₙ è il proiettore ortogonale
-    # sull'n-esimo autospazio di N.
-    projectors = [level_subspace_proj(sites[range_spins], n)
-                  for n = 0:n_spin_sites]
-    num_eigenspace_projs = [embed_slice(sites, range_spins, p)
-                            for p in projectors]
-  else
-    preload = false
-  end
-
-  for (current_sim_n, parameters) in enumerate(parameter_lists)
-    # Impostazione dei parametri
-    # ==========================
-
-    # - parametri tecnici
+    # Parametri tecnici per la simulazione
     max_err = parameters["MP_compression_error"]
     max_dim = parameters["MP_maximum_bond_dimension"]
 
-    # - parametri fisici
-    ε = parameters["spin_excitation_energy"]
-    # λ = 1
-    #Ω = parameters["spectral_density_peak"]
-    #γ = parameters["spectral_density_half_width"]
-    #κ = parameters["spectral_density_overall_factor"]
-    # La densità spettrale è data da
-    T = parameters["temperature"]
-    #ωc = parameters["frequency_cutoff"]
-
-    # - intervallo temporale delle simulazioni
+    # Istanti di tempo da attraversare
     τ = parameters["simulation_time_step"]
     time_step_list = construct_step_list(parameters)
     skip_steps = parameters["skip_steps"]
 
-    # Costruzione della catena
-    # ========================
-    if !preload
-      n_spin_sites = parameters["number_of_spin_sites"]
-      n_osc_left = parameters["number_of_oscillators_left"]
-      n_osc_right = parameters["number_of_oscillators_right"]
-      max_osc_dim = parameters["maximum_oscillator_space_dimension"]
-      osc_dims_decay = parameters["oscillator_space_dimensions_decay"]
-      sites = [
-               reverse([siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_left, max_osc_dim, osc_dims_decay)]);
-               repeat([siteind("S=1/2")], n_spin_sites);
-               [siteind("Osc"; dim=d) for d ∈ oscdimensions(n_osc_right, max_osc_dim, osc_dims_decay)]
-              ]
-      for n ∈ eachindex(sites)
-        sites[n] = addtags(sites[n], "n=$n")
+    # Parametri della catena di spin
+    ε = parameters["spin_excitation_energy"]
+    # λ = 1
+    
+    # Parametri delle catene di oscillatori
+    # Ci sono due casi qui, in base a cosa viene specificato nel JSON:
+    # 1) viene indicato un file alla voce "X_chain_coefficients_file"
+    #    dove X è "left" o "right". In questo caso, prendo i
+    #    coefficienti da quel file.
+    # 2) viene descritta una densità spettrale, con i suoi parametri,
+    #    alle voci "spectral_density_parameters" e "…_function". In
+    #    questo caso, calcolo i coefficienti con le funzioni del
+    #    T-TEDOPA come sempre.
+    # In ogni caso, la temperatura dell'ambiente è completamente
+    # inserita nei coefficienti, così come la frequenza di taglio,
+    # quindi non verranno specificati.
+    # È ammessa pure una situazione mista, in cui una catena è data
+    # tramite i coefficienti e l'altra tramite una funzione.
+    # Ciò che non è ammesso è dare contemporaneamente funzione e
+    # coefficienti per il medesimo ambiente: qui lancio un errore.
+    leftp = parameters["left_bath"]
+    if (haskey(leftp, "chain_coefficients_file") &&
+        !haskey(leftp, "spectral_density_function"))
+      ccoeffs = DataFrame(CSV.File(leftp["chain_coefficients_file"]))
+      if size(ccoeffs, 1) ≥ n_osc_left
+        # Se è >, allora i coefficienti in eccesso vengono ignorati;
+        # se è =, allora tutto combacia e tutti i coefficienti sono
+        # considerati.
+        Ωₗ = ccoeffs[1:n_osc_left, :loc]
+        ηₗ = ccoeffs[1,            :int]
+        κₗ = ccoeffs[2:n_osc_left, :int]
+      else
+        error("File $(leftp["chain_coefficients_file"]) does "*
+              "not contain enough coefficients.")
+      end
+    elseif (!haskey(leftp, "chain_coefficients_file") &&
+            haskey(leftp, "spectral_density_function"))
+      fn = leftp["spectral_density_function"]
+      tmp = eval(Meta.parse("(a, x) -> " * fn))
+      sdf = x -> tmp(leftp["spectral_density_parameters"], x)
+
+      ωc = leftp["frequency_cutoff"]
+      T = leftp["temperature"]
+
+      if T == 0
+        (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(sdf,
+                                            (0, ωc),
+                                            n_osc_left-1;
+                                            Nquad=leftp["PolyChaos_nquad"],
+                                            discretization=lanczos)
+      else
+        sdf_thermalised = ω -> thermalisedJ(sdf, ω, T)
+        (Ωₗ, κₗ, ηₗ) = chainmapcoefficients(sdf_thermalised,
+                                            (-ωc, 0, ωc),
+                                            n_osc_left-1;
+                                            Nquad=leftp["PolyChaos_nquad"],
+                                            discretization=lanczos)
       end
     end
 
-    range_osc_left = 1:n_osc_left
-    range_spins = n_osc_left .+ (1:n_spin_sites)
-    range_osc_right = n_osc_left .+ n_spin_sites .+ (1:n_osc_right)
+    # Ora lo stesso, ma con l'ambiente di destra...
+    rightp = parameters["right_bath"]
+    if (haskey(rightp, "chain_coefficients_file") &&
+        !haskey(rightp, "spectral_density_function"))
+      ccoeffs = DataFrame(CSV.File(rightp["chain_coefficients_file"]))
+      if size(ccoeffs, 1) ≥ n_osc_right
+        # Se è >, allora i coefficienti in eccesso vengono ignorati;
+        # se è =, allora tutto combacia e tutti i coefficienti sono
+        # considerati.
+        Ωᵣ = ccoeffs[1:n_osc_right, :loc]
+        ηᵣ = ccoeffs[1,             :int]
+        κᵣ = ccoeffs[2:n_osc_right, :int]
+      else
+        error("File $(rightp["chain_coefficients_file"]) does "*
+              "not contain enough coefficients.")
+      end
+    elseif (!haskey(rightp, "chain_coefficients_file") &&
+            haskey(rightp, "spectral_density_function"))
+      fn = rightp["spectral_density_function"]
+      tmp = eval(Meta.parse("(a, x) -> " * fn))
+      sdf = x -> tmp(rightp["spectral_density_parameters"], x)
+
+      ωc = rightp["frequency_cutoff"]
+      T = rightp["temperature"]
+
+      if T == 0
+        (Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(sdf,
+                                            (0, ωc),
+                                            n_osc_right-1;
+                                            Nquad=rightp["PolyChaos_nquad"],
+                                            discretization=lanczos)
+      else
+        sdf_thermalised = ω -> thermalisedJ(sdf, ω, T)
+        (Ωᵣ, κᵣ, ηᵣ) = chainmapcoefficients(sdf_thermalised,
+                                            (-ωc, 0, ωc),
+                                            n_osc_right-1;
+                                            Nquad=rightp["PolyChaos_nquad"],
+                                            discretization=lanczos)
+      end
+    end
+
+    # Raccolgo i coefficienti in due array (uno per quelli a sx, l'altro per
+    # quelli a dx) per poterli disegnare assieme nei grafici.
+    # (I coefficienti κ sono uno in meno degli Ω! Pareggio le lunghezze
+    # inserendo uno zero all'inizio dei κ…)
+    osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
+    osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
+    # Adesso che ho i coefficienti, posso anche dimenticarmi di tutti i
+    # parametri usati per costruire gli ambienti.
 
     #= Definizione degli operatori nell'Hamiltoniana
        =============================================
@@ -160,36 +215,6 @@ let
        - n_osc_left+1:n_osc_left+n_spin_sites -> catena di spin
        - n_osc_left+n_spin_sites+1:end -> catena di oscillatori a destra
     =#
-    # Caricamento dei coefficienti dalla densità spettrale
-    ccoeffs = DataFrame(CSV.File(parameters["left_chain_coefficients_file"]))
-    if size(ccoeffs, 1) ≥ n_osc_left
-      # Se è >, allora i coefficienti in eccesso vengono ignorati; se è
-      # =, allora tutto combacia e tutti i coefficienti sono considerati.
-      Ωₗ = ccoeffs[1:n_osc_left, :loc]
-      ηₗ = ccoeffs[1,            :int]
-      κₗ = ccoeffs[2:n_osc_left, :int]
-    else
-      error("File $(parameters["left_chain_coefficients_file"]) does "*
-            "not contain enough coefficients.")
-    end
-
-    ccoeffs = DataFrame(CSV.File(parameters["right_chain_coefficients_file"]))
-    if size(ccoeffs, 1) ≥ n_osc_right
-      # Come sopra.
-      Ωᵣ = ccoeffs[1:n_osc_right, :loc]
-      ηᵣ = ccoeffs[1,             :int]
-      κᵣ = ccoeffs[2:n_osc_right, :int]
-    else
-      error("File $(parameters["right_chain_coefficients_file"]) does "*
-            "not contain enough coefficients.")
-    end
-
-    # Raccolgo i coefficienti in due array (uno per quelli a sx, l'altro per
-    # quelli a dx) per poterli disegnare assieme nei grafici.
-    # (I coefficienti κ sono uno in meno degli Ω! Per ora pareggio le lunghezze
-    # inserendo uno zero all'inizio dei κ…)
-    osc_chain_coefficients_left = [Ωₗ [0; κₗ]]
-    osc_chain_coefficients_right = [Ωᵣ [0; κᵣ]]
 
     localcfs = [reverse(Ωₗ); repeat([ε], n_spin_sites); Ωᵣ]
     interactioncfs = [reverse(κₗ); ηₗ; repeat([1], n_spin_sites-1); ηᵣ; κᵣ]
@@ -324,7 +349,8 @@ let
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione "*
                              "(oscillatori a sx)",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "occn_osc_left.png")
 
@@ -342,7 +368,8 @@ let
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (spin)",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "occn_spins.png")
   
@@ -360,7 +387,8 @@ let
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (oscillatori dx)",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "occn_osc_right.png")
 
@@ -382,7 +410,8 @@ let
                   commonxlabel=L"t",
                   commonylabel=L"\langle n_i(t)\rangle",
                   plottitle="Numeri di occupazione (sommati)",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
                   
   savefig(plt, "occn_sums.png")
 
@@ -405,7 +434,8 @@ let
                   commonxlabel=L"t",
                   commonylabel=L"\chi_{k,k+1}(t)",
                   plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "bond_dimensions.png")
 
@@ -423,13 +453,14 @@ let
                   commonxlabel=L"t",
                   commonylabel=L"j_{k,k+1}(t)",
                   plottitle="Corrente di spin",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "spin_current.png")
 
   # Grafico dei coefficienti della chain map
   # ----------------------------------------
-  plt = groupplot([1:p["number_of_oscillators_left"]
+  plt = groupplot([1:p["left_bath"]["number_of_oscillators"]
                    for p ∈ parameter_lists],
                   osc_chain_coefficients_left_super,
                   parameter_lists;
@@ -439,11 +470,12 @@ let
                   commonylabel="Coefficiente",
                   plottitle="Coefficienti della catena di "*
                              "oscillatori (sx)",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "osc_left_coefficients.png")
 
-  plt = groupplot([1:p["number_of_oscillators_right"]
+  plt = groupplot([1:p["right_bath"]["number_of_oscillators"]
                    for p ∈ parameter_lists],
                   osc_chain_coefficients_right_super,
                   parameter_lists;
@@ -453,7 +485,8 @@ let
                   commonylabel="Coefficiente",
                   plottitle="Coefficienti della catena di "*
                             "oscillatori (dx)",
-                  plotsize=plotsize)
+                  plotsize=plotsize,
+                 filenameastitle=true)
 
   savefig(plt, "osc_right_coefficients.png")
 
@@ -469,7 +502,8 @@ let
                     xlabel=L"i",
                     ylabel="Numero di occupazione",
                     plottitle="Numeri di occupazione, alla fine",
-                    plotsize=plotsize)
+                    plotsize=plotsize,
+                   filenameastitle=true)
 
   savefig(plt, "snapshot.png")
 
@@ -481,7 +515,8 @@ let
                     xlabel=L"i",
                     ylabel="Numero di occupazione",
                     plottitle="Numeri di occupazione, alla fine, solo spin",
-                    plotsize=plotsize)
+                    plotsize=plotsize,
+                   filenameastitle=true)
 
   savefig(plt, "snapshot_spins.png")
 
@@ -495,7 +530,8 @@ let
                     xlabel=L"t",
                     ylabel=L"\Vert\psi(t)\Vert",
                     plottitle="Norma dello stato",
-                    plotsize=plotsize)
+                    plotsize=plotsize,
+                   filenameastitle=true)
 
   savefig(plt, "normalisation.png")
 
