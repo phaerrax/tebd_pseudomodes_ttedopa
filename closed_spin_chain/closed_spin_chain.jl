@@ -4,17 +4,6 @@ using ITensors
 using LaTeXStrings
 using ProgressMeter
 
-# Se lo script viene eseguito su Qtech, devo disabilitare l'output
-# grafico altrimenti il programma si schianta.
-if gethostname() == "qtech.fisica.unimi.it" ||
-   gethostname() == "qtech2.fisica.unimi.it"
-  ENV["GKSwstype"] = "100"
-  @info "Esecuzione su server remoto. Output grafico disattivato."
-else
-  delete!(ENV, "GKSwstype")
-  # Se la chiave "GKSwstype" non esiste non succede niente.
-end
-
 root_path = dirname(dirname(Base.source_path()))
 lib_path = root_path * "/lib"
 # Sali di due cartelle. root_path è la cartella principale del progetto.
@@ -22,6 +11,8 @@ include(lib_path * "/utils.jl")
 include(lib_path * "/plotting.jl")
 include(lib_path * "/spin_chain_space.jl")
 include(lib_path * "/operators.jl")
+
+disablegrifqtech()
 
 # Questo programma calcola l'evoluzione della catena di spin isolata,
 # usando le tecniche dei MPS ed MPO.

@@ -8,17 +8,6 @@ using CSV
 using Plots
 using QuadGK
 
-# Se lo script viene eseguito su Qtech, devo disabilitare l'output
-# grafico altrimenti il programma si schianta.
-if gethostname() == "qtech.fisica.unimi.it" ||
-  gethostname() == "qtech2.fisica.unimi.it"
-  ENV["GKSwstype"] = "100"
-  @info "Esecuzione su server remoto. Output grafico disattivato."
-else
-  delete!(ENV, "GKSwstype")
-  # Se la chiave "GKSwstype" non esiste non succede niente.
-end
-
 rootdirname = "simulazioni_tesi"
 sourcepath = Base.source_path()
 # Cartella base: determina il percorso assoluto del file in esecuzione, e
@@ -27,6 +16,8 @@ ind = findfirst(rootdirname, sourcepath)
 rootpath = sourcepath[begin:ind[end]]
 # `rootpath` è la cartella principale del progetto.
 libpath = joinpath(rootpath, "lib")
+
+disablegrifqtech()
 
 let  
   Ω = 10

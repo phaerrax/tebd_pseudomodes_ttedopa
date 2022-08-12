@@ -8,17 +8,6 @@ using DataFrames
 using CSV
 using QuadGK
 
-# Se lo script viene eseguito su Qtech, devo disabilitare l'output
-# grafico altrimenti il programma si schianta.
-if gethostname() == "qtech.fisica.unimi.it" ||
-  gethostname() == "qtech2.fisica.unimi.it"
-  ENV["GKSwstype"] = "100"
-  @info "Esecuzione su server remoto. Output grafico disattivato."
-else
-  delete!(ENV, "GKSwstype")
-  # Se la chiave "GKSwstype" non esiste non succede niente.
-end
-
 rootdirname = "simulazioni_tesi"
 sourcepath = Base.source_path()
 # Cartella base: determina il percorso assoluto del file in esecuzione, e
@@ -34,6 +23,8 @@ include(joinpath(libpath, "spin_chain_space.jl"))
 include(joinpath(libpath, "harmonic_oscillator_space.jl"))
 include(joinpath(libpath, "operators.jl"))
 include(joinpath(libpath, "prony.jl"))
+
+disablegrifqtech()
 
 # Questo programma prende la densità spettrale antisimmetrica lorentziana e,
 # seguendo quanto scritto nell'articolo di Mascherpa e altri, la mappa (al

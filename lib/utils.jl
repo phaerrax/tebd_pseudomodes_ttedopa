@@ -3,6 +3,24 @@ using Base.Filesystem
 using ITensors
 using LinearAlgebra
 
+"""
+    disablegrifqtech()
+
+Disable the graphical output if the script is running on Qtech.
+"""
+function disablegrifqtech()
+  # The script crashes if it is executed on Qtech, unless we disable
+  # the graphical output.
+  if gethostname() == "qtech.fisica.unimi.it" ||
+    gethostname() == "qtech2.fisica.unimi.it"
+    ENV["GKSwstype"] = "100"
+    @info "Running on remote server. Disabling graphical output."
+  else
+    delete!(ENV, "GKSwstype")
+    # If the key "GKSwstype" doesn't exist then nothing happens.
+  end
+end
+
 # Vectorisation utilities
 # =======================
 # In order to use tr(x'*y) as a tool to extract coefficient the basis must

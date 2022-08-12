@@ -19,6 +19,8 @@ include(joinpath(libpath, "utils.jl"))
 include(joinpath(libpath, "plotting.jl"))
 include(joinpath(libpath, "tedopa.jl"))
 
+disablegrifqtech()
+
 # Questo programma mostra come evolve un'eccitazione solitaria in una catena
 # di oscillatori ottenuta con il T-TEDOPA, in modo da determinare una lunghezza
 # ottimale per la catena nel resto delle simulazioni.

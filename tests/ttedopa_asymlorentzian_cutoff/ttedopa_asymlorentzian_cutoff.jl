@@ -19,6 +19,8 @@ include(joinpath(libpath, "utils.jl"))
 include(joinpath(libpath, "plotting.jl"))
 include(joinpath(libpath, "tedopa.jl"))
 
+disablegrifqtech()
+
 # Questo programma calcola l'energia di ripartizione relativa residua,
 # come metro di misura della bontà del cutoff scelto.
 
