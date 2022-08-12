@@ -9,32 +9,26 @@ in the `envparameters` dictionary.
 """
 function getchaincoefficients(envparameters)
   n_osc = envparameters["number_of_oscillators"]
-  #=
-  Parametri delle catene di oscillatori
-  Ci sono due casi qui, in base a cosa viene specificato nel JSON:
-  1) viene indicato un file alla voce "X_chain_coefficients_file"
-     dove X è "left" o "right". In questo caso, prendo i
-     coefficienti da quel file.
-  2) viene descritta una densità spettrale, con i suoi parametri,
-     alle voci "spectral_density_parameters" e "…_function". In
-     questo caso, calcolo i coefficienti con le funzioni del
-     T-TEDOPA come sempre.
-  In ogni caso, la temperatura dell'ambiente è completamente
-  inserita nei coefficienti, così come la frequenza di taglio,
-  quindi non verranno specificati.
-  È ammessa pure una situazione mista, in cui una catena è data
-  tramite i coefficienti e l'altra tramite una funzione.
-  Ciò che non è ammesso è dare contemporaneamente funzione e
-  coefficienti per il medesimo ambiente: qui lancio un errore.
-  =#
+  # There are two possible cases here, according to the parameters in the JSON
+  # files:
+  # 1) if there is an entry "X_chain_coefficients_file" (where "X" can be "left"
+  #    or "right"), then we read the coefficients from that file.
+  # 2) if a specific spectral density is described through the entries
+  #    "spectral_density_parameters" and "…_function", we compute the T-TEDOPA
+  #    coefficients as usual.
+  # A mixed-type situation in which one bath is given by a file and the other
+  # by a spectral density is allowed: they are completely independent.
+  # What is 𝑛𝑜𝑡 allowed, is putting in the JSON file both a coefficient file
+  # and a spectral density: in this case, an error is thrown.
   if (haskey(envparameters, "chain_coefficients_file") &&
       !haskey(envparameters, "spectral_density_function"))
     ccoeffs = DataFrame(CSV.File(envparameters["chain_coefficients_file"]))
     if size(ccoeffs, 1) ≥ n_osc
-      # TODO: studiare il caso particolare n_osc == 1
-      # Se è >, allora i coefficienti in eccesso vengono ignorati;
-      # se è =, allora tutto combacia e tutti i coefficienti sono
-      # considerati.
+      # If >, then excess coefficients are ignored.
+      # If =, all coefficients are taken into account.
+      # If <, there aren't enough coefficients to fill the sites, and an error
+      # is thrown.
+      # TODO: study the case n_osc == 1
       Ω = ccoeffs[1:n_osc, :loc]
       η = ccoeffs[1,       :int]
       κ = ccoeffs[2:n_osc, :int]
@@ -44,7 +38,7 @@ function getchaincoefficients(envparameters)
     end
   elseif (!haskey(envparameters, "chain_coefficients_file") &&
           haskey(envparameters, "spectral_density_function"))
-    # Codice per creare la funzione a partire dalla stringa tratto da
+    # The code which creates a function from a String is taken from
     # https://stackoverflow.com/a/53134127/4160978 
     fn = envparameters["spectral_density_function"]
     tmp = eval(Meta.parse("(a, x) -> " * fn))
@@ -81,12 +75,10 @@ Create a thermalised spectral function from `J`, at the temperature
 function thermalisedJ(J::Function,
                       ω::Real,
                       T::Real)
-  # Per evitare divisioni per zero, scrivo a parte il fattore:
-  # lim T->0 coth(x/T)=Θ(x).
-  # Si potrebbe anche scrivere f=1 e basta, assumendo che chi chiama
-  # la funzione abbia usato un supporto che escluda già (-∞,0), ma
-  # così almeno sto sicuro.
   if T == 0
+    # In this case we could write f=1 and be done with it, but instead we choose
+    # this more articulated way so that even if the caller doesn't already
+    # exclude (-∞,0) from the support, we do it ourselves now.
     f = ω > 0 ? one(ω) : zero(ω)
   else
     f = 0.5(1 + coth(0.5 * ω / T))
@@ -134,21 +126,15 @@ while `η` is the integral of `J` over its support.
 function chainmapcoefficients(J::Function, support, L::Int; kwargs...)
   measure = PolyChaos.Measure("measure", J, (support[begin], support[end]), false, Dict())
   poly = PolyChaos.OrthoPoly("poly", L, measure; kwargs...)
-  #=
-  Per costruire una serie di L oscillatori, servono i coefficienti αᵢ e βᵢ da
-  i=0 a i=L-1: siccome però gli array sono indicizzati partendo da 1 in Julia,
-  mi serviranno α[1:L] e β[1:L].
-  A partire da questi coefficienti, indicizzando i siti degli oscillatori da 1
-  a L, le frequenze Ωᵢ di ciascun oscillatore e la costante di interazione κᵢ
-  tra gli oscillatori (i,i+1) sono date da
-  Ωᵢ = αᵢ            per i∈{1,…,L},
-  κᵢ = sqrt(βᵢ₊₁)    per i∈{1,…,L-1}.
-  Il coefficiente β₀ rimane inutilizzato (onestamente, siccome a livello
-  teorico è arbitrario, il suo valore dipende dall'implementazione di
-  PolyChaos, quindi non so neanche quanto vale).
-  Rimane il coefficiente η di interazione tra oscillatore e spin, che calcolo
-  come l'integrale di J sul supporto dato.
-  =#
+  # In order to build a series of L oscillators, we need the αᵢ and βᵢ
+  # coefficients from i=0 to i=L-1, that means α[1:L] and β[1:L].
+  # From these, the local frequencies Ωᵢ and the coupling constants κᵢ of
+  # the (i,i+1) pair are given by
+  #     Ωᵢ = αᵢ            for i∈{1,…,L},
+  #     κᵢ = sqrt(βᵢ₊₁)    for i∈{1,…,L-1}.
+  # β₀ remains unused (and rightly so, since its value is implementation-defined).
+  # The oscillator-spin coupling constant η is given, lastly, by the integral
+  # of J over its support.
   α = coeffs(poly)[:,1]
   β = coeffs(poly)[:,2]
   Ω = α

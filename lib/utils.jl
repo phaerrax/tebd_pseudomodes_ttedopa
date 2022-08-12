@@ -3,17 +3,12 @@ using Base.Filesystem
 using ITensors
 using LinearAlgebra
 
-#= Questo file contiene un insieme variegato di funzioni che servono bene o
-   male per tutti gli script. Le raduno tutte qui in modo da non dover copiare
-   il loro codice ad ogni nuovo file.
-=#
+# Vectorisation utilities
+# =======================
+# In order to use tr(x'*y) as a tool to extract coefficient the basis must
+# of course be orthonormal wrt this inner product.
+# The canonical basis or the Gell-Mann one are okay.
 
-# Vettorizzazione di matrici ed operatori
-# =======================================
-# L'uso di tr(x'*y) come prodotto interno tra gli elementi x e y fa sì che
-# queste formule di vettorizzazione abbiano senso solo quando la base scelta
-# è ortonormale rispetto a tale prodotto interno: vanno bene ad esempio la
-# base canonica o quella di Gell-Mann.
 """
     vec(A::Matrix, basis::Vector)
 
@@ -39,20 +34,12 @@ end
 Compute the partial trace, on the `j`-th site of `sites`, of the matrix
 represented, as vectorised, by the MPS `v`.
 The result is a `Vector` containing the coordinates of the partial trace
-(which is a matrix).
+(i.e. the result is still in vectorised form).
 """
 function partialtrace(sites::Vector{Index{Int64}}, v::MPS, j::Int)
-  # Calcola la traccia parziale della matrice rappresentata (tramite
-  # vettorizzazione) dal MPS `v` nel j° sito.
-  # (Restituisce la matrice ancora nella forma vettorizzata.)
-  # Contraggo tutti i siti in v[2:end] con uno stato vecId per ottenere
-  # un MPS con un solo indice fisico: quello dello stato a sinistra,
-  # che diventa così un vettore.
-  # Definisco una procedura di contrazione personalizzata: parto da v[end]
-  # e lo contraggo per prima cosa con un vecId; il risultato lo contraggo
-  # con v[end-1], poi con un altro vecId ma sul sito end-1, e così via fino
-  # ad arrivare a v[j].
-  # Poi faccio lo stesso partendo da v[1] e contraendo verso destra.
+  # Custom contraction sequence: we start from v[end] and we contract it with
+  # a vecId state; we contract the result with v[end-1] and so on, until we
+  # get to v[j].  # Then we do the same starting from v[1].
   x = ITensor(1.)
   for i ∈ length(sites):-1:j+1
     x = v[i] * state(sites[i], "vecId") * x
@@ -62,12 +49,12 @@ function partialtrace(sites::Vector{Index{Int64}}, v::MPS, j::Int)
     y = v[i] * state(sites[i], "vecId") * y
   end
   z = y * v[j] * x
-  # Ora `vector(z)` è il vettore di coordinate della traccia parziale.
+  # Now `vector(z)` is the coordinate vector of the partial trace.
   return vector(z)
 end
 
-# Matrici di Gell-Mann generalizzate
-# ==================================
+# Generalised Gell-Mann matrices
+# ==============================
 """
     gellmannmatrix(j, k, dim)
 
@@ -118,8 +105,8 @@ of the ``dim²`` generalised Gell-Mann matrices.
 function gellmannbasis(dim)
   return [gellmannmatrix(j, k, dim)
           for (j, k) ∈ [Base.product(1:dim, 1:dim)...]]
-  # Devo spacchettare il risultato di `product` in modo che il risultato
-  # sia una lista di matrici (un Vector, per la precisione) e non una Matrix.
+  # We need to splat the result from `product` so that the result is a list
+  # of matrices (a Vector) and not a Matrix.
 end
 
 """
@@ -151,8 +138,8 @@ function canonicalbasis(dim)
           for (i, j) ∈ [Base.product(1:dim, 1:dim)...]]
 end
 
-# Entropia (di Von Neumann)
-# =========================
+# (Von Neumann) Entropy
+# =====================
 """
     vonneumannentropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
 
@@ -162,19 +149,20 @@ using its Schmidt decomposition.
 """
 function vonneumannentropy(ψ::MPS, sites::Vector{Index{Int64}}, n::Int)
   orthogonalize!(ψ, n)
-  # Decomponi ψ[n] nei suoi valori singolari, trattando il Link tra il sito
-  # n-1 e il sito n e l'indice fisico come "indici di riga"; il Link tra il
-  # sito n e il sito n+1, che rimane, sarà l'"indice di colonna".
+  # Decompose ψ[n] in singular values, treating the Link between sites n-1 and n
+  # and the physical index as "row index"; the remaining index, the Link
+  # between n and n+1, is the "column index".
   _, S, _ = svd(ψ[n], (linkind(ψ, n-1), sites[n]))
-  # Calcolo il quadrato dei valori singolari (aka i coefficienti di Schmidt
-  # della bipartizione), e infine da essi l'entropia.
+  # Compute the square of the singular values (aka the Schmidt coefficients
+  # of the bipartition), and from them the entropy.
   sqdiagS = [S[j,j]^2 for j ∈ dim(S, 1)]
   return -sum(p -> p * log(p), sqdiagS; init=0.0)
 end
 
-# Chop (da Mathematica)
-# =====================
-# Imitazione della funzione "Chop" di Mathematica.
+# Chop (from Mathematica)
+# =======================
+# Imitation of Mathematica's "Chop" function
+
 """
     chop(x::Real; tolerance=1e-10)
 
@@ -194,8 +182,9 @@ function chop(x::Complex; tolerance=1e-10)
   return Complex(chop(real(x)), chop(imag(x)))
 end
 
-# Manipolazione dei dati di oggetti di ITensors
-# =============================================
+# Manipulating ITensor objects
+# ============================
+
 """
     sitetypes(s::Index)
 
@@ -205,14 +194,13 @@ This function is already defined in the ITensor library, but it is not publicly
 accessible.
 """
 function sitetypes(s::Index)
-  # Questi SiteType possono poi essere interpretati da una funzione che riceve
-  # l'Index come argomento per capire come comportarsi.
   ts = tags(s)
   return SiteType[SiteType(ts.data[n]) for n in 1:length(ts)]
 end
 
-# Lettura dei parametri della simulazione
-# =======================================
+# Reading the parameters of the simulations
+# =========================================
+
 """
     isjson(filename::String)
 
@@ -222,7 +210,7 @@ By design, filenames consisting of only ".json" return `false`.
 """
 function isjson(filename::String)
   return length(filename) > 5 && filename[end-4:end] == ".json"
-  # Volutamente, un file che di nome fa solo ".json" viene ignorato.
+  # We ignore a file whose name is only ".json".
 end
 
 """
@@ -237,32 +225,29 @@ dictionary is created for each one of them.
 """
 function load_parameters(file_list)
   if isempty(file_list)
-    throw(ErrorException("Non è stato fornito alcun file di parametri."))
+    throw(ErrorException("No parameter file provided."))
   end
   first_arg = file_list[1]
   prev_dir = pwd()
   if isdir(first_arg)
-    # Se il primo input è una cartella, legge tutti i file .json al suo
-    # interno e li carica come file di parametri; alla fine i file di
-    # output saranno salvati in tale cartella.
-    # I restanti elementi di ARGS vengono ignorati (l'utente viene avvisato).
+    # If the first argument is a directory, we read all the JSON files within
+    # and load them as parameter files; in the end all output will be saved
+    # in that same directory. We ignore the remaining elements in ARGS.
     cd(first_arg)
     files = filter(isjson, readdir())
-    @info "$first_arg è una cartella. I restanti argomenti passati alla "*
-          "linea di comando saranno ignorati."
+    @info "$first_arg is a directory. Ignoring other command line arguments."
   else
-    # Se il primo input non è una cartella, tutti gli argomenti passati in
-    # ARGS vengono trattati come file da leggere contenenti i parametri.
-    # I file di output saranno salvati nella cartella pwd() al momento
-    # del lancio del programma.
+    # Otherwise, all command line arguments are treated as parameter files.
+    # Output files will be saved in the pwd() from which the script was
+    # launched.
     files = file_list
   end
-  # Carico i file di parametri nei dizionari.
+  # Load parameters into dictionaries, one for each file.
   parameter_lists = []
   for f in files
     open(f) do input
       s = read(input, String)
-      # Aggiungo anche il nome del file alla lista di parametri.
+      # Add the filename too to the dictionary.
       push!(parameter_lists, merge(Dict("filename" => f), JSON.parse(s)))
     end
   end
@@ -274,8 +259,9 @@ function allequal(a)
   return all(x -> x == first(a), a)
 end
 
-# Costruzione della lista di istanti di tempo per la simulazione
-# ==============================================================
+# Defining the time interval of the simulation
+# ============================================
+
 """
     construct_step_list(parameters)
 
@@ -290,10 +276,12 @@ function construct_step_list(parameters)
   return collect(range(0, end_time; step=τ))
 end
 
-# Calcolo di osservabili durante la simulazione
-# =============================================
-# Per calcolare gli autostati dell'operatore numero: calcolo anche la somma
-# di tutti i coefficienti (così da verificare che sia pari a 1).
+# Computing expectation values of observables
+# ===========================================
+
+# Function that calculates the eigenvalues of the number operator, given a set
+# of projectors on the eigenspaces, and also return their sum (which should
+# be 1).
 # TODO: these two functions are probably outdated. Anyway they are not
 # specific to the occupation levels, so they should have a more general
 # description.
@@ -306,7 +294,9 @@ function levels(projs::Vector{MPS}, state::MPS)
   return [lev; sum(lev)]
 end
 
-# Rilevazione della dimensione dei legami tra i siti degli MPS o MPO
+# MPS and MPO utilities
+# =====================
+
 """
     linkdims(m::Union{MPS, MPO})
 
@@ -316,25 +306,20 @@ function linkdims(m::Union{MPS, MPO})
   return [ITensors.dim(linkind(m, j)) for j ∈ 1:length(m)-1]
 end
 
-# Composizione di MPS e MPO
-# =========================
 """
     chain(left::MPS, right::MPS)
 
 Concatenate `left` and `right`, returning `left` ``⊗`` `right`.
 """
 function chain(left::MPS, right::MPS)
-  # Questa funzione dovrebbe essere l'analogo di `chain` di mpnum: prende
-  # due MPS e ne crea uno che ne è la concatenazione.
-  # Per scriverla mi sono "ispirato" al codice della funzione `MPS` nel
-  # file mps.jl, riga 308.
+  # This function is like mpnum's `chain`: it takes two MPSs ans concatenates
+  # them. The code is "inspired" from `ITensors.MPS` in mps.jl:308.
 
-  midN = length(left) # È l'indice a cui si troverà il "buco"
-  # Innanzitutto, riscalo i tag dei Link negli MPS di argomento, in
-  # modo che la numerazione alla fine risulti corretta.
-  # Facendo un po' di prove ho visto che la numerazione degli Index di
-  # tipo Link nei MPS segue uno schema proprio, cioè non è legata a come
-  # vengono chiamati i siti: va semplicemente da 1 alla lunghezza-1.
+  midN = length(left) # The site with the missing link between the two MPSs.
+  # First of all we shift the Link tags of the given MPSs, so that the final
+  # enumeration of the tags is correct.
+  # Note that in each MPS the numbers in the Link tags do not follow the
+  # numbering of the Sites on which it is based, they always start from 1.
   for j in eachindex(left)
     replacetags!(left[j], "l=$j", "l=$j"; tags="Link")
     replacetags!(left[j], "l=$(j-1)", "l=$(j-1)"; tags="Link")
@@ -343,14 +328,12 @@ function chain(left::MPS, right::MPS)
     replacetags!(right[j], "l=$j", "l=$(midN+j)"; tags="Link")
     replacetags!(right[j], "l=$(j-1)", "l=$(midN+j-1)"; tags="Link")
   end
-  # Spacchetto i tensori in `left` e `right` e creo un MPS con le
-  # liste concatenate.
+  # "Shallow" concatenation of the MPSs (there's still a missing link).
   M = MPS([left..., right...])
-  # I siti "di confine", l'ultimo a dx di `left` e il primo a sx di
-  # `right`, non sono ancora collegati. Creo un indice banale, di
-  # dimensione 1, di tipo Link e lo aggiungo a quei due siti.
-  # L'indice è _sempre_ banale perché per costruzione il MPS risultato
-  # è il prodotto tensore dei due argomenti: non c'è interazione tra loro.
+  # We create a "trivial" Index of dimension 1 and add it to the two sites
+  # which are not yet connected.
+  # The Index has dimension 1 because this is a tensor product between the
+  # states so there's no correlation between them.
   missing_link = Index(1; tags="Link,l=$midN")
   M[midN] = M[midN] * state(missing_link, 1)
   M[midN+1] = state(dag(missing_link), 1) * M[midN+1]
@@ -364,12 +347,8 @@ end
 Concatenate `left` and `right`, returning `left` ``⊗`` `right`.
 """
 function chain(left::MPO, right::MPO)
-  # Come sopra, ma per due MPO.
-  midN = length(left) # È l'indice a cui si troverà il "buco"
-  #for j in eachindex(left)
-  #  replacetags!(left[j], "l=$j", "l=$j"; tags="Link")
-  #  replacetags!(left[j], "l=$(j-1)", "l=$(j-1)"; tags="Link")
-  #end
+  # Like the previous `chain`, but for MPOs.
+  midN = length(left)# The site with the missing link between the two MPOs.
   for j in eachindex(right)
     replacetags!(right[j], "l=$j", "l=$(midN+j)"; tags="Link")
     replacetags!(right[j], "l=$(j-1)", "l=$(midN+j-1)"; tags="Link")
@@ -378,17 +357,15 @@ function chain(left::MPO, right::MPO)
   missing_link = Index(1; tags="Link,l=$midN")
   M[midN] = M[midN] * state(missing_link, 1)
   M[midN+1] = M[midN+1] * state(dag(missing_link), 1)
-  # L'ordine degli Index negli ITensor M[midN] e M[midN+1] non è quello
-  # che si otterrebbe costruendo normalmente un MPO che si estende su
-  # tutto l'array dei siti; per la precisione i due Index di tipo "Link"
-  # sono scambiati.
-  # Siccome però l'ordine degli Index posseduti da un ITensor non è
-  # importante, conta solo quali indici ha, il risultato non dovrebbe
-  # cambiare.
+  # The order of the Indexes in M[midN] and M[midN+1] ns not what we would get
+  # if we built an MPO on the whole system as usual; namely, the two "Link"
+  # Indexes are swapped.
+  # This however should not matter since ITensor does not care about the order.
   return M
 end
 
-# Variante a numero di argomenti libero
+# Varargs versions
+
 """
     chain(a::MPS, b...)
 
@@ -422,9 +399,8 @@ function embed_slice(sites::Array{Index{Int64}},
                      slice::MPO)
   # TODO: compute automatically on which sites the MPO is defined, without
   # having to supply the range explicitly as an argument.
-  # Controllo dei parametri
   if length(slice) != length(range)
-    throw(DimensionMismatch("Le dimensioni di slice e range non combaciano."))
+    throw(DimensionMismatch("slice and range must have the same size."))
   end
   if !issubset(range, eachindex(sites))
     throw(BoundsError(range, sites))
@@ -464,9 +440,8 @@ SiteTypes of the remaining sites.
 function embed_slice(sites::Array{Index{Int64}},
                      range::UnitRange{Int},
                      slice::MPS)
-  # Controllo dei parametri
   if length(slice) != length(range)
-    throw(DimensionMismatch("Le dimensioni di slice e range non combaciano."))
+    throw(DimensionMismatch("slice e range must have the same size."))
   end
   if !issubset(range, eachindex(sites))
     throw(BoundsError(range, sites))

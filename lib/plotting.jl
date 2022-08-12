@@ -3,8 +3,6 @@ using Base.Filesystem
 using Plots
 using JSON
 
-# Grafici
-# =======
 """
     categorise_parameters(parameter_lists)
 
@@ -15,11 +13,11 @@ Returns two lists, `unique` and `repeated`, packed into a tuple.
 """
 function categorise_parameters(parameter_lists)
   distinct = String[]
-
-  # Devo controllare ciascuna lista di parametri per controllare se specifica
-  # le dimensioni degli oscillatori separatamente per quelli caldi e freddi
-  # o se dà solo una dimensione per entrambi.
-  # Nel secondo caso, modifico il dizionario per riportarlo al primo caso.
+  # We need to examine each parameter list to check if the dimension of the
+  # oscillator Hilbert spaces are given separately for the cold and hot baths,
+  # or if there's one dimension given for both.
+  # In the latter case, we duplicate the information to make it like the
+  # former.
   for dict in parameter_lists
     if (haskey(dict, "oscillator_space_dimension") &&
         !haskey(dict, "hot_oscillator_space_dimension") &&
@@ -52,7 +50,8 @@ function subplot_title(values_dict, keys)
   rootpath = sourcepath[begin:ind[end]]
   libpath = joinpath(rootpath, "lib")
   f = open(joinpath(libpath, "short_names_dictionary.json"), "r")
-  # Carico il dizionario dei "nomi brevi" per i parametri.
+  # Load the dictionary to assign a symbol to each parameter, to be displayed
+  # in the plots.
   short_name = JSON.parse(read(f, String))
   close(f)
   hidden_parameters = ["skip_steps", "filename"]
@@ -74,15 +73,13 @@ The title will contain the parameters which are common to all subplots.
 function shared_title_fake_plot(subject::String,
                                 parameters;
                                 filenameastitle = false)
-  # Siccome il titolone contiene i parametri comuni a tutte le simulazioni,
-  # posso prendere senza problemi uno degli elementi di parameter_lists
-  # qualunque) e lo uso come titolo del gruppo di grafici.
+  # The big title contains parameters common to all simulations, therefore we
+  # can choose any element from `parameter_lists` and the result is the same.
   
   if filenameastitle
     bigtitle = subject
   else
-    # Inserire in questo array i parametri che non si vuole che appaiano nel
-    # titolo:
+    # Parameters we don't want to appear in the big title:
     hidden_parameters = ["simulation_end_time", "skip_steps", "filename"]
     _, repeated_parameters = categorise_parameters(parameters)
     #
@@ -92,7 +89,8 @@ function shared_title_fake_plot(subject::String,
     rootpath = sourcepath[begin:ind[end]]
     libpath = joinpath(rootpath, "lib")
     f = open(joinpath(libpath, "short_names_dictionary.json"), "r")
-    # Carico il dizionario dei "nomi brevi" per i parametri.
+    # Load the dictionary to assign a symbol to each parameter, to be displayed
+    # in the plots.
     short_name = JSON.parse(read(f, String))
     close(f)
     #
@@ -101,7 +99,7 @@ function shared_title_fake_plot(subject::String,
                         ", ")
     bigtitle = subject * "\n" * shared_title
   end
-  y = ones(3) # Dati falsi per far apparire un grafico
+  y = ones(3) # Fake data in order to create an empty plot
   title_fake_plot = Plots.scatter(y, marker=0, markeralpha=0, ticks=nothing, annotations=(2, y[2], Plots.text(bigtitle)), axis=false, grid=false, leg=false, bottom_margin=2cm, size=(200,100))
   return title_fake_plot
 end
@@ -128,11 +126,19 @@ above each subplot.
 - `commonxlabel` → x-axis label (common to all subplots).
 - `commonylabel` → y-axis label (common to all subplots).
 - `maxyrange` → y-axis range at which the subplots may be clipped
-- `rescale` → if `true`, all subplots are rescaled so that they have the same
-- `filenameastitle` → if `true`, the title of each subplot will be given by
   the filename of the JSON file describing the parameters of the simulation
 - `plottitle` → title of the plot group.
 - `plotsize` → a Pair denoting the size of the individual subplots.
+
+# Usage
+Each element ``Yᵢ ∈`` `y_super` is what we would pass to `Plots.plot`, together
+with the respective element ``Xᵢ ∈`` `x_super`, to draw its plot.
+In other words, each ``Yᵢ ∈`` `y_super` is a `M×N` matrix, with
+`M = length(Xᵢ)`; `N` is the number of columns, each of which is a separate
+line in the plot.
+For example, in order to draw the occupation numbers of 10 sites all
+together in a single plot, we create a 10-column matrix, with the n-th
+column containing the occupation numbers of the n-th site at each instant.
 """
 function groupplot(x_super,
     y_super,
@@ -146,40 +152,30 @@ function groupplot(x_super,
     commonylabel,
     plottitle,
     plotsize)
-  #=
-  `y_super` è un array, ogni elemento del quale è quello che si passerebbe
-  alla funzione Plots.plot insieme al rispettivo elemento Xᵢ ∈ x_super
-  per disegnarne il grafico. Questo significa che ogni Yᵢ ∈ y_super è una 
-  matrice M×N con M = length(Xᵢ); N è il numero di colonne, e ogni
-  colonna rappresenta una serie di dati da graficare. Ad esempio, per
-  graficare tutti assieme i numeri di occupazione di 10 siti si può
-  creare una matrice di 10 colonne: ogni riga della matrice conterrà
-  i numeri di occupazione dei siti a un certo istante di tempo.
-  =#
-  # Se `labels` è un vettore di vettori riga di stringhe, significa che
-  # ogni sottografico ha già il suo insieme di etichette: sono a posto.
-  # Se invece `labels` è solo un vettore riga di stringhe, significa che
-  # quelle etichette sono da usare per tutti i grafici: allora creo in
-  # questo momento il vettore di vettori riga di stringhe ripetendo quello
-  # fornito come argomento.
+  # If `labels` is a vector of row vectors of strings, then each subplot
+  # already has its own set of labels (each column of the row vector corresponds
+  # to the columns in each element of `y_super`).
+  # If `labels` is only a row vector of strings instead, then this means that
+  # the labels are common to all plots, so we repeat them creating a vector
+  # of identical copies.
   if labels isa Matrix{String}
     newlabels = repeat([labels], length(parameter_super))
     labels = newlabels
   end
-  # Ripeto lo stesso trattamento per `linestyles`...
+  # Now we do the same, but with `linestyles`...
   if linestyles isa Matrix{Symbol}
     newlinestyles = repeat([linestyles], length(parameter_super))
     linestyles = newlinestyles
   end
-  # ...e per `maxyrange`
+  # ...and `maxyrange`.
   if !isnothing(maxyrange) && !isa(maxyrange, Vector)
     newmaxyrange = repeat([maxyrange], length(parameter_super))
     maxyrange = newmaxyrange
   end
 
   if rescale
-    # Per poter meglio confrontare a vista i dati, imposto una scala delle
-    # ordinate uguale per tutti i grafici.
+    # We set a common scale for the y-axis among all subplots: this makes
+    # comparing the results easier.
     yminima = minimum.(y_super)
     ymaxima = maximum.(y_super)
     ylimits = (minimum(yminima), maximum(ymaxima))
@@ -188,10 +184,10 @@ function groupplot(x_super,
     ylimits_super = extrema.(y_super)
   end
 
-  # Limito l'asse y a maxyrange 𝑠𝑜𝑙𝑜 se i grafici non ci stanno già
-  # dentro da soli.
-  # Forse qui si potrebbe semplificare il tutto con `clamp`, se solo
-  # trovassi il modo di farla funzionare con le tuple...
+  # We need to limit the y-axis to `maxyrange` 𝑜𝑛𝑙𝑦 if the range isn't already
+  # within it.
+  # TODO: try to simplify the code here by using `clamp` (if only I knew how
+  # to make it work with tuples...).
   if !isnothing(maxyrange)
     for (i, maxrn) ∈ zip(eachindex(ylimits_super), maxyrange)
       if first(ylimits_super[i]) < maxrn[begin]
@@ -203,7 +199,7 @@ function groupplot(x_super,
     end
   end
 
-  # Smisto i parametri in ripetuti e non, per creare i titoli dei grafici.
+  # Sort the parameters into repeated and not-repeated, for the plot titles.
   if filenameastitle
     subplottitles = [p["filename"] for p ∈ parameter_super]
   else
@@ -212,10 +208,11 @@ function groupplot(x_super,
                      for p ∈ parameter_super]
   end
 
-  # Calcolo la grandezza totale dell'immagine a partire da quella dei grafici.
+  # Compute the dimension of the whole image, starting from the size of the
+  # single subplot.
   figuresize = (2, Int(ceil(length(x_super)/2))+0.5) .* plotsize
 
-  # Creo i singoli grafici.
+  # Create the subplots.
   subplots = [Plots.plot(X,
                          Y,
                          ylim=ylimits,
@@ -235,9 +232,8 @@ function groupplot(x_super,
                                                               ylimits_super,
                                                               subplottitles,
                                                               parameter_super)]
-  # I grafici saranno disposti in una griglia con due colonne; se ho un numero
-  # dispari di grafici, ne creo uno vuoto in modo da riempire il buco che
-  # si crea (altrimenti mi becco un errore).
+  # The subplots will be arranged into a two-column grid; if we have an odd
+  # number of plots, we need to create an empty one in order to fill the gap.
   if isodd(length(subplots))
     fakeplot = Plots.scatter(ones(2),
                              marker=0,
@@ -249,12 +245,12 @@ function groupplot(x_super,
                              size=figuresize)
     push!(subplots, fakeplot)
   end
-  # Creo il grafico che raggruppa tutto, insieme al titolo principale.
+  # Create the bigger plot which will contain all subplots, and the title.
   group = Plots.plot(shared_title_fake_plot(plottitle,
                                             parameter_super;
                                             filenameastitle),
                      Plots.plot(subplots..., layout=(length(subplots)÷2, 2)),
-                     # Usa ÷ e non /, in modo da ottenere un Int!
+                     # Use ÷, not /, to get an Int
                      layout=Plots.grid(2, 1, heights=[0.1, 0.9]))
   return group
 end
@@ -281,7 +277,7 @@ in the label of each series.
 - `plotsize` → a Pair representing the plot size (in pixels).
 """
 function unifiedplot(x_super, y_super, parameter_super; filenameastitle = false, linestyle, xlabel, ylabel, plottitle, plotsize)
-  # Smisto i parametri in ripetuti e non, per creare le etichette dei grafici.
+  # Sort the parameters into repeated and not-repeated, for the plot titles.
   if filenameastitle
     labels = [p["filename"] for p ∈ parameter_super]
   else
@@ -289,7 +285,7 @@ function unifiedplot(x_super, y_super, parameter_super; filenameastitle = false,
     labels = [subplot_title(p, distinct_parameters)
                      for p ∈ parameter_super]
   end
-  # Imposto la dimensione della figura (con un po' di spazio per il titolo).
+  # Set the figure size (allowing a little more space for the title).
   figuresize = (1, 1.25) .* plotsize
   plt = Plots.plot()
   for (X, Y, lb, p) in zip(x_super, y_super, labels, parameter_super)

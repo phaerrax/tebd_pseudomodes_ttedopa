@@ -3,23 +3,46 @@ using LinearAlgebra
 
 const ⊗ = kron
 
-#=
-In questo file definisco gli stati e gli operatori con cui può essere descritto
-un oscillatore armonico, sia nella versione normale che in quella vettorizzata.
-La base è il tipo "Qudit" già definito da ITensors, che rinomino in "Osc"; forse
-è possibile usare direttamente le funzioni `op` sui Qudit definite da ITensors,
-ma non riesco a trovare il modo, perciò sono costretto a definirle da capo.
-La versione vettorizzata è un codice a parte, ma sempre ispirato alle stesse
-funzioni.
-La dimensione dell'oscillatore viene determinata dall'utente, al momento della
-creazione del sito.
-=#
+# In this file the states and operators describing harmonic oscillators (in a
+# T-TEDOPA setting) are defined, both in a normal and vectorised way.
+# We base the normal version on the "Qudit" SiteType provided by ITensors.
 
-# Matrici base 
-# ------------
+# Basic matrices
+# --------------
+
+"""
+    a⁻(dim::Int)
+
+Return the matrix representing the destruction operator of a harmonic oscillator
+of the given dimension `dim`, in the eigenbasis of the number operator.
+"""
 a⁻(dim::Int) = diagm(1 => [sqrt(j) for j = 1:dim-1])
+
+"""
+    a⁻(dim::Int)
+
+Return the matrix representing the creation operator of a harmonic oscillator
+of the given dimension `dim`, in the eigenbasis of the number operator. The
+truncation to a finite dimension is performed by imposing ``a⁺|dim-1⟩ = 0`` on
+the most-occupied state in the
+basis.
+"""
 a⁺(dim::Int) = diagm(-1 => [sqrt(j) for j = 1:dim-1])
+
+"""
+    num(dim::Int)
+
+Return the matrix representing the number operator of a harmonic oscillator of
+the given dimension `dim`, in its eigenbasis.
+"""
 num(dim::Int) = a⁺(dim) * a⁻(dim)
+
+"""
+    id(dim::Int)
+
+Return the identity operator of a harmonic oscillator of the given dimension
+`dim`.
+"""
 id(dim::Int) = Matrix{Int}(I, dim, dim)
 
 """
@@ -27,7 +50,7 @@ id(dim::Int) = Matrix{Int}(I, dim, dim)
 
 Compute a decreasing sequence of length `N` where the first two elements are
 equal to `basedim` and the following ones are given by
-floor(2 + basedim * ℯ^(-decay * n).
+`floor(2 + basedim * ℯ^(-decay * n))`.
 
 Useful to determine the dimensions of oscillator sites in a TEDOPA chain.
 """
@@ -36,39 +59,46 @@ function oscdimensions(length, basedim, decay)
   return [basedim; basedim; (Int ∘ floor ∘ f).(3:length)]
 end
 
-# Spazio degli oscillatori (normale)
-# ==================================
+# Space of harmonic oscillators
+# =============================
+
 alias(::SiteType"Osc") = SiteType"Qudit"()
+
+"""
+    ITensors.space(st::SiteType"Osc";
+                   dim = 2,
+                   conserve_qns = false,
+                   conserve_number = false,
+                   qnname_number = "Number")
+
+Create the Hilbert space for a site of type "Osc".
+
+Optionally specify the conserved symmetries and their quantum number labels.
+"""
 ITensors.space(st::SiteType"Osc"; kwargs...) = space(alias(st); kwargs...)
 
-# Stati
-# -----
-#=
-Per creare uno stato della base canonica, si passa il numero di occupazione
-sotto forma di stringa alla funzione `state`.
-Ad esempio, se s è un sito ITensor di tipo "Osc",
-  state(s, "n")
-crea uno stato con n quanti nel sito s, mentre se `sites` è un array di m siti
-  MPS(sites, ["n₁", "n₂", …, "nₘ"])
-crea un MPS con il j-esimo sito occupato da nⱼ quanti.
-=#
+# States
+# ------
+
+# Generic function that forwards "Osc" state definitions to "Qudit" states.
+# The available states are therefore the same between the two SiteTypes.
 ITensors.state(sn::StateName, st::SiteType"Osc", s::Index) = state(sn, alias(st), s)
 
-# Operatori
+# Operators
 # ---------
-#=
-Quando si invoca la funzione
-  op(name::AbstractString, s::Index...; kwargs...)
-ITensor prova a chiamare le seguenti funzioni (in ordine, tra le altre):
-  op(::OpName, ::SiteType, ::Index; kwargs...)
-  op(::OpName, ::SiteType; kwargs...)
-Definendo la seguente funzione, intercetto la prima chiamata, e posso far
-calcolare la dimensione alla funzione, a partire dall'Index dato.
-La funzione aggiungerà la dimensione ai kwargs, e a sua volta chiamerà una
-delle `op` definite qui di seguito, trasformando il risultato in un oggetto
-ITensor nel modo appropriato (vedere src/physics/site_types/qudit.jl alla
-riga 73 come esempio).
-=#
+
+# When we call
+#   op(name::AbstractString, s::Index...; kwargs...)
+# the following functions are called by the library (in this order):
+#   op(::OpName, ::SiteType, ::Index; kwargs...)
+#   op(::OpName, ::SiteType; kwargs...)
+# By defining the following function, we place ourselves before the first of
+# these two calls, "intercepting" the process so that we can add the dimension
+# of the state to the keyword arguments; then we call `op` again and resume
+# the normal execution, with the new kwargs.
+# We also need to wrap the result in an `itensor` object so that the operator
+# is really an ITensor (see for example src/physics/site_types/qudit.jl:73)
+# since the custom `op` function we define below just return matrices.
 function ITensors.op(on::OpName, st::SiteType"Osc", s::Index; kwargs...)
   return itensor(op(on, st; dim=ITensors.dim(s), kwargs...), s', dag(s))
 end
@@ -83,59 +113,62 @@ ITensors.op(::OpName"N", ::SiteType"Osc"; dim=2) = num(dim)
 ITensors.op(::OpName"X", ::SiteType"Osc"; dim=2) = a⁻(dim) + a⁺(dim)
 ITensors.op(::OpName"Y", ::SiteType"Osc"; dim=2) = im*(a⁻(dim) - a⁺(dim))
 
-# Spazio degli oscillatori vettorizzato
-# =====================================
+# Space of harmonic oscillators (vectorised)
+# ==========================================
+
+"""
+    ITensors.space(st::SiteType"vecOsc"; dim = 2)
+
+Create the Hilbert space for a site of type "vecOsc", i.e. a vectorised
+harmonic oscillator of dimension `dim` (this means that the space has dimension
+`dim^2`), where the vectorisation is performed wrt the canonical basis of
+`Mat(ℂᵈⁱᵐ)`.
+"""
 function ITensors.space(::SiteType"vecOsc"; dim=2)
   return dim^2
 end
 
-# Stati
-# -----
-#=
-Tutti gli stati del tipo "vecOsc" variano in base alla dimensione dello spazio,
-che è la radice quadrata della variabile `dim` degli Index di questo tipo.
+# States
+# ------
 
-Quando viene chiamata la funzione
-  state(s::Index, name::AbstractString; kwargs...)
-ITensors chiama nuovamente la funzione `state` provando diverse combinazioni
-di argomenti, tra cui (in ordine)
-  state(::StateName"Name", ::SiteType"Tag", s::Index; kwargs...)
-  state(::StateName"Name", ::SiteType"Tag"; kwargs...)
-e incapsulando il risultato in un oggetto ITensor.
-La seconda, che deve restituire un vettore, è il tipo di funzione che
-sovrascriverò con le definizioni date di seguito.
-
-A questa funzione l'Index non viene passato come argomento, quindi devo passare
-la dimensione in qualche modo tramite i kwargs.
-La seguente definizione di `state` per il tipo "vecOsc" intercetta la prima
-delle due combinazioni di cui sopra, calcola dall'Index fornito come argomento
-la dimensione giusta, la aggiunge ai kwargs e chiama poi la seconda combinazione.
-=#
+# Here there is no "vecQudit" on which we can depend for the states, so we
+# need to make our own from scratch.
+# Each state is ultimately a vector whose length is `dim^2`, and we can get
+# `dim` by calling `ITensors.dim` on the state's Index.
+# We do as we did for the `op` function above for the "Osc" SiteType, i.e.
+#   state(s::Index, name::AbstractString; kwargs...)
+# tries to call, in turn,
+#    state(::StateName"Name", ::SiteType"Tag", s::Index; kwargs...)
+#    state(::StateName"Name", ::SiteType"Tag"; kwargs...)
+# so we try to intercept the call to the first one, we add the dimension to
+# the keyword arguments, and finally we call the second one, which will refer
+# to one of the specific `op`s we define below.
 function ITensors.state(sn::StateName, st::SiteType"vecOsc", s::Index; kwargs...)
   return state(sn, st; dim=isqrt(ITensors.dim(s)), kwargs...)
-  # Uso `isqrt` che prende un Int e restituisce un Int; il fatto che tronchi la
-  # parte decimale non dovrebbe mai essere un problema, dato che dim(s) per
-  # costruzione è il quadrato di un intero.
+  # Use `isqrt` which takes an Int and returns an Int; the decimal part is
+  # truncated, but it's not a problem since by construction dim(s) is a
+  # perfect square, so the decimal part should be zero.
 end
 
-#=
-Prima di arrivare a chiamare `state` come spiegato qui sopra, però, ITensors
-prova a chiamare anche 
-  state(::StateName"Name", st::SiteType"Tag", s::Index; kwargs...)
-per ogni `st` nei tag dell'Index `s`; se il risultato è `nothing` prova con il
-tag successivo, fino ad esaurirli e poi continuare con altri tipi di argomenti
-per `state`, se invece il risultato non è `nothing` lo restituisce, incapsulato
-in un oggetto ITensor.
-Qui c'è un problema: i siti creati con `siteinds` non hanno solo il tipo
-"vecOsc" ma anche "Site" e "n=N", e non esiste alcuna funzione del tipo
-  state(::StateName{ThermEq}, ::SiteType{Site}, ::Index{Int64}; kwargs...)
-o con "n=N", di conseguenza Julia dà un errore di tipo MethodError.
-Devo quindi definire questa funzione, e farle restituire `nothing` in modo
-che venga saltata.
-=#
+# There's a problem with this trick: before calling `state` as explained above,
+# ITensors also tries to call
+#   state(::StateName"Name", st::SiteType"Tag", s::Index; kwargs...)
+# for each Tag `st` in the Index `s`. If `nothing` is returned, then it goes on
+# to the next available Tag, exhausting all possibilities; if the return value
+# is not `nothing` then the result is passed to `itensor` and encapsulated into
+# an ITensor object.
+# The point is, if we create "vecOsc" sites through `siteinds` they will have
+# the Tags "Site" and "n=N" (for some `N`) too, and there is no
+#   state(::StateName{ThermEq}, ::SiteType{Site}, ::Index{Int64}; kwargs...)
+# (for example) or with "n=N". As a consequence, a MethodError exception is
+# thrown.
+# To solve this, we define a sort of "default" function which always returns
+# `nothing`, on which `state` can fall back if there is no other `state`
+# defined.
 ITensors.state(sn::StateName, st::SiteType, s::Index; kwargs...) = nothing
 
 function ITensors.state(::StateName{N}, ::SiteType"vecOsc"; dim=2) where {N}
+  # Eigenstates of the number operator (NOT the canonical basis of ℂᵈⁱᵐ ⊗ ℂᵈⁱᵐ)
   n = parse(Int, String(N))
   v = zeros(dim)
   v[n + 1] = 1.0
@@ -143,6 +176,9 @@ function ITensors.state(::StateName{N}, ::SiteType"vecOsc"; dim=2) where {N}
 end
 
 function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; dim=2, ω::Real, T::Real)
+  # Thermal equilibrium state at given frequency and temperature.
+  # TODO: is there a way we can include ω and T directy within the "vecOsc"
+  # Index? After all, they are set at the beginning, and never change.
   if T == 0
     v = state(StateName("0"), st; dim=dim)
   else
@@ -153,7 +189,8 @@ function ITensors.state(::StateName"ThermEq", st::SiteType"vecOsc"; dim=2, ω::R
   return v
 end
 
-# TODO: fix the signature of the function (j and k should be mandatory args).
+# FIXME: fix the signature of the function (j and k should be mandatory args).
+# Or maybe just delete the function. Do we really need this?
 function ITensors.state(::StateName"mat_comp", ::SiteType"vecOsc"; dim=2, j::Int, k::Int)
   êⱼ = zeros(dim)
   êₖ = zeros(dim)
@@ -162,9 +199,17 @@ function ITensors.state(::StateName"mat_comp", ::SiteType"vecOsc"; dim=2, j::Int
   return êⱼ ⊗ êₖ
 end
 
-# Stati che sono operatori vettorizzati (per costruire le osservabili)
-# --------------------------------------------------------------------
+# States representing vectorised operators
+# ----------------------------------------
+
+# Expectation values of observables are translated into the inner product of
+# the vectorised matrices, i.e.
+#   ⟨A⟩ = tr(A ρ) = vec(A)† vec(ρ)
+# so we need to define vec(A) for some known observable As.
+
 function ITensors.state(::StateName"veca+", ::SiteType"vecOsc"; dim=2)
+  # This is not an observable by itself, but it may be used to build proper
+  # observables which span more than one site (i.e. current operators).
   return vec(a⁺(dim), canonicalbasis(dim))
 end
 function ITensors.state(::StateName"veca-", ::SiteType"vecOsc"; dim=2)
@@ -184,50 +229,73 @@ function ITensors.state(::StateName"vecminus", st::SiteType"vecOsc"; kwargs...)
   return ITensors.state(StateName("veca-"), st; kwargs...)
 end
 
-# Operatori generici per oscillatori vettorizzati
-# -----------------------------------------------
+# Operators acting on vectorised oscillators
+# ------------------------------------------
+
+# Same as `op` above with "Osc" SiteTypes.
 function ITensors.op(on::OpName, st::SiteType"vecOsc", s::Index; kwargs...)
   return itensor(op(on, st; dim=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
 end
-# Operatori semplici sullo spazio degli oscillatori
+
+# For vectorisation wrt the canonical basis, there exist explicit formula for
+# the representazione of linear maps, namely
+#    ρ ↦ A ρ B
+# is transformed into the map
+#    vec(ρ) ↦ (B ⊗ Aᵀ) vec(ρ)
+# on the respective vectorised state.
+
 ITensors.op(::OpName"Id:Id", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ id(dim)
 ITensors.op(::OpName"Id", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ id(dim)
-# - interazione con la catena
+# - spin-oscillator interaction terms
 ITensors.op(::OpName"Id:asum", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ (a⁺(dim)+a⁻(dim))
 ITensors.op(::OpName"asum:Id", ::SiteType"vecOsc"; dim=2) = (a⁺(dim)+a⁻(dim)) ⊗ id(dim)
-# - Hamiltoniano del sistema libero
+# - free Hamiltonian
 ITensors.op(::OpName"N:Id", ::SiteType"vecOsc"; dim=2) = num(dim) ⊗ id(dim)
 ITensors.op(::OpName"Id:N", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ num(dim)
-# - termini di dissipazione
+# - terms appearing in dissipative operators in GKSL equation
 ITensors.op(::OpName"a-a+:Id", ::SiteType"vecOsc"; dim=2) = (a⁻(dim)*a⁺(dim)) ⊗ id(dim)
 ITensors.op(::OpName"Id:a-a+", ::SiteType"vecOsc"; dim=2) = id(dim) ⊗ (a⁻(dim)*a⁺(dim))
 ITensors.op(::OpName"a+T:a-", ::SiteType"vecOsc"; dim=2) = transpose(a⁺(dim)) ⊗ a⁻(dim)
 ITensors.op(::OpName"a-T:a+", ::SiteType"vecOsc"; dim=2) = transpose(a⁻(dim)) ⊗ a⁺(dim)
 
-# Spazio degli oscillatori vettorizzato hermitiano
-# ================================================
+# Space of harmonic oscillators (vectorised wrt Gell-Mann matrices)
+# =================================================================
+
+"""
+    ITensors.space(st::SiteType"HvOsc"; dim = 2)
+
+Create the Hilbert space for a site of type "HvOsc", i.e. a vectorised
+harmonic oscillator of dimension `dim` (this means that the space has dimension
+`dim^2`), where the vectorisation is performed wrt the generalised Gell-Mann
+basis of `Mat(ℂᵈⁱᵐ)`, composed of Hermitian traceless matrices together with
+the identity matrix.
+"""
 function ITensors.space(::SiteType"HvOsc"; dim=2)
   return dim^2
 end
+# TODO: find out if there's a way we can unify "vecOsc" and "HvOsc" in a single
+# SiteType, passing the choice of basis as a parameter at the moment of the
+# creation of the site (as we do with the dimension).
 
-# Stati
-# -----
+# States
+# ------
+
+# The following functions are mostly the same as those for "vecOsc", except
+# that we use the Gell-Mann (Hermitian) basis.
+
 function ITensors.state(sn::StateName, st::SiteType"HvOsc", s::Index; kwargs...)
   return state(sn, st; dim=isqrt(ITensors.dim(s)), kwargs...)
-  # Uso `isqrt` che prende un Int e restituisce un Int; il fatto che tronchi la
-  # parte decimale non dovrebbe mai essere un problema, dato che dim(s) per
-  # costruzione è il quadrato di un intero.
 end
 
-# Gli stati della base canonica (êₙ:êₙ) ≡ êₙ ⊗ êₙ
 function ITensors.state(::StateName{N}, ::SiteType"HvOsc"; dim=2) where {N}
+  # Eigenstates êₙ ⊗ êₙ of the number operator, written wrt the Hermitian
+  # basis.
   n = parse(Int, String(N))
   v = zeros(dim)
   v[n + 1] = 1.0
   return vec(v ⊗ v', gellmannbasis(dim))
 end
 
-# Lo stato di equilibrio termico Z⁻¹vec(exp(-βH)) = Z⁻¹vec(exp(-ω/T N))
 function ITensors.state(::StateName"ThermEq", st::SiteType"HvOsc"; dim=2, ω, T)
   if T == 0
     v = state(StateName("0"), st; dim=dim)
@@ -239,7 +307,8 @@ function ITensors.state(::StateName"ThermEq", st::SiteType"HvOsc"; dim=2, ω, T)
   return v
 end
 
-# Prodotto di X e dello stato eq. termico Z⁻¹vec(exp(-βH)) = Z⁻¹vec(exp(-ω/T N))
+# Product of X = a+a† and of the thermal equilibrium state Z⁻¹vec(exp(-βH)).
+# It is used in the computation of the correlation function of the bath.
 function ITensors.state(::StateName"X⋅Therm", st::SiteType"HvOsc"; dim=2, ω, T)
   if T == 0
     mat = zeros(Float64, dim, dim)
@@ -251,9 +320,6 @@ function ITensors.state(::StateName"X⋅Therm", st::SiteType"HvOsc"; dim=2, ω, 
   return vec((a⁺(dim) + a⁻(dim)) * mat, gellmannbasis(dim))
 end
 
-# Stati del tipo êⱼ ⊗ êₖ (servono ad esempio per poter calcolare, tramite una
-# proiezione su di essi, la componente j,k di una matrice definita su un sito
-# di tipo "HvOsc").
 function ITensors.state(::StateName"mat_comp", ::SiteType"HvOsc"; dim=2, j::Int, k::Int)
   êⱼ = zeros(dim)
   êₖ = zeros(dim)
@@ -262,8 +328,9 @@ function ITensors.state(::StateName"mat_comp", ::SiteType"HvOsc"; dim=2, j::Int,
   return vec(êⱼ ⊗ êₖ', gellmannbasis(dim))
 end
 
-# Stati che sono operatori vettorizzati (per costruire le osservabili)
-# --------------------------------------------------------------------
+# States representing vectorised operators
+# ----------------------------------------
+
 function ITensors.state(::StateName"veca+", ::SiteType"HvOsc"; dim=2)
   return vec(a⁺(dim), gellmannbasis(dim))
 end
@@ -291,8 +358,9 @@ function ITensors.state(::StateName"vecminus", st::SiteType"HvOsc"; kwargs...)
   return ITensors.state(StateName("veca-"), st; kwargs...)
 end
 
-# Operatori generici per oscillatori vettorizzati
-# -----------------------------------------------
+# Operators acting on vectorised oscillators
+# ------------------------------------------
+
 function ITensors.op(on::OpName, st::SiteType"HvOsc", s::Index; kwargs...)
   return itensor(op(on, st; dim=isqrt(ITensors.dim(s)), kwargs...), s', dag(s))
 end
@@ -329,9 +397,10 @@ function ITensors.op(::OpName"⋅N", ::SiteType"HvOsc"; dim=2)
   return vec(x -> x*num(dim), gellmannbasis(dim))
 end
 
-# Termini nell'equazione di Lindblad per oscillatori vettorizzati
-# ---------------------------------------------------------------
-# Termini di smorzamento
+# GKSL equation terms
+# -------------------
+
+# Dissipator in the canonical basis
 function ITensors.op(::OpName"Damping", ::SiteType"vecOsc", s::Index; ω::Number, T::Number)
   if T == 0
     n = 0
@@ -342,6 +411,8 @@ function ITensors.op(::OpName"Damping", ::SiteType"vecOsc", s::Index; ω::Number
       n * (op("a-T:a+", s) - 0.5 * (op("a-a+:Id", s) + op("Id:a-a+", s)))
   return d
 end
+
+# Dissipator in the Hermitian basis
 function ITensors.op(::OpName"Damping", ::SiteType"HvOsc"; dim=2, ω::Number, T::Number)
   if T == 0
     n = 0
@@ -356,6 +427,7 @@ function ITensors.op(::OpName"Damping", ::SiteType"HvOsc"; dim=2, ω::Number, T:
   return d
 end
 
+# Separate absorption and dissipation terms in GKSL equation
 function ITensors.op(::OpName"Lindb+", ::SiteType"HvOsc"; dim=2)
   A = a⁻(dim)
   A⁺ = a⁺(dim)
@@ -370,6 +442,7 @@ function ITensors.op(::OpName"Lindb-", ::SiteType"HvOsc"; dim=2)
   return d
 end
 
+# Mixed dissipator appearing in the equation for two pseudomodes
 function mixedlindbladplus(s1::Index{Int64}, s2::Index{Int64})
   return (op("a-⋅", s1) * op("⋅a+", s2) +
           op("a-⋅", s2) * op("⋅a+", s1) -
@@ -387,19 +460,27 @@ function mixedlindbladminus(s1::Index{Int64}, s2::Index{Int64})
                op("⋅a-", s2) * op("⋅a+", s1)))
 end
 
-# Proiezione sugli autostati dell'operatore numero
+# Projection on the eigenstates of the number operator
 # ------------------------------------------------
-# Il sito è uno solo quindi basta usare i vettori della base canonica
-# TODO: check if this function really has a point
+
+# TODO: this is a really basic function... we could do without this.
+"""
+    osc_levels_proj(s::Index{Int64}, n::Int)
+
+Return an MPS representing the `n`-th occupied level of `s`'s SiteType.
+"""
 function osc_levels_proj(site::Index{Int64}, level::Int)
   st = state(site, "$level")
   return MPS([st])
 end
 
-# Scelta dello stato iniziale dell'oscillatore
-# --------------------------------------------
+# Choice of the oscillator's initial state
+# ----------------------------------------
+
 """
-    parse_init_state_osc(site::Index{Int64}, statename::String; <keyword arguments>)
+    parse_init_state_osc(site::Index{Int64},
+                         statename::String;
+                         <keyword arguments>)
 
 Return an MPS representing a particular state of a harmonic oscillator, given
 by the string `statename`:
@@ -409,7 +490,7 @@ by the string `statename`:
 - "empty"   → alias for "fock0"
 
 The string is case-insensitive. Other parameters required to build the state
-may be supplied as keyword arguments.
+(e.g. frequency, temperature) may be supplied as keyword arguments.
 """
 function parse_init_state_osc(site::Index{Int64}, statename::String; kwargs...)
   # TODO: maybe remove "init" from title? It is a generic state, after all.
@@ -423,8 +504,8 @@ function parse_init_state_osc(site::Index{Int64}, statename::String; kwargs...)
     s = state(site, "0")
   else
     throw(DomainError(statename,
-                      "Stato non riconosciuto; scegliere tra «empty», «fockN» "*
-                      "oppure «thermal»."))
+                      "Unrecognised state name; please choose from "*
+                      "\"empty\", \"fockN\" or \"thermal\"."))
   end
   return MPS([s])
 end

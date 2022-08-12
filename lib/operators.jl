@@ -1,6 +1,5 @@
 using ITensors
 
-# Costruzione della lista di operatori 2-locali
 @doc raw"""
     twositeoperators(sites::Vector{Index{Int64}}, localcfs::Vector{<:Real}, interactioncfs::Vector{<:Real})
 
@@ -29,11 +28,11 @@ function twositeoperators(sites::Vector{Index{Int64}},
     localcfs::Vector{<:Real},
     interactioncfs::Vector{<:Real})
   list = ITensor[]
+  # The sites at the edge of the chain need to be treated separately since their
+  # local coefficients must not be multiplied by 1/2. Instead of writing these
+  # particular cases out of the loop, I just multiply them beforehand by 2.
   localcfs[begin] *= 2
   localcfs[end] *= 2
-  # Anziché dividere per casi il ciclo che segue distinguendo i siti ai lati
-  # della catena (che non devono avere il fattore 0.5 scritto sotto), moltiplico
-  # qui per 2 i rispettivi coefficienti degli operatori locali.
   for j ∈ 1:length(sites)-1
     s1 = sites[j]
     s2 = sites[j+1]
@@ -45,7 +44,6 @@ function twositeoperators(sites::Vector{Index{Int64}},
   return list
 end
 
-# Operatori locali
 """
     localop(s::Index)
 
@@ -74,7 +72,6 @@ function localop(s::Index)
   return t
 end
 
-# Operatori di interazione
 """
     interactionop(s1::Index, s2::Index)
 
@@ -127,15 +124,15 @@ function interactionop(s1::Index, s2::Index)
                op("⋅σx", s1) * op("⋅asum", s2))
   elseif SiteType("HvOsc") ∈ sitetypes(s1) &&
     SiteType("HvOsc") ∈ sitetypes(s2)
-    # Interazione del tipo H = a₁†a₂ + a₂†a₁, da inserire
-    # nel commutatore -i[H,ρ]:
-    # -i (a₁†a₂ ρ + a₂†a₁ ρ - ρ a₁†a₂ - ρ a₂†a₁)
+    # Oscillator-oscillator interaction H = a₁†a₂ + a₂†a₁ that goes in the
+    # commutator -i[H,ρ] as 
+    #   -i (a₁†a₂ ρ + a₂†a₁ ρ - ρ a₁†a₂ - ρ a₂†a₁)
     t = -im * (op("a+⋅", s1) * op("a-⋅", s2) +
                op("a+⋅", s2) * op("a-⋅", s1) -
                op("⋅a+", s1) * op("⋅a-", s2) -
                op("⋅a+", s2) * op("⋅a-", s1))
   else
-    throw(DomainError((s1, s2), "SiteType non riconosciuti."))
+    throw(DomainError((s1, s2), "Unrecognised SiteTypes."))
   end
   return t
 end
@@ -171,55 +168,44 @@ time instant in `ts`, that is `b1[j]` is equal to `a1` applied to the state at
 """
 function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
     linkseven, maxerr, maxrank; fout)
-  @info "Calcolo della decomposizione di Suzuki-Trotter dell'operatore di evoluzione."
+  @info "Computing Suzuki-Trotter decomposition of the evolution operator."
   τ = timesteplist[2] - timesteplist[1]
   if STorder == 1
-    # Se l'ordine di espansione è 1, non ci sono semplificazioni da fare.
+    # Nothing to do if the order is 1.
     list = [linksodd(τ), linkseven(τ)]
     seq = repeat([1, 2], nskip)
   elseif STorder == 2
-    # Al secondo ordine, posso raggruppare gli operatori con t/2 in modo
-    # da risparmiare un po' di calcoli (e di errori numerici...): anziché
-    # avere 3*nskip serie di operatori da applicare allo stato tra una
-    # misurazione e la successiva, ne ho solo 2*nskip+1.
-    #list = [linksodd(0.5τ),
-    #        repeat([linkseven(τ), linksodd(τ)], nskip-1)...,
-    #        linkseven(τ),
-    #        linksodd(0.5τ)]
+    # At 2nd order we can group the operators with t/2 (from two consecutive
+    # steps) in order to save some time and numerical errors.
+    # Instead of a series of 3*nskip operators between a measurement and the
+    # next one, we have only 2*nskip+1 of them.
     list = [linksodd(0.5τ), linkseven(τ), linksodd(τ)]
     seq = [1; repeat([2, 3], nskip-1); 2; 1]
   elseif STorder == 4
     c = (4 - 4^(1/3))^(-1)
-    #list = repeat([linksodd(c * τ),
-    #       linkseven(2c * τ),
-    #       linksodd((0.5 - c) * τ),
-    #       linkseven((1 - 4c) * τ),
-    #       linksodd((0.5 - c) * τ),
-    #       linkseven(2c * τ),
-    #       linksodd(c * τ)], nskip)
     list = [linksodd(c * τ),
            linkseven(2c * τ),
            linksodd((0.5 - c) * τ),
            linkseven((1 - 4c) * τ)]
     seq = repeat([1, 2, 3, 4, 3, 2, 1], nskip)
-    # Qui c'è ancora qualche margine di ottimizzazione: si potrebbe ad
-    # esempio raggruppare il primo e l'ultimo linksodd quando nskip>1.
+    # There could be still some margin for improvement: maybe group the first
+    # and last `linksodd` when nskip > 1. It doesn't make that much of a
+    # difference, though.
   else
     throw(DomainError(STorder,
-                      "L'espansione di Trotter-Suzuki all'ordine $STorder "*
-                      "non è supportata. Attualmente sono disponibili "*
-                      "solo le espansioni con ordine 1, 2 o 4."))
+                      "Suzuki-Trotter expansion of order $STorder "*
+                      "is not supported. Only orders 1, 2 and 4 are "*
+                      "available."))
   end
 
-  # Ora comincia l'evoluzione temporale.
-  # Applicare `list` allo stato significa farlo evolvere per nskip*τ, dove
-  # τ è il passo di integrazione.
-  @info "Avvio del calcolo dell'evoluzione temporale."
+  # Applying `list` to a state means evolving it for a time equal to nskip*τ,
+  # where τ is the integration time step.
+  @info "Starting time evolution."
   state = initialstate
   returnvalues = [[f(state) for f in fout]]
 
   tout = timesteplist[1:nskip:end]
-  progress = Progress(length(tout), 1, "Simulazione in corso", 30)
+  progress = Progress(length(tout), 1, "Simulation in progress", 30)
   for _ ∈ timesteplist[1+nskip:nskip:end]
     for n ∈ seq
       state .= apply(list[n], state, cutoff=maxerr, maxdim=maxrank)
@@ -228,21 +214,21 @@ function evolve(initialstate, timesteplist, nskip, STorder, linksodd,
     next!(progress)
   end
 
-  # La lista `returnvalues` contiene N ≡ length(timesteplist[1:nskip:end])
-  # sottoliste, ciascuna delle quali ha come j° elemento il risultato
-  # di fout[j] applicato allo stato a un istante di tempo.
-  # Voglio riorganizzare l'output in modo che la funzione restituisca
-  # una lista `tout` degli istanti di tempo, e insieme ad essa tante liste
-  # quante sono le `fout` fornite come argomento: la jᵃ lista dovrà
-  # contenere il risultato di fout[j] applicato allo stato all'istante t
-  # per ogni t in tout.
+  # The list `returnvalues` contains N ≡ length(timesteplist[1:nskip:end])
+  # lists as elements; in each one, the j-th element is the result of fout[j]
+  # when applied to the state at a given time instant.
+  # We want to reorganise the output, so that the function returns a list `tout`
+  # with the instant at which the observables are measures, together with as
+  # many lists as the functions in `fout`: the j-th list will be the result
+  # of fout[j] applied to the state for each t in `tout`.
   outresults = [[returnvalues[k][j] for k in eachindex(tout)]
                 for j in eachindex(fout)]
   return tout, outresults...
 end
 
-# Corrente tra due oscillatori
-# ----------------------------
+# Current operators
+# -----------------
+
 """
     current(sites, leftsite::Int, rightsite::Int)
 
@@ -254,18 +240,14 @@ with OpName "Z"; `sites(leftsite)` and `sites(rightsite)` are assigned "plus"
 and "minus", and other sites are assigned "Id" operators. All these operators
 thus must be correctly defined in order to use this function.
 """
-function current(sites,
-    leftsite::Int,
-    rightsite::Int)
-  # La funzione non discrimina, in entrata, sul tipo di siti su
-  # cui viene applicata, in modo da poterla usare anche con degli
-  # oscillatori armonici (`Osc` e le sue versioni vettorizzate) però
-  # vale solo quando sono agli estremi, cioè se gli oscillatori si
-  # trovano esattamente su `leftsite` o `rightsite`; altre situazioni
-  # non sono ammesse perché l'operatore analogo a σᶻ non c'è per essi.
-  # Usare la funzione in quel caso darebbe un errore perché lo stato
-  # od operatore "Z" non è definito per quei SiteType.
-  # E forse la definizione matematica non avrebbe nemmeno senso...
+function current(sites, leftsite::Int, rightsite::Int)
+  # The function doesn't care about the SiteType on which it is applied.
+  # This allows us to use it also on oscillators, when needed, for example
+  # to measure the current between the first oscillator sites just beyond
+  # the edge of the spin chain (it works!).
+  # The oscillators need to be exactly at the `leftsite` and `rightsite`
+  # positions, and not between them, otherwise the function doesn't work
+  # since there is no "Z" operator defined for oscillators.
   n = rightsite - leftsite
   tags1 = repeat(["Id"], length(sites))
   tags2 = repeat(["Id"], length(sites))
@@ -288,7 +270,7 @@ function current(sites,
     op = im * (-1)^n * (MPS(sites, string.("vec", tags1)) -
                         MPS(sites, string.("vec", tags2)))
   else
-    throw(DomainError(s, "SiteType non riconosciuto."))
+    throw(DomainError(s, "Unrecognised SiteType."))
   end
   return op
 end
@@ -296,7 +278,7 @@ end
 function forwardflux(sites,
     leftsite::Int,
     rightsite::Int)
-  # Solo uno dei due termini di j_{k,k'}
+  # Just one of the two terms in j_{k,k'}...
   n = rightsite - leftsite
   tags1 = repeat(["Id"], length(sites))
   tags1[leftsite] = "plus"
@@ -314,14 +296,14 @@ function forwardflux(sites,
           SiteType("HvOsc") ∈ sitetypes(first(sites)))
     op = im * (-1)^n * MPS(sites, string.("vec", tags1))
   else
-    throw(DomainError(s, "SiteType non riconosciuto."))
+    throw(DomainError(s, "Unrecognised SiteType."))
   end
   return op
 end
 function backwardflux(sites,
     leftsite::Int,
     rightsite::Int)
-  # L'altro termine
+  # ...and the other one.
   n = rightsite - leftsite
   tags2 = repeat(["Id"], length(sites))
   tags2[leftsite] = "minus"
@@ -339,7 +321,7 @@ function backwardflux(sites,
           SiteType("HvOsc") ∈ sitetypes(first(sites)))
     op = im * (-1)^n * MPS(sites, string.("vec", tags2))
   else
-    throw(DomainError(s, "SiteType non riconosciuto."))
+    throw(DomainError(s, "Unrecognised SiteType."))
   end
   return op
 end
