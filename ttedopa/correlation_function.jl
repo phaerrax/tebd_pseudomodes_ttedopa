@@ -1,27 +1,7 @@
 #!/usr/bin/julia
 
-using ITensors
-using LaTeXStrings
-using ProgressMeter
-using Base.Filesystem
-using DataFrames
-using CSV
-
-rootdirname = "simulazioni_tesi"
-sourcepath = Base.source_path()
-# Cartella base: determina il percorso assoluto del file in esecuzione, e
-# rimuovi tutto ciò che segue rootdirname.
-ind = findfirst(rootdirname, sourcepath)
-rootpath = sourcepath[begin:ind[end]]
-# `rootpath` è la cartella principale del progetto.
-libpath = joinpath(rootpath, "lib")
-
-include(joinpath(libpath, "utils.jl"))
-include(joinpath(libpath, "plotting.jl"))
-include(joinpath(libpath, "spin_chain_space.jl"))
-include(joinpath(libpath, "harmonic_oscillator_space.jl"))
-include(joinpath(libpath, "operators.jl"))
-include(joinpath(libpath, "tedopa.jl"))
+using ITensors, LaTeXStrings, DataFrames, CSV, Plots, QuadGK
+using PseudomodesTTEDOPA
 
 disablegrifqtech()
 

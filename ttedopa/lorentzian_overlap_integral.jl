@@ -1,21 +1,7 @@
 #!/usr/bin/julia
 
-using ITensors
-using LaTeXStrings
-using Base.Filesystem
-using DataFrames
-using CSV
-using Plots
-using QuadGK
-
-rootdirname = "simulazioni_tesi"
-sourcepath = Base.source_path()
-# Cartella base: determina il percorso assoluto del file in esecuzione, e
-# rimuovi tutto ciò che segue rootdirname.
-ind = findfirst(rootdirname, sourcepath)
-rootpath = sourcepath[begin:ind[end]]
-# `rootpath` è la cartella principale del progetto.
-libpath = joinpath(rootpath, "lib")
+using ITensors, DataFrames, LaTeXStrings, CSV, Plots, QuadGK
+using PseudomodesTTEDOPA
 
 disablegrifqtech()
 

@@ -1,14 +1,7 @@
 #!/usr/bin/julia
 
-using Plots
-using DataFrames
-using CSV
-using GR
-
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/utils.jl")
+using Plots, DataFrames, CSV, GR
+using PseudomodesTTEDOPA
 
 disablegrifqtech()
 

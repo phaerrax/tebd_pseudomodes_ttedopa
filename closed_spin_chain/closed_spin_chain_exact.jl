@@ -1,17 +1,7 @@
 #!/usr/bin/julia
 
-using LaTeXStrings
-using ProgressMeter
-using DataFrames
-using CSV
-using DelimitedFiles
-
-root_path = dirname(dirname(Base.source_path()))
-lib_path = root_path * "/lib"
-# Sali di due cartelle. root_path è la cartella principale del progetto.
-include(lib_path * "/spin_chain_space.jl")
-include(lib_path * "/utils.jl")
-include(lib_path * "/plotting.jl")
+using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using PseudomodesTTEDOPA
 
 disablegrifqtech()
 
