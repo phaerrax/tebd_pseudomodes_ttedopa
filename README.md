@@ -19,7 +19,7 @@ Questi file possono essere forniti a ciascun programma tramite la riga di comand
 Il programma produce come output una tabella CSV con i dati ricavati dalla simulazione (un file per ciascun file di parametri fornito), e alcuni grafici in formato PNG: nel caso 1), i file sono salvati nella cartella da dove è stato lanciato il programma, nel caso 2) invece i file si troveranno nella cartella che contiene i file JSON e che è stata fornita come argomento alla linea di comando.
 
 Tutte le grandezze fisiche sono da intendersi come quantità ridotte (come spiegato nella tesi), vale a dire che il coefficiente λ dell'interazione tra gli spin vale sempre 1. Gli script richiedono determinati parametri, che devono essere forniti nei file JSON.
-Per ciascuno script è presente un file, il cui nome termina in `_sample.json`, in cui sono elencati tutti i parametri necessari per eseguire la simulazione.
+In ciascuna cartella, la sottocartella `examples` contiene alcuni file di parametri di esempio, in cui sono elencati tutti i parametri necessari per eseguire le simulazioni.
 
 Nella cartella `tests` si trovano inoltre alcuni script usati per testare alcune particolarità dei sistemi o per fini diagnostici.
 
@@ -54,7 +54,8 @@ In questo script i due bagni possono essere specificati in due modi esclusivi (a
 
 Un file JSON non può contenere entrambe le descrizioni per un solo ambiente, ma i due ambienti in un sistema possono essere descritti in modi diversi.
 
-Il file `ttedopa/test_generic/generic_sample.json` illustra entrambe le modalità. Inoltre, `ttedopa/gen_coefficients.jl` genera un file di coefficienti (nel giusto formato per `generic.jl`) a partire da una densità descritta in questo modo.
+Il file `ttedopa/examples/generic_example.json` illustra entrambe le modalità, e in `ttedopa/examples/spectral_densities` sono presenti alcuni file di esempio per descrivere le densità spettrali.
+Inoltre, `ttedopa/gen_coefficients.jl` genera un file di coefficienti (nel giusto formato per `generic.jl`) a partire da una densità descritta in questo modo.
 
 ##### `ttedopa/lorentzian.jl`, `ttedopa/double_lorentzian.jl`
 Questi script sono specializzati al caso in cui la densità spettrale sia composta, rispettivamente, da una Lorentziana antisimmetrizzata, o dalla combinazione lineare di due tali funzioni.

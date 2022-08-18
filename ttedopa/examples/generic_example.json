@@ -1,7 +1,7 @@
 {
   "left_bath": {
-    "chain_coefficients_file": "examples/asym_lorentzian_hot.ttedopa.dat",
-    "number_of_oscillators": 30,
+    "chain_coefficients_file": "examples/spectral_densities/asym_lorentzian_cold.ttedopa.dat",
+    "number_of_oscillators": 20,
     "maximum_oscillator_space_dimension": 5,
     "oscillator_space_dimensions_decay": 1,
     "frequency_cutoff": 10,

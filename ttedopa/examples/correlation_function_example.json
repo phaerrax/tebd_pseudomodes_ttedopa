@@ -1,0 +1,22 @@
+{
+  "spin_excitation_energy": 10,
+  "number_of_spin_sites": 10,
+  "number_of_oscillators_left": 40,
+  "number_of_oscillators_right": 40,
+  "maximum_oscillator_space_dimension": 6,
+  "oscillator_space_dimensions_decay": 1,
+  "frequency_cutoff": 20,
+  "simulation_end_time": 2,
+  "simulation_time_step": 0.001,
+  "skip_steps": 10,
+  "chain_initial_state": "empty",
+  "left_oscillator_initial_state": "empty",
+  "MP_maximum_bond_dimension": 100,
+  "MP_compression_error": 1e-12,
+  "TS_expansion_order": 2,
+  "PolyChaos_nquad": 1e4,
+  "temperature": 20,
+  "spectral_density_peak": 10,
+  "spectral_density_half_width": 0.1,
+  "spectral_density_overall_factor": 0.5
+}
