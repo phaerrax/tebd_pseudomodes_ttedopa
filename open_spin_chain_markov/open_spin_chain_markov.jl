@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -156,69 +156,105 @@ let
     push!(normalisation_super, normalisation)
   end
 
-  # Grafici
-  # =======
-  
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
-  N = size(occ_n_super[begin], 2)
-  plt = groupplot(timesteps_super,
-                  occ_n_super,
-                  parameter_lists;
-                  labels=reduce(hcat, string.(1:N)),
-                  linestyles=reduce(hcat, repeat([:solid], N)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
+  # Occupation numbers
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occ_n_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.(1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("occ_n.pdf", grp)
+  end
 
-  savefig(plt, "occ_n_all.png")
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["($j,$(j+1))" for j ∈ 1:N-1] ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions.pdf", grp)
+  end
 
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  N = size(bond_dimensions_super[begin], 2)
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=reduce(hcat, ["($j,$(j+1))" for j ∈ 1:N]),
-                  linestyles=reduce(hcat, repeat([:solid], N)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
+  # Trace of the density matrix
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\operatorname{tr}\rho(t)",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             normalisation_super,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("normalisation.pdf", ax)
+  end
 
-  savefig(plt, "bond_dimensions.png")
-
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super,
-                    normalisation_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\operatorname{tr}\,\rho(t)",
-                    plottitle="Normalizzazione della matrice densità",
-                    plotsize=plotsize)
-
-  savefig(plt, "dm_normalisation.png")
-
-  # Grafico della corrente di spin
-  # ------------------------------
-  N = size(current_adjsites_super[begin], 2)
-  plt = groupplot(timesteps_super,
-                  current_adjsites_super,
-                  parameter_lists;
-                  labels=reduce(hcat, ["($j,$(j+1))" for j ∈ 1:N]),
-                  linestyles=reduce(hcat, repeat([:solid], N)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"j_{k,k+1}(t)",
-                  plottitle="Corrente di spin",
-                  plotsize=plotsize)
-
-  savefig(plt, "spin_current.png")
+  # Particle current
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle j_{i,i+1}(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           current_adjsites_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["($j,$(j+1))" for j ∈ 1:N] ))
+      push!(grp, ax)
+    end
+    pgfsave("particle_current.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

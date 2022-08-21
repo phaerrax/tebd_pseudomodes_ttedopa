@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -252,31 +252,27 @@ let
     push!(normalisation_super, normalisation)
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  @info "Creazione dei grafici."
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
-
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super,
-                    normalisation_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\mathrm{tr}\,\rho(t)",
-                    plottitle="Normalizzazione della matrice densità",
-                    plotsize=plotsize)
-
-  savefig(plt, "dm_normalisation.png")
+  # Trace of the density matrix
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\operatorname{tr}\rho(t)",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             normalisation_super,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("normalisation.pdf", ax)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

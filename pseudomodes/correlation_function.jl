@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots, QuadGK
+using ITensors, LaTeXStrings, DataFrames, CSV, QuadGK, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -161,42 +161,71 @@ let
                                    trueXcorrelation))
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico della funzione di correlazione
-  # --------------------------------------
-  plt = groupplot(timesteps_super,
-                  real.(Xcorrelation_super),
-                  parameter_lists;
-                  labels=["calculated" "p.mode expected" "true"],
-                  linestyles=[:solid :dash :dot],
-                  commonxlabel=L"t",
-                  commonylabel=L"\mathrm{Re}\,(\langle X(t)X(0)\rangle)",
-                  plottitle="Funzione di correlazione (parte reale)",
-                  plotsize=plotsize)
+  # Correlation function, real part
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\mathrm{Re}\,(\langle X_tX_0\rangle)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           real.(Xcorrelation_super),
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(N),
+                           ["solid", "dashed", "dotted"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["calculated", "expected (p.mode)", "true"] ))
+      push!(grp, ax)
+    end
+    pgfsave("Xcorrelation_re.pdf", grp)
+  end
 
-  savefig(plt, "Xcorrelation_re.png")
-
-  plt = groupplot(timesteps_super,
-                  imag.(Xcorrelation_super),
-                  parameter_lists;
-                  labels=["calculated" "p.mode expected" "true"],
-                  linestyles=[:solid :dash :dot],
-                  commonxlabel=L"t",
-                  commonylabel=L"\mathrm{Im}\,(\langle X(t)X(0)\rangle)",
-                  plottitle="Funzione di correlazione (parte immaginaria)",
-                  plotsize=plotsize)
-
-  savefig(plt, "Xcorrelation_im.png")
+  # Correlation function, imaginary part
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\mathrm{Im}\,(\langle X_tX_0\rangle)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           imag.(Xcorrelation_super),
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(N),
+                           ["solid", "dashed", "dotted"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["calculated", "expected (p.mode)", "true"] ))
+      push!(grp, ax)
+    end
+    pgfsave("Xcorrelation_im.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, DataFrames, LaTeXStrings, CSV, Plots
+using ITensors, DataFrames, LaTeXStrings, CSV
 using PseudomodesTTEDOPA
 
 disablegrifqtech()

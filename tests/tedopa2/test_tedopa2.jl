@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -192,72 +192,109 @@ let
     push!(snapshot_super, snapshot)
   end
 
-  # Grafici
-  # =======
-  plot_size = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  # Grafico dei numeri di occupazione
-  # ---------------------------------
-  N = size(occ_n_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  occ_n_super,
-                  parameter_lists;
-                  labels=[string.(N-1:-1:1)... "S"],
-                  linestyles=repeat([:solid]... len),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  savefig(plt, "occ_n.png")
+  # Occupation numbers
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occ_n_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( [string.(N-1:-1:1); "S"] ))
+      push!(grp, ax)
+    end
+    pgfsave("populations.pdf", grp)
+  end
 
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  N = size(bond_dimensions_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( consecutivepairs(1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions.pdf", grp)
+  end
 
-  savefig(plt, "bond_dimensions.png")
- 
-  # Grafico dei coefficienti della chain map
-  # ----------------------------------------
-  osc_sites = [reverse(1:length(chain[:,1]))
-               for chain in osc_chain_coefficient_super]
-  plt = groupplot(osc_sites,
-                  [mat[:, 1:2] for mat in osc_chain_coefficients_super],
-                  parameter_lists;
-                  labels=[L"\Omega_i" L"\kappa_i"],
-                  linestyles=[:solid :solid],
-                  commonxlabel=L"i",
-                  commonylabel="Coefficiente",
-                  plottitle="Coefficienti della catena di "*
-                            "oscillatori (sx ≡ dx)",
-                  plotsize=plotsize)
+  # Chain map coefficients, both chains
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"i",
+        ylabel = "Coefficient",
+       })
+    for (i, data, p) ∈ zip([reverse(1:length(chain[:,1]))
+                            for chain ∈ osc_chain_coefficients_super],
+                           [mat[:, 1:2]
+                            for mat ∈ osc_chain_coefficients_super],
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      for (y, c) ∈ zip(eachcol(data), readablecolours(2))
+        plot = Plot({ color = c }, Table([i, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( [L"\Omega_i", L"\kappa_i"] ))
+      push!(grp, ax)
+    end
+    pgfsave("chain_coefficients.pdf", grp)
+  end
 
-  savefig(plt, "osc_coefficients_left.png")
-
-  # Istantanea dei numeri di occupazione alla fine
-  # ----------------------------------------------
-  plt = unifiedplot(repeat([[reverse(range_osc_left);
-                             range_spins;
-                             range_osc_right]],
-                           length(snapshot_super)),
-                    snapshot_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"i",
-                    ylabel="Numero di occupazione",
-                    plottitle="Numeri di occupazione alla fine",
-                    plotsize=plotsize)
-
-  savefig(plt, "snapshot.png")
+  # Snapshot of occupation numbers at the end
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"i",
+               ylabel       = L"n_i(t_\mathrm{end})",
+               title        = "Snapshot of the population at the end",
+               "legend pos" = "outer north east"
+              })
+    inds = [reverse(range_osc_left); range_spins; range_osc_right]
+    for (y, p, col) ∈ zip(snapshot_super,
+                          parameter_lists,
+                          distinguishable_colors(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([inds, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("snapshot.pdf", ax)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

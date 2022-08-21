@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -112,58 +112,99 @@ let
     CSV.write(filename, table)
   end
 
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  plt = unifiedplot(chainranges,
-                    frequencies,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel="k",
-                    ylabel="Ωₖ",
-                    plottitle="Frequenze T-TEDOPA",
-                    plotsize=plotsize)
-  savefig(plt, "frequencies.png")
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"i",
+               ylabel       = L"\Omega_i",
+               "legend pos" = "outer north east"
+               title        = "T-TEDOPA frequency coefficients",
+              })
+    for (t, y, p, col) ∈ zip(chainranges,
+                             frequencies,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("frequencies.pdf", ax)
+  end
 
-  shorterchainranges = [rn[1:end-1] for rn ∈ chainranges]
-  plt = unifiedplot(shorterchainranges,
-                    couplingcoeffs,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel="k",
-                    ylabel="κₖ",
-                    plottitle="Coefficienti di interazione T-TEDOPA",
-                    plotsize=plotsize)
-  savefig(plt, "couplingcoeffs.png")
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"i",
+               ylabel       = L"\kappa_i",
+               "legend pos" = "outer north east"
+               title        = "T-TEDOPA interaction coefficients",
+              })
+    for (t, y, p, col) ∈ zip([rn[1:end-1] for rn ∈ chainranges],
+                             couplingcoeffs,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("couplingcoeffs.pdf", ax)
+  end
 
-  plt = unifiedplot(timeranges,
-                    firstsiteevos,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\langle n_1(t)\rangle",
-                    plottitle="Evoluzione con coefficienti veri",
-                    plotsize=plotsize)
-  savefig(plt, "realevos1.png")
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\langle n_1(t)\rangle",
+               "legend pos" = "outer north east"
+               title        = "Evolution using real coefficients",
+              })
+    for (t, y, p, col) ∈ zip(timeranges,
+                             firstsitesevos,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("realevos1.pdf", ax)
+  end
 
-  plt = unifiedplot(timeranges,
-                    first2sitesevos,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\langle n_1(t)+n_2(t)\rangle",
-                    plottitle="Evoluzione con coefficienti veri",
-                    plotsize=plotsize)
-  savefig(plt, "realevos1+2.png")
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\langle n_1(t)+n_2(t)\rangle",
+               "legend pos" = "outer north east"
+               title        = "Evolution using real coefficients",
+              })
+    for (t, y, p, col) ∈ zip(timeranges,
+                             first2sitesevos,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("realevos1+2.pdf", ax)
+  end
 
-  plt = unifiedplot(timeranges,
-                    asymptoticevos,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\langle n_1(t)\rangle",
-                    plottitle="Evoluzione con coefficienti asintotici",
-                    plotsize=plotsize)
-  savefig(plt, "asymptoticevos.png")
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\langle n_1(t)\rangle",
+               "legend pos" = "outer north east"
+               title        = "Evolution using asymptotic coefficients",
+              })
+    for (t, y, p, col) ∈ zip(timeranges,
+                             asymptoticevos,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("asymptoticevos.pdf", ax)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
 end

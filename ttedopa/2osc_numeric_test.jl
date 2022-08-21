@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -190,91 +190,148 @@ let
     CSV.write(filename, table)
   end
 
-  @info "Creazione dei grafici con i risultati."
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  # Numeri di occupazione
-  # ---------------------
-  N = size(numeric_occn_super[begin], 2)-4
-  plt = groupplot(timesteps_super,
-                  numeric_occn_super,
-                  parameter_lists;
-                  labels=["L2" "L1" string.(1:N)... "R1" "R2"],
-                  linestyles=[:dash :dash repeat([:solid], N)... :dash :dash],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (sol. numerica)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_numeric.png")
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Norma dello stato
-  # -----------------
-  plt = unifiedplot(timesteps_super,
-                    norm_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\Vert\psi(t)\Vert",
-                    plottitle="Norma dello stato",
-                    plotsize=plotsize)
-  savefig(plt, "norm_numeric.png")
+  # Occupation numbers
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           numeric_occn_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(N),
+                           ["dashed";
+                            "dashed";
+                            repeat(["solid"], N-4);
+                            "dashed";
+                            "dashed"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["L2" "L1"; string.(1:N-4); "R1"; "R2"] ))
+      push!(grp, ax)
+    end
+    pgfsave("population_numeric_solution.pdf", grp)
+  end
 
-  # Numeri di occupazione (solo spin)
-  # ---------------------------------
-  plt = groupplot(timesteps_super,
-                  [occn[:, 3:end-2] for occn ∈ numeric_occn_super],
-                  parameter_lists;
-                  rescale=false,
-                  labels=reduce(hcat, string.("S", 1:N)),
-                  linestyles=reduce(hcat, repeat([:solid], N)),
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (solo spin, sol. numerica)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_spins_numeric.png")
+  # State norm
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\Vert\psi(t)\Vert",
+               title        = "State norm",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             normalisation_super,
+                             parameter_lists,
+                             distinguishable_colors(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("normalisation_numeric_solution.pdf", ax)
+  end
 
-  # Numeri di occupazione (oscillatori sx)
-  # --------------------------------------
+  # Population of spin sites
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           [occn[:, 3:end-2] for occn ∈ numeric_occn_super],
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("S", 1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("population_spin_sites.pdf", grp)
+  end
+
+  # Population, left pseudomodes
   data = [[occn[:, 1];;
            occn[:, 2];;
            occn[:, 1] .+ occn[: ,2]]
            for occn ∈ numeric_occn_super]
-  plt = groupplot(timesteps_super,
-                  data,
-                  parameter_lists;
-                  rescale=false,
-                  labels=["L2" "L1" "L1+L2"],
-                  linestyles=[:solid :solid :dash],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (osc sx, sol. numerica)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_oscsx_numeric.png")
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           data,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(N)
+                           ["solid", "solid", "dashed"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["L2", "L1", "L1+L2"] ))
+      push!(grp, ax)
+    end
+    pgfsave("population_left_pmode_numeric_solution.pdf", grp)
+  end
   
-  # Numeri di occupazione (oscillatori dx)
-  # --------------------------------------
+  # Population, right pseudomodes
   data = [[occn[:, end-1];;
            occn[:, end];;
            occn[:, end-1] .+ occn[:, end]]
            for occn ∈ numeric_occn_super]
-  plt = groupplot(timesteps_super,
-                  data,
-                  parameter_lists;
-                  rescale=false,
-                  labels=["R1" "R2" "R1+R2"],
-                  linestyles=[:solid :solid :dash],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (osc dx, sol. numerica)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_oscdx_numeric.png")
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           data,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(N)
+                           ["solid", "solid", "dashed"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["R1", "R2", "R1+R2"] ))
+      push!(grp, ax)
+    end
+    pgfsave("population_right_pmode_numeric_solution.pdf", grp)
+  end
  
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

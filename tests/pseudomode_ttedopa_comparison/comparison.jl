@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -75,38 +75,69 @@ let
     push!(range_spins_super, range_spins)
   end
 
-  # Grafici
-  # =======
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  # Grafico dei numeri di occupazione (solo spin)
-  # ---------------------------------------------
-  plt = groupplot(timesteps_super,
-                  occn_abserr_super,
-                  parameter_lists;
-                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
-                          for rn ∈ range_spins_super],
-                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
-                              for rn ∈ range_spins_super],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle_\rm{TTEDOPA}-\langle n_i(t)\rangle_\rm{PM}",
-                  plottitle="Differenza numeri di occupazione spin (TTEDOPA - p.modi)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_abserr.png")
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  plt = groupplot(timesteps_super,
-                  occn_relerr_super,
-                  parameter_lists;
-                  maxyrange=(-1,1),
-                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
-                          for rn ∈ range_spins_super],
-                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
-                              for rn ∈ range_spins_super],
-                  commonxlabel=L"t",
-                  commonylabel=L"1-\langle n_i(t)\rangle_\rm{TTEDOPA}/\langle n_i(t)\rangle_\rm{PM})",
-                  plottitle="Err. relativo numeri di occupazione spin (TTEDOPA - p.modi)/TTEDOPA",
-                  plotsize=plotsize)
-  savefig(plt, "occn_relerr.png")
+  # Occupation numbers, absolute error btw. TTEDOPA and pseudomodes
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle_\rm{TTEDOPA}-\langle n_i(t)\rangle_\rm{PM}",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occn_abserr_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("S", 1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("population_absolute_error.pdf", grp)
+  end
+
+  # Occupation numbers, relative error btw. TTEDOPA and pseudomodes
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"1-\langle n_i(t)\rangle_\rm{TTEDOPA}/\langle n_i(t)\rangle_\rm{PM})",
+        ymin = -1,
+        ymax = 1
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occn_abserr_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("S", 1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("population_relative_error.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

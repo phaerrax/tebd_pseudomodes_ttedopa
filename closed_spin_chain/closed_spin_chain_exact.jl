@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -91,43 +91,65 @@ let
     push!(current_super, current_list)
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
-  N = size(occ_n_super[begin], 2)
-  plt = groupplot(timesteps_super,
-                  occ_n_super,
-                  parameter_lists;
-                  labels=hcat(string.(1:N)...),
-                  linestyles=hcat(repeat([:solid], N...)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
-                  
-  savefig(plt, "occ_n.png")
+  # Occupation numbers
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occ_n_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.(1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("occ_n.pdf", grp)
+  end
 
-  N = size(current_super[begin], 2)
-  plt = groupplot(timesteps_super,
-                  current_super,
-                  parameter_lists;
-                  labels=hcat(string.(1:N)...),
-                  linestyles=hcat(repeat([:solid], N...)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle j_{k,k+1}(t)\rangle",
-                  plottitle="Corrente tra spin adiacenti",
-                  plotsize=plotsize)
-                  
-  savefig(plt, "current.png")
-
+  # Particle current
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle j_{i,i+1}(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           current_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["($j,$(j+1))" for j ∈ 1:N-1] ))
+      push!(grp, ax)
+    end
+    pgfsave("particle_current.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

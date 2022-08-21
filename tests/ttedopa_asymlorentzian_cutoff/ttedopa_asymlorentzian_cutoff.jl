@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots, QuadGK
+using ITensors, LaTeXStrings, DataFrames, CSV, QuadGK, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -56,17 +56,27 @@ let
     CSV.write(filename, table)
   end
 
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  plt = unifiedplot(cutoffs,
-                    [clamp!(values, 0, 1e-4) for values ∈ residuals],
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\omega_c",
-                    ylabel="Residual",
-                    plottitle="Neglected relative reorganisation energy",
-                    plotsize=plotsize)
-  savefig(plt, "residual.png")
+  # State norm
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = "Residual",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(cutoffs,
+                             [clamp!(values, 0, 1e-4) for values ∈ residuals],
+                             parameter_lists,
+                             distinguishable_colors(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("neglected_relative_reorganisation_energy.pdf", ax)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
 end

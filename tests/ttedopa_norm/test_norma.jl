@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -283,175 +283,124 @@ let
     push!(hermiticity_super, hermiticity)
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  distinct_p, repeated_p = categorise_parameters(parameter_lists)
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
-  N = size(occ_n_mps_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  occ_n_mps_super,
-                  parameter_lists;
-                  labels=["L" string.(1:N-2)... "R"],
-                  linestyles=[:dash repeat([:solid], N-2)... :dash],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
-
-  savefig(plt, "occ_n_all.png")
-
-  # Grafico dell'occupazione del primo oscillatore (riunito)
-  # -------------------------------------------------------
-  # Estraggo da occ_n_super i valori dell'oscillatore sinistro.
-  occ_n_osc_left_super = [occ_n[:,1] for occ_n in occ_n_mps_super]
-  plt = unifiedplot(timesteps_super,
-                    occ_n_osc_left_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\langle n_L(t)\rangle",
-                    plottitle="Occupazione dell'oscillatore sx",
-                    plotsize=plotsize)
-
-  savefig(plt, "occ_n_osc_left.png")
-
-  #=
-  # Grafico dei numeri di occupazione (solo spin)
-  # ---------------------------------------------
-  spinsonly = [mat[:, 2:end-1] for mat in occ_n_super]
-  plt = groupplot(timesteps_super,
-                  spinsonly,
-                  parameter_lists;
-                  labels=hcat(string.(1:N-2)...),
-                  linestyles=hcat(repeat([:solid], N-2)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (solo spin)",
-                  plotsize=plotsize)
-  
-  savefig(plt, "occ_n_spins_only.png")
-  
-  # Grafico dei numeri di occupazione (oscillatori + totale catena)
-  # ---------------------------------------------------------------
-  # sum(X, dims=2) prende la matrice X e restituisce un vettore colonna
-  # le cui righe sono le somme dei valori sulle rispettive righe di X.
-  sums = [[mat[:, 1] sum(mat[:, 2:end-1], dims=2) mat[:, end]]
-          for mat in occ_n_super]
-  plt = groupplot(timesteps_super,
-                  sums,
-                  parameter_lists;
-                  labels=["L" "catena" "R"],
-                  linestyles=[:solid :dot :solid],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (oscillatori + totale catena)",
-                  plotsize=plotsize)
-
-  savefig(plt, "occ_n_sums.png")
-  =#
-
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  N = size(bond_dimensions_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
-
-  savefig(plt, "bond_dimensions.png")
-
-  # Grafico della traccia della matrice densità
-  # -------------------------------------------
-  # Questo serve più che altro per controllare che rimanga sempre pari a 1.
-  plt = unifiedplot(timesteps_super,
-                    normalisation_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\operatorname{tr}\,\rho(t)",
-                    plottitle="Normalizzazione della matrice densità",
-                    plotsize=plotsize)
-
-  savefig(plt, "dm_normalisation.png")
-
-  plt = unifiedplot(timesteps_super,
-                    hermiticity_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"\lambda\, t",
-                    ylabel=L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
-                    plottitle="Controllo hermitianità della matrice densità",
-                    plotsize=plotsize)
-
-  savefig(plt, "hermiticity_monitor.png")
-
-  #=
-  # Grafico della corrente di spin
-  # ------------------------------
-  N = size(spin_current_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  spin_current_super,
-                  parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"j_{k,k+1}(t)",
-                  plottitle="Corrente di spin",
-                  plotsize=plotsize)
-
-  savefig(plt, "spin_current.png")
-
-  # Grafico dell'occupazione degli autospazi di N della catena di spin
-  # ------------------------------------------------------------------
-  # L'ultimo valore di ciascuna riga rappresenta la somma di tutti i
-  # restanti valori.
-  N = size(chain_levels_super[begin])[2] - 1
-  plt = groupplot(timesteps_super,
-                  chain_levels_super,
-                  parameter_lists;
-                  labels=[string.(0:N-1)... "total"],
-                  linestyles=[repeat([:solid], N)... :dash],
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"n(",
-                  plottitle="Occupazione degli autospazi "
-                  * "della catena di spin",
-                  plotsize=plotsize)
-
-  savefig(plt, "chain_levels.png")
-
-  # Grafico dell'occupazione dei livelli degli oscillatori
-  # ------------------------------------------------------
-  for (list, pos) in zip([osc_levels_left_super, osc_levels_right_super],
-                         ["sx", "dx"])
-    N = size(list[begin])[2] - 1
-    plt = groupplot(timesteps_super,
-                    list,
-                    parameter_lists;
-                    labels=[string.(0:N-1)... "total"],
-                    linestyles=[repeat([:solid], N)... :dash],
-                    commonxlabel=L"\lambda\, t",
-                    commonylabel=L"n",
-                    plottitle="Occupazione degli autospazi "
-                    * "dell'oscillatore $pos",
-                    plotsize=plotsize)
-
-    savefig(plt, "osc_levels_$pos.png")
+  # Occupation numbers, left chain
+  occn_left = [mat[:, range]
+               for (mat, range) ∈ zip(occn_super, range_osc_left_super)]
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occ_n_mps_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["L"; string.(1:N-2); "R"] ))
+      push!(grp, ax)
+    end
+    pgfsave("population.pdf", grp)
   end
-  =#
+
+  # Population, left oscillator
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\langla n_L(t)\rangle",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             [occ_n[:,1] for occ_n ∈ occ_n_mps_super],
+                             parameter_lists,
+                             distinguishable_colors(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("population_left_pseudomode.pdf", ax)
+  end
+
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2) - 1
+      sitelabels = ["L"; string.("S", 1:N); "R"]
+      for (y, c, ls) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( consecutivepairs(sitelabels) ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions.pdf", grp)
+  end
+
+  # Trace of the density matrix
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\operatorname{tr}\rho(t)",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             normalisation_super,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("normalisation.pdf", ax)
+  end
+
+  # Hermiticity of the reduced density matrix of the left pseudomode
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             hermiticity_super,
+                             parameter_lists,
+                             distinguishable_colors(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("hermiticity.pdf", ax)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

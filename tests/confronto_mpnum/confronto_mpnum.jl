@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, DataFrames, LaTeXStrings, CSV, Plots
+using ITensors, DataFrames, LaTeXStrings, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -109,69 +109,112 @@ let
     push!(ranks_super, hcat(ranks...)')
   end
 
-  # Grafici
-  # =======
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  occ_n_super,
-                  parameter_lists;
-                  labels=hcat(string.(1:N)...),
-                  linestyles=hcat(repeat([:solid], N...)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
-                  
-  savefig(plt, "occ_n.png")
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Confronto con Python dell'andamento del primo sito
-  # --------------------------------------------------
+  # Occupation numbers, left chain
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occ_n_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.(1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("population.pdf", grp)
+  end
+
+  # Comparison btw. mpnum and ITensors on selected sites
   cols = [1, 5, 10]
-  selection = [mat[:, cols] for mat in occ_n_comp_super]
-  plt = groupplot(timesteps_super,
-                  selection,
-                  parameter_lists;
-                  labels=hcat(string.(cols)...),
-                  linestyles=hcat(repeat([:solid], length(cols))...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i\rangle",
-                  plottitle="Discrepanza tra ITensors e mpnum",
-                  plotsize=plotsize)
-                  
-  savefig(plt, "discrepanza.png")
+  selection = [mat[:, cols] for mat ∈ occ_n_comp_super]
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\Delta\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           selection,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2) # whatever this is
+      for (y, c, ls) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( cols ))
+      push!(grp, ax)
+    end
+    pgfsave("itensors_mpnum_discrepancy.pdf", grp)
+  end
 
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  N = size(ranks_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  ranks_super,
-                  parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2) # whatever this is
+      for (y, c, ls) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( consecutivepairs(1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions.pdf", grp)
+  end
 
-  savefig(plt, "bond_dimensions.png")
-
-  # Istantanea dei numeri di occupazione alla fine
-  # ----------------------------------------------
-  plt = groupplot([1:size(arr, 1) for arr in snapshot_comp_super],
-                  snapshot_comp_super,
-                  parameter_lists;
-                  labels=["ITensors" "mpnum"],
-                  linestyles=[:solid :solid],
-                  commonxlabel="Sito",
-                  commonylabel="Numero di occupazione",
-                  plottitle="Contronfo tra i numeri di occupazione alla fine",
-                  plotsize=plotsize)
-
-  savefig(plt, "snapshot_confronto.png")
+  # Snapshot of the occupation numbers at the end, ITensors v. mpnum comparison
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = "Site",
+        ylabel = "Occ. n. comparison",
+    })
+    for (i, data, p) ∈ zip([1:size(arr, 1) for arr ∈ snapshot_comp_super],
+                           snapshot_comp_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      for (y, c) ∈ zip(eachcol(data), readablecolours(2))
+        plot = Plot({ color = c }, Table([i, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["ITensors" "mpnum"] ))
+      push!(grp, ax)
+    end
+    pgfsave("snapshot_comparison.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

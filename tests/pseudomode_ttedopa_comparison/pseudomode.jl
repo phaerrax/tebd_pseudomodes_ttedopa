@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -170,81 +170,92 @@ let
     push!(range_spins_super, range_spins)
     push!(bond_dimensions_super, ranks)
   end
+ 
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  # Grafici
-  # =======
-  plotsize = (600, 400)
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico dei numeri di occupazione
-  # ---------------------------------
-  plt = groupplot(timesteps_super,
-                  occn_PM_super,
-                  parameter_lists;
-                  labels=[reduce(hcat,
-                                 ["L"; ["S$n" for n ∈ eachindex(rn)]; "R"])
-                          for rn ∈ range_spins_super],
-                  linestyles=[reduce(hcat,
-                                     [:dash;
-                                      repeat([:solid], length(rn));
-                                      :dash])
-                              for rn ∈ range_spins_super],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione (pseudomodi)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_PM.png")
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2) # = no. of spins + 2
+      sitelabels=["L"; string.("S", 1:N-2); "R"]
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(N),
+                           [repeat(["solid"], N-1); "dashed"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( [consecutivepairs(sitelabels); "max"] ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions_pseudomodes.pdf", grp)
+  end
 
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  ranklabels=[reduce(hcat, ["(L1,S1)";
-                            ["(S$j,S$(j+1))" for j ∈ 1:size(v, 2)-3];
-                            "(S10,R1)";
-                            "max"])
-                          for v ∈ bond_dimensions_super]
-  ranklinestyles = [reduce(hcat, [repeat([:solid], size(v, 2)-1);
-                                  :dash])
-                    for v ∈ bond_dimensions_super]
 
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=ranklabels,
-                  linestyles=ranklinestyles,
-                  commonxlabel=L"t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
+  # Population of spin sites
+  spinsonly = [occn[:, rn] for (rn, occn) ∈ zip(range_spins_super,
+                                                occn_PM_super)]
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           spinsonly,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("S", 1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("population_spin_sites_pseudomodes.pdf", grp)
+  end
 
-  savefig(plt, "bond_dimensions_PM.png")
-
-  # Grafico dei numeri di occupazione (solo spin)
-  # ---------------------------------------------
-  plt = groupplot(timesteps_super,
-                  [occn[:, rn] for (rn, occn) ∈ zip(range_spins_super,
-                                                 occn_PM_super)],
-                  parameter_lists;
-                  rescale=false,
-                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
-                          for rn ∈ range_spins_super],
-                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
-                              for rn ∈ range_spins_super],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione degli spin (pseudomodi)",
-                  plotsize=plotsize)
-  savefig(plt, "occn_spins_PM.png")
-  
-  # Grafico della norma dello stato
-  # -------------------------------
-  plt = unifiedplot(timesteps_super,
-                    normalisation_PM_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\mathrm{tr}\rho(t)",
-                    plottitle="Norma dello stato (pseudomodi)",
-                    plotsize=plotsize)
-  savefig(plt, "normalisation_PM.png")
+  # Trace of the density matrix
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\operatorname{tr}\rho(t)",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             normalisation_PM,super,
+                             parameter_lists,
+                             readablecolours(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("normalisation_pseudomodes.pdf", ax)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

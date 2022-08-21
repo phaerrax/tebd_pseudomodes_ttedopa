@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -111,82 +111,87 @@ let
     push!(entropy_super, entropylist)
   end
 
-  #= Grafici
-     =======
-     Come funziona: creo un grafico per ogni tipo di osservabile misurata. In
-     ogni grafico, metto nel titolo tutti i parametri usati, evidenziando con
-     la grandezza del font o con il colore quelli che cambiano da una
-     simulazione all'altra.
-  =#
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico dei numeri di occupazione (tutti i siti)
-  # ------------------------------------------------
-  N = size(occ_n_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  occ_n_super,
-                  parameter_lists;
-                  labels=hcat(string.(1:N)...),
-                  linestyles=hcat(repeat([:solid], N...)),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione",
-                  plotsize=plotsize)
-                  
-  savefig(plt, "occ_n.png")
-
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  N = size(bond_dimensions_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=hcat(["($j,$(j+1))" for j ∈ 1:N]...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
-
-  savefig(plt, "bond_dimensions.png")
-
-  # Qui purtroppo bisogna assumere che tutte le simulazioni siano state
-  # definite con lo stesso numero di spin... se no il seguente codice
-  # si rompe.
-  # `current_allsites_super` è una lista: ogni suo elemento si riferisce
-  # a una simulazione differente.
-  # Ogni suo elemento è una matrice di n_spins² colonne: la corrente dallo
-  # spin i° allo spin k° si trova nella colonna (i-1)*n_spin + k.
-  n_spins = parameter_lists[begin]["number_of_spin_sites"]
-  for i ∈ 1:n_spins-1
-    data = [table[:, (i-1)*n_spins .+ (1:n_spins)] for table ∈ current_allsites_super]
-    plt = groupplot(timesteps_super,
-                    data,
-                    parameter_lists;
-                    labels=reduce(hcat, ["l=$l" for l ∈ 1:n_spins]),
-                    linestyles=reduce(hcat, repeat([:solid], n_spins)),
-                    commonxlabel=L"\lambda\, t",
-                    commonylabel=LaTeXString("\\langle j_{$i,l}\\rangle"),
-                    plottitle="Corrente tra spin (dal $(i)° spin)",
-                    plotsize=plotsize)
-
-    savefig(plt, "spin_current_fromsite$i.png")
+  # Occupation numbers
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occ_n_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.(1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("occ_n.pdf", grp)
   end
 
-  # Grafico dell'entropia di entanglement
-  # -------------------------------------
-  N = size(entropy_super[begin])[2]
-  plt = groupplot(timesteps_super,
-                  entropy_super,
-                  parameter_lists;
-                  labels=hcat(string.(1 .+ 1:N)...),
-                  linestyles=hcat(repeat([:solid], N)...),
-                  commonxlabel=L"\lambda\, t",
-                  commonylabel=L"S_i(t)",
-                  plottitle="Entropia di entanglement delle bipartizioni",
-                  plotsize=plotsize)
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( ["($j,$(j+1))" for j ∈ 1:N] ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions.pdf", grp)
+  end
 
-  savefig(plt, "entropy.png")
+  # Entanglement entropy
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"S_i(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           entropy_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.(1 .+ (1:N)) ))
+      push!(grp, ax)
+    end
+    pgfsave("entropy.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return

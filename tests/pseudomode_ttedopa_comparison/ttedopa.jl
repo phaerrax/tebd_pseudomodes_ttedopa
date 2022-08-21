@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, Plots
+using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -202,92 +202,139 @@ let
     push!(oscmaxlevels_super, oscmaxlevels)
   end
 
-  # Grafici
-  # =======
-  plotsize = (600, 400)
+  # Plots
+  # -----
+  @info "Drawing plots."
 
-  # Grafico della norma dello stato
-  # -------------------------------
-  plt = unifiedplot(timesteps_super,
-                    normalisation_TTEDOPA_super,
-                    parameter_lists;
-                    linestyle=:solid,
-                    xlabel=L"t",
-                    ylabel=L"\Vert\psi(t)\Vert",
-                    plottitle="Norma dello stato (TTEDOPA)",
-                    plotsize=plotsize)
-  savefig(plt, "normalisation_TTEDOPA.png")
+  # Common options for group plots
+  nrows = Int(ceil(tot_sim_n / 2))
+  group_opts = @pgf {
+    group_style = {
+      group_size        = "$nrows by 2",
+      y_descriptions_at = "edge left",
+      horizontal_sep    = "2cm",
+      vertical_sep      = "2cm"
+    },
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east"
+  }
 
-  # Grafico dei ranghi del MPS
-  # --------------------------
-  ranklabels=[reduce(hcat, ["(L1,S1)";
-                            ["(S$j,S$(j+1))" for j ∈ 1:size(v, 2)-3];
-                            "(S10,R1)";
-                            "max"])
-                          for v ∈ bond_dimensions_super]
-  ranklinestyles = [reduce(hcat, [repeat([:solid], size(v, 2)-1);
-                                  :dash])
-                    for v ∈ bond_dimensions_super]
+  # State norm
+  @pgf begin
+    ax = Axis({
+               xlabel       = L"\lambda t",
+               ylabel       = L"\Vert\psi(t)\Vert",
+               title        = "State norm",
+               "legend pos" = "outer north east"
+              })
+    for (t, y, p, col) ∈ zip(timesteps_super,
+                             normalisation_TTEDOPA_super,
+                             parameter_lists,
+                             distinguishable_colors(length(parameter_lists)))
+      plot = PlotInc({color = col}, Table([t, y]))
+      push!(ax, plot)
+      push!(ax, LegendEntry(filenamett(p)))
+    end
+    pgfsave("normalisation_TTEDOPA.pdf", ax)
+  end
 
-  plt = groupplot(timesteps_super,
-                  bond_dimensions_super,
-                  parameter_lists;
-                  labels=ranklabels,
-                  linestyles=ranklinestyles,
-                  commonxlabel=L"t",
-                  commonylabel=L"\chi_{k,k+1}(t)",
-                  plottitle="Ranghi del MPS",
-                  plotsize=plotsize)
+  # Bond dimensions
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\chi_{i,i+1}(t)",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           bond_dimensions_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      nsites = size(data, 2) - 2
+      sitelabels = ["L1"; string.("S", 1:nsites); "R1"]
+      for (y, c, ls) ∈ zip(eachcol(data),
+                           readablecolours(nsites+2),
+                           [repeat(["solid"], nsites+1); "dashed"])
+        plot = Plot({ color = c, $ls }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( [consecutivepairs(sitelabels); "max"] ))
+      push!(grp, ax)
+    end
+    pgfsave("bond_dimensions_TTEDOPA.pdf", grp)
+  end
 
-  savefig(plt, "bond_dimensions_TTEDOPA.png")
-
-  # Grafico dei numeri di occupazione (solo oscillatori sx)
-  # -------------------------------------------------------
+  # Occupation numbers, left chain
   Nlines = 10
-  plt = groupplot(timesteps_super,
-                  [occn[:, rn[end:-1:end-Nlines+1]]
-                   for (rn, occn) ∈ zip(range_osc_left_super, occn_TTEDOPA_super)],
-                  parameter_lists;
-                  labels=[reduce(hcat, string.("L", 1:Nlines))
-                          for rn ∈ range_osc_left_super],
-                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
-                              for rn ∈ range_osc_left_super],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione degli oscillatori sx, TTEDOPA",
-                  plotsize=plotsize)
-  savefig(plt, "occn_oscsx_TTEDOPA.png")
+  occn_left = [occn[:, rn[end:-1:end-Nlines+1]]
+               for (rn, occn) ∈ zip(range_osc_left_super, occn_TTEDOPA_super)]
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occn_left,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("L", 1:Nlines) ))
+      push!(grp, ax)
+    end
+    pgfsave("population_left_chain_TTEDOPA.pdf", grp)
+  end
 
-  # Grafico dei numeri di occupazione (solo oscillatori sx)
-  # -------------------------------------------------------
+  # Population of the highest level of the oscillators in the left chain
   Nlines = 4
-  plt = groupplot(timesteps_super,
-                  oscmaxlevels_super,
-                  parameter_lists;
-                  labels=reduce(hcat, string.("L", 1:Nlines)),
-                  linestyles=reduce(hcat, repeat([:solid], 4)),
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n^{(i)}_{{d_i}-1}(t)\rangle",
-                  plottitle="Occ. del livello max degli oscillatori sx, TTEDOPA",
-                  plotsize=plotsize)
-  savefig(plt, "maxlevels_oscsx_TTEDOPA.png")
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n^{(i)}_{{d_i}-1}(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           oscmaxlevels_super,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("L", 1:Nlines) ))
+      push!(grp, ax)
+    end
+    pgfsave("highest_level_population_left_chain_TTEDOPA.pdf", grp)
+  end
 
-  # Grafico dei numeri di occupazione (solo spin)
-  # ---------------------------------------------
-  plt = groupplot(timesteps_super,
-                  [occn[:, rn]
-                   for (rn, occn) ∈ zip(range_spins_super, occn_TTEDOPA_super)],
-                  parameter_lists;
-                  rescale=false,
-                  labels=[reduce(hcat, ["S$n" for n ∈ eachindex(rn)])
-                          for rn ∈ range_spins_super],
-                  linestyles=[reduce(hcat, repeat([:solid], length(rn)))
-                              for rn ∈ range_spins_super],
-                  commonxlabel=L"t",
-                  commonylabel=L"\langle n_i(t)\rangle",
-                  plottitle="Numeri di occupazione degli spin, TTEDOPA",
-                  plotsize=plotsize)
-  savefig(plt, "occn_spins_TTEDOPA.png")
+  # Occupation numbers, spin chain
+  occn_spin = [occn[:, rn]
+               for (rn, occn) ∈ zip(range_spins_super, occn_TTEDOPA_super)]
+  @pgf begin
+    grp = GroupPlot({
+        group_opts...,
+        xlabel = L"\lambda t",
+        ylabel = L"\langle n_i(t)\rangle",
+    })
+    for (t, data, p) ∈ zip(timesteps_super,
+                           occn_spin,
+                           parameter_lists)
+      ax = Axis({title = filenamett(p)})
+      N = size(data, 2)
+      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+        plot = Plot({ color = c }, Table([t, y]))
+        push!(ax, plot)
+      end
+      push!(ax, Legend( string.("S", 1:N) ))
+      push!(grp, ax)
+    end
+    pgfsave("population_spin_chain_TTEDOPA.pdf", grp)
+  end
 
   cd(prev_dir) # Il lavoro è completato: ritorna alla cartella iniziale.
   return
