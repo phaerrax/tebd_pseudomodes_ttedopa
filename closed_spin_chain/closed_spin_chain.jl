@@ -68,7 +68,7 @@ let
     ψ₀ = parse_init_state(sites, parameters["chain_initial_state"])
 
     # Misuro le osservabili sullo stato iniziale
-    current_allsites_ops = [[current(sites, s, j)
+    current_allsites_ops = [[fermioncurrent(sites, s, j)
                              for j ∈ filter(n -> n != s, 1:n_sites)]
                             for s ∈ 1:n_sites]
 

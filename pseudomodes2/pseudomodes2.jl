@@ -83,7 +83,7 @@ let
                    for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    current_allsites_ops = [current(sites, i, j)
+    current_allsites_ops = [fermioncurrent(sites, i, j)
                             for i ∈ spin_range
                             for j ∈ spin_range
                             if j > i]
@@ -186,7 +186,7 @@ let
                      for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      current_allsites_ops = [current(sites, i, j)
+      current_allsites_ops = [fermioncurrent(sites, i, j)
                               for i ∈ spin_range
                               for j ∈ spin_range
                               if j > i]
@@ -195,10 +195,10 @@ let
       traceMPS = MPS(sites, "vecId")
     end
 
-    current_adjsites_ops = [-2κ̃₁*current(sites, 2, 3);
-                            [current(sites, j, j+1)
+    current_adjsites_ops = [-2κ̃₁*fermioncurrent(sites, 2, 3);
+                            [fermioncurrent(sites, j, j+1)
                              for j ∈ spin_range[1:end-1]];
-                            -2κᵣ*current(sites,
+                            -2κᵣ*fermioncurrent(sites,
                                          spin_range[end],
                                          spin_range[end]+1)]
 

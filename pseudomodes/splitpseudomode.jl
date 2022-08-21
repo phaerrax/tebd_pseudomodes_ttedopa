@@ -156,7 +156,7 @@ let
     # - la normalizzazione (cioè la traccia) della matrice densità
     full_trace = MPS(sites, "vecId")
 
-    current_adjsites_ops = [current(sites, j, j+1)
+    current_adjsites_ops = [fermioncurrent(sites, j, j+1)
                             for j ∈ range_spins[1:end-1]]
 
     osclevels_projs_L1 = [embed_slice(sites, 2:2, osc_levels_proj(sites[2], n))

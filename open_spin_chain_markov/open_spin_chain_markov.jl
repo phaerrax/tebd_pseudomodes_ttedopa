@@ -82,7 +82,7 @@ let
     # Osservabili da misurare
     # =======================
     # - la corrente di spin
-    current_adjsitesops = [current(sites, j, j+1)
+    current_adjsitesops = [fermioncurrent(sites, j, j+1)
                            for j ∈ eachindex(sites)[1:end-1]]
                     
     # - la traccia di ρ

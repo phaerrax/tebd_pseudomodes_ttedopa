@@ -88,11 +88,11 @@ let
                    for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    current_adjsites_ops = [-2κ*current(sites, 1, 2);
-                            [current(sites, j, j+1)
+    current_adjsites_ops = [-2κ*fermioncurrent(sites, 1, 2);
+                            [fermioncurrent(sites, j, j+1)
                              for j ∈ spin_range[1:end-1]];
-                            -2κ*current(sites, spin_range[end], spin_range[end]+1)]
-    current_allsites_ops = [current(sites, i, j)
+                            -2κ*fermioncurrent(sites, spin_range[end], spin_range[end]+1)]
+    current_allsites_ops = [fermioncurrent(sites, i, j)
                             for i ∈ spin_range
                             for j ∈ spin_range
                             if j > i]
@@ -202,11 +202,11 @@ let
                      for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      current_adjsites_ops = [-2κ*current(sites, 1, 2);
-                              [current(sites, j, j+1)
+      current_adjsites_ops = [-2κ*fermioncurrent(sites, 1, 2);
+                              [fermioncurrent(sites, j, j+1)
                                for j ∈ spin_range[1:end-1]];
-                              -2κ*current(sites, spin_range[end], spin_range[end]+1)]
-      current_allsites_ops = [current(sites, i, j)
+                              -2κ*fermioncurrent(sites, spin_range[end], spin_range[end]+1)]
+      current_allsites_ops = [fermioncurrent(sites, i, j)
                               for i ∈ spin_range
                               for j ∈ spin_range
                               if j > i]

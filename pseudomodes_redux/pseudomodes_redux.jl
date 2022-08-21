@@ -86,7 +86,7 @@ let
                   for n ∈ 1:length(sites)]
 
     # - la corrente tra siti
-    current_adjsites_ops = [current(sites, j, j+1)
+    current_adjsites_ops = [fermioncurrent(sites, j, j+1)
                              for j ∈ spin_range[1:end-1]]
 
     # - la normalizzazione (cioè la traccia) della matrice densità
@@ -166,7 +166,7 @@ let
                     for n ∈ 1:length(sites)]
 
       # - la corrente tra siti
-      current_adjsites_ops = [current(sites, j, j+1)
+      current_adjsites_ops = [fermioncurrent(sites, j, j+1)
                                for j ∈ spin_range[1:end-1]]
 
       # - la normalizzazione (cioè la traccia) della matrice densità

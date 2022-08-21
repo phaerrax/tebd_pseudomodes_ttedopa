@@ -181,11 +181,11 @@ let
     # =======================
     # - la corrente di spin
     # (Ci metto anche quella tra spin e primi oscillatori)
-    spin_current_ops = [-2ηₗ*current(sites,
+    spin_current_ops = [-2ηₗ*fermioncurrent(sites,
                                      range_spins[1]-1,
                                      range_spins[1]);
-                        [current(sites, j, j+1) for j ∈ range_spins[1:end-1]];
-                        -2ηᵣ*current(sites,
+                        [fermioncurrent(sites, j, j+1) for j ∈ range_spins[1:end-1]];
+                        -2ηᵣ*fermioncurrent(sites,
                                      range_spins[end],
                                      range_spins[end]+1)]
 
