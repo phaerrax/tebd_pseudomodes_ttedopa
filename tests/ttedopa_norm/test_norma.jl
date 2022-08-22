@@ -298,7 +298,8 @@ let
     },
     no_markers,
     grid       = "major",
-    legend_pos = "outer north east"
+    legend_pos = "outer north east",
+"every axis plot/.append style" = "thick"
   }
 
   # Occupation numbers, left chain
@@ -330,7 +331,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langla n_L(t)\rangle",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              [occ_n[:,1] for occ_n ∈ occ_n_mps_super],
@@ -371,7 +373,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\mathrm{tr}\rho(t)",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              normalisation_super,
@@ -389,7 +392,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\Vert\rho_\mathrm{L}(t)-\rho_\mathrm{L}(t)^\dagger\Vert",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              hermiticity_super,

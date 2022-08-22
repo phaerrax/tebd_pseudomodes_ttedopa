@@ -207,7 +207,8 @@ let
     },
     no_markers,
     grid       = "major",
-    legend_pos = "outer north east"
+    legend_pos = "outer north east",
+"every axis plot/.append style" = "thick"
   }
 
   # Occupation numbers
@@ -283,7 +284,8 @@ let
                xlabel       = L"i",
                ylabel       = L"n_i(t_\mathrm{end})",
                title        = "Snapshot of the population at the end",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     inds = [reverse(range_osc_left); range_spins; range_osc_right]
     for (y, p, col) ∈ zip(snapshot_super,

@@ -204,7 +204,8 @@ let
     },
     no_markers,
     grid       = "major",
-    legend_pos = "outer north east"
+    legend_pos = "outer north east",
+"every axis plot/.append style" = "thick"
   }
 
   # Correlation function, real part

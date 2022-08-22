@@ -65,7 +65,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = "Residual",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(cutoffs,
                              [clamp!(values, 0, 1e-4) for values ∈ residuals],

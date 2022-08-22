@@ -269,7 +269,8 @@ let
     },
     no_markers,
     grid       = "major",
-    legend_pos = "outer north east"
+    legend_pos = "outer north east",
+"every axis plot/.append style" = "thick"
   }
 
   # Occupation numbers, left chain
@@ -452,7 +453,8 @@ let
                xlabel       = L"i",
                ylabel       = L"n_i(t_\mathrm{end})",
                title        = "Snapshot of the population at the end",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (i, y, p, col) ∈ zip(vcat.(range_osc_left_super,
                                    range_spins_super,
@@ -473,7 +475,8 @@ let
                xlabel       = L"\lambda t",
                ylabel       = L"\Vert\psi(t)\Vert",
                title        = "State norm",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              normalisation_super,

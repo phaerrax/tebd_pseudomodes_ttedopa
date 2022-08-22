@@ -120,7 +120,8 @@ let
     ax = Axis({
                xlabel       = L"i",
                ylabel       = L"\Omega_i",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
                title        = "T-TEDOPA frequency coefficients",
               })
     for (t, y, p, col) ∈ zip(chainranges,
@@ -138,7 +139,8 @@ let
     ax = Axis({
                xlabel       = L"i",
                ylabel       = L"\kappa_i",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
                title        = "T-TEDOPA interaction coefficients",
               })
     for (t, y, p, col) ∈ zip([rn[1:end-1] for rn ∈ chainranges],
@@ -156,7 +158,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)\rangle",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
                title        = "Evolution using real coefficients",
               })
     for (t, y, p, col) ∈ zip(timeranges,
@@ -174,7 +177,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)+n_2(t)\rangle",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
                title        = "Evolution using real coefficients",
               })
     for (t, y, p, col) ∈ zip(timeranges,
@@ -192,7 +196,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)\rangle",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
                title        = "Evolution using asymptotic coefficients",
               })
     for (t, y, p, col) ∈ zip(timeranges,

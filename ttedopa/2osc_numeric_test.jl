@@ -205,7 +205,8 @@ let
     },
     no_markers,
     grid       = "major",
-    legend_pos = "outer north east"
+    legend_pos = "outer north east",
+"every axis plot/.append style" = "thick"
   }
 
   # Occupation numbers
@@ -243,7 +244,8 @@ let
                xlabel       = L"\lambda t",
                ylabel       = L"\Vert\psi(t)\Vert",
                title        = "State norm",
-               "legend pos" = "outer north east"
+               "legend pos" = "outer north east",
+"every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              normalisation_super,
