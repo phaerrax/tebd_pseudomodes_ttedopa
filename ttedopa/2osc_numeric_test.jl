@@ -1,6 +1,6 @@
 #!/usr/bin/julia
 
-using QuantumOptics, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
+using PolyChaos, QuantumOptics, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using PseudomodesTTEDOPA
 
 disablegrifqtech()
@@ -232,7 +232,7 @@ let
  plot[ls] = nothing
         push!(ax, plot)
       end
-      push!(ax, Legend( ["L2" "L1"; string.(1:N-4); "R1"; "R2"] ))
+      push!(ax, Legend( ["L2"; "L1"; string.(1:N-4); "R1"; "R2"] ))
       push!(grp, ax)
     end
     pgfsave("population_numeric_solution.pdf", grp)
@@ -248,7 +248,7 @@ let
 "every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
-                             normalisation_super,
+                             norm_super,
                              parameter_lists,
                              distinguishable_colors(length(parameter_lists)))
       plot = PlotInc({color = col}, Table([t, y]))
@@ -297,7 +297,7 @@ let
       ax = Axis({title = filenamett(p)})
       N = size(data, 2)
       for (y, c, ls) ∈ zip(eachcol(data),
-                           readablecolours(N)
+                           readablecolours(N),
                            ["solid", "solid", "dashed"])
         plot = Plot({ color = c }, Table([t, y]))
  plot[ls] = nothing
@@ -326,7 +326,7 @@ let
       ax = Axis({title = filenamett(p)})
       N = size(data, 2)
       for (y, c, ls) ∈ zip(eachcol(data),
-                           readablecolours(N)
+                           readablecolours(N),
                            ["solid", "solid", "dashed"])
         plot = Plot({ color = c }, Table([t, y]))
  plot[ls] = nothing
