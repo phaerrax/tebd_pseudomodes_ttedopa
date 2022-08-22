@@ -596,30 +596,6 @@ let
     pgfsave("particle_current_from_1st_spin.pdf", grp)
   end
 
-  # Particle current, from the 4st site to the others
-  data = [table[:, 3*p["number_of_spin_sites"] .+ (1:p["number_of_spin_sites"])]
-          for (p, table) in zip(parameter_lists, current_allsites_super)]
-  @pgf begin
-    grp = GroupPlot({
-        group_opts...,
-        xlabel = L"\lambda t",
-        ylabel = L"\langle j_{4,i}(t)\rangle",
-    })
-    for (t, data, p) ∈ zip(timesteps_super,
-                           data,
-                           parameter_lists)
-      ax = Axis({title = filenamett(p)})
-      N = size(data, 2) # N ≡ no. of spin sites
-      for (y, c) ∈ zip(eachcol(data), readablecolours(N))
-        plot = Plot({ color = c }, Table([t, y]))
-        push!(ax, plot)
-      end
-      push!(ax, Legend( string.([1:N]) ))
-      push!(grp, ax)
-    end
-    pgfsave("particle_current_from_4th_spin.pdf", grp)
-  end
-
   # Occupations of the number operator eigenspaces in the spin chain
   @pgf begin
     grp = GroupPlot({
