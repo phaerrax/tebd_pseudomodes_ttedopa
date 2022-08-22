@@ -67,11 +67,11 @@ let
 
   if (allequal(n_spin_sites_list) &&
       allequal(hotoscdim_list) &&
-      allequal(coldscdim_list))
+      allequal(coldoscdim_list))
     preload = true
     n_spin_sites = first(n_spin_sites_list)
     hotoscdim = first(hotoscdim_list)
-    coldscdim = first(coldscdim_list)
+    coldoscdim = first(coldoscdim_list)
 
     spin_range = 2 .+ (1:n_spin_sites)
 
@@ -214,10 +214,10 @@ let
       # Lo stato iniziale della catena è dato da "chain_initial_state".
       # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
       # 1) Calcolo la matrice densità dello stato termico
-      a⁻(d::Int)  = diagm(1  => sqrt.(1:dim-1))
-      a⁺(d::Int)  = diagm(-1 => sqrt.(1:dim-1))
-      num(d::Int) = diagm(0  => 0:dim-1)
-      id(d::Int)  = Matrix{Int}(I, dim, dim)
+      a⁻(dim::Int)  = diagm(1  => sqrt.(1:dim-1))
+      a⁺(dim::Int)  = diagm(-1 => sqrt.(1:dim-1))
+      num(dim::Int) = diagm(0  => 0:dim-1)
+      id(dim::Int)  = Matrix{Int}(I, dim, dim)
 
       HoscL = (ω̃₁ * num(hotoscdim) ⊗ id(hotoscdim) +
                ω̃₂ * id(hotoscdim) ⊗ num(hotoscdim) +
@@ -373,7 +373,7 @@ let
  plot[ls] = nothing
         push!(ax, plot)
       end
-      push!(ax, Legend( ["L2" "L1"; string.(1:N-3); "R"] ))
+      push!(ax, Legend( ["L2"; "L1"; string.(1:N-3); "R"] ))
       push!(grp, ax)
     end
     pgfsave("populations.pdf", grp)
@@ -425,7 +425,7 @@ let
         plot = Plot({ color = c }, Table([t, y]))
         push!(ax, plot)
       end
-      push!(ax, Legend( ["L1+L2" "spin total" "R"] ))
+      push!(ax, Legend( ["L1+L2", "spin total", "R"] ))
       push!(grp, ax)
     end
     pgfsave("population_sums.pdf", grp)
