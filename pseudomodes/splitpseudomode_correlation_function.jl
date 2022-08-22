@@ -331,7 +331,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(N),
                            ["solid", "solid", "dashed", "dotted"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["single p.mode",
@@ -358,7 +359,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(N),
                            ["solid", "solid", "dashed", "dotted"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["single p.mode",
@@ -388,7 +390,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(N),
                            ["solid", "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["real part", "imag part"] ))

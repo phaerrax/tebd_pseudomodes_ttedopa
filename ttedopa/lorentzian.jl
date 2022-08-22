@@ -386,7 +386,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(4),
                            [repeat(["solid"], 3); "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["left ch.", "spin ch.", "right ch.", "total"] ))
@@ -411,7 +412,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(nsites+2),
                            [repeat(["solid"], nsites+1); "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( [consecutivepairs(sitelabels); "max"] ))

@@ -205,7 +205,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(N),
                            [repeat(["solid"], N-1); "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( [consecutivepairs(sitelabels); "max"] ))

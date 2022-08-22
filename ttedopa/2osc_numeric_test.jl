@@ -227,7 +227,8 @@ let
                             repeat(["solid"], N-4);
                             "dashed";
                             "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["L2" "L1"; string.(1:N-4); "R1"; "R2"] ))
@@ -296,7 +297,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(N)
                            ["solid", "solid", "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["L2", "L1", "L1+L2"] ))
@@ -324,7 +326,8 @@ let
       for (y, c, ls) ∈ zip(eachcol(data),
                            readablecolours(N)
                            ["solid", "solid", "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["R1", "R2", "R1+R2"] ))

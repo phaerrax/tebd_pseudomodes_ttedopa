@@ -349,7 +349,8 @@ let
                             "dashed";
                             repeat(["solid"], N-3);
                             "dashed"])
-        plot = Plot({ color = c, $ls }, Table([t, y]))
+        plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
         push!(ax, plot)
       end
       push!(ax, Legend( ["L1"; "L2"; string.(1:N-3); "R"] ))
@@ -518,7 +519,8 @@ let
         for (y, c, ls) ∈ zip(eachcol(data),
                              readablecolours(N+1),
                              [repeat(["solid"], N); "dashed"])
-          plot = Plot({ color = c, $ls }, Table([t, y]))
+          plot = Plot({ color = c }, Table([t, y]))
+ plot[ls] = nothing
           push!(ax, plot)
         end
         push!(ax, Legend( [string.([0:N-1]); "total"] ))
