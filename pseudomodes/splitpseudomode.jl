@@ -187,7 +187,7 @@ let
       M = exp(-1/T * HoscL)
       M /= tr(M)
       # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-      v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(hotoscdim), gellmannbasis(hotoscdim))...]])
+      v = PseudomodesTTEDOPA.vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(hotoscdim), gellmannbasis(hotoscdim))...]])
       # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
       iv = itensor(v, sites[1], sites[2])
       # 4) lo decompongo in due pezzi con una SVD

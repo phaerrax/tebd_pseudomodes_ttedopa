@@ -103,12 +103,12 @@ let
     # Le unisco e calcolo la matrice rappresentativa nella base hermitiana.
     L(x) = L₀(x) + D(x)
     basis = [i⊗j⊗k for (i,j,k) in [Base.product(gellmannbasis(oscdimL), gellmannbasis(2), gellmannbasis(oscdimR))...]]
-    manualL = vec(L, basis)
-    maxothers = norm(vec(L₀, basis)[end,:], Inf)
+    manualL = PseudomodesTTEDOPA.vec(L, basis)
+    maxothers = norm(PseudomodesTTEDOPA.vec(L₀, basis)[end,:], Inf)
     println("Nell'ultima riga della matrice che rappresenta la parte "*
             "unitaria dell'equazione di Lindblad, costruita manualmente, "*
             "le componenti sono tutte ≤ $maxothers in valore assoluto.")
-    maxothers = norm(vec(D, basis)[end,:], Inf)
+    maxothers = norm(PseudomodesTTEDOPA.vec(D, basis)[end,:], Inf)
     println("Nell'ultima riga della matrice che rappresenta la parte "*
             "dissipativa dell'equazione di Lindblad, costruita manualmente, "*
             "le componenti sono tutte ≤ $maxothers in valore assoluto.")

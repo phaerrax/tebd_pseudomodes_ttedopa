@@ -249,8 +249,7 @@ let
     emptystate[1, 1] = 1.0
     M = (id(oscdim) ⊗ (a⁺(oscdim) + a⁻(oscdim))) * (emptystate ⊗ emptystate)
     # 2) la vettorizzo sul prodotto delle basi hermitiane dei due siti
-    v = vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(oscdim),
-                                                     gellmannbasis(oscdim))...]])
+    v = PseudomodesTTEDOPA.vec(M, [êᵢ ⊗ êⱼ for (êᵢ, êⱼ) ∈ [Base.product(gellmannbasis(oscdim), gellmannbasis(oscdim))...]])
     # 3) inserisco il vettore in un tensore con gli Index degli oscillatori
     iv = itensor(v, sites[1], sites[2])
     # 4) lo decompongo in due pezzi con una SVD
