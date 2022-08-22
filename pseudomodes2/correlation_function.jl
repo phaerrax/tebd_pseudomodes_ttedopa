@@ -1,7 +1,9 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using LinearAlgebra, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
+
+const ⊗ = kron
 
 disablegrifqtech()
 
@@ -139,6 +141,10 @@ let
     # Lo stato iniziale qui è X₀ρ₀ (vedi eq. sopra).
     # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
     # 1) per gli oscillatori
+    a⁻(dim::Int)  = diagm(1  => sqrt.(1:dim-1))
+    a⁺(dim::Int)  = diagm(-1 => sqrt.(1:dim-1))
+    num(dim::Int) = diagm(0  => 0:dim-1)
+    id(dim::Int)  = Matrix{Int}(I, dim, dim)
     if T != 0 # ρ₀ = Z⁻¹exp(-βH)
       HoscL = (ω̃₁ * num(oscdim) ⊗ id(oscdim) +
                ω̃₂ * id(oscdim) ⊗ num(oscdim) +

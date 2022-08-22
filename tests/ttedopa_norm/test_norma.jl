@@ -1,7 +1,9 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using LinearAlgebra, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
+
+const ⊗ = kron
 
 disablegrifqtech()
 
@@ -72,6 +74,14 @@ let
                    op("Damping", sites[end]; ω=ω, T=0))
 
     filename = parameters["filename"]
+
+    a⁻(d::Int)  = diagm(1  => sqrt.(1:dim-1))
+    a⁺(d::Int)  = diagm(-1 => sqrt.(1:dim-1))
+    num(d::Int) = diagm(0 =>  sqrt.(0:dim-1))
+    id(d::Int)  = Matrix{Int}(I, dim, dim)
+    σˣ          = [0 1; 1  0]
+    σᶻ          = [1 0; 0 -1]
+
     println("-------------------- test ($filename) --------------------")
     # Definisco la parte unitaria dell'equazione di Lindblad
     # L₀(ρ) = -i[H,ρ]

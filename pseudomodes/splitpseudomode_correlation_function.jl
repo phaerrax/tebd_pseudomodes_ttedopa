@@ -1,7 +1,9 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, QuadGK, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using LinearAlgebra, LaTeXStrings, DataFrames, CSV, QuadGK, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
+
+const ⊗ = kron
 
 disablegrifqtech()
 
@@ -240,6 +242,9 @@ let
     # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
     # 1) la temperatura è sempre 0 quindi lo stato iniziale è
     #    ρ₀ = |∅⟩ ⟨∅| = |0⟩ ⟨0| ⊗ |0⟩ ⟨0|
+    a⁻(d::Int)  = diagm(1  => sqrt.(1:dim-1))
+    a⁺(d::Int)  = diagm(-1 => sqrt.(1:dim-1))
+    id(d::Int)  = Matrix{Int}(I, dim, dim)
     emptystate = zeros(Float64, oscdim, oscdim)
     emptystate[1, 1] = 1.0
     M = (id(oscdim) ⊗ (a⁺(oscdim) + a⁻(oscdim))) * (emptystate ⊗ emptystate)

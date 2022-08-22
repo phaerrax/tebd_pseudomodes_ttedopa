@@ -1,7 +1,9 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using LinearAlgebra, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
+
+const ⊗ = kron
 
 disablegrifqtech()
 
@@ -212,6 +214,11 @@ let
       # Lo stato iniziale della catena è dato da "chain_initial_state".
       # Per calcolare lo stato iniziale dei due oscillatori a sinistra:
       # 1) Calcolo la matrice densità dello stato termico
+      a⁻(d::Int)  = diagm(1  => sqrt.(1:dim-1))
+      a⁺(d::Int)  = diagm(-1 => sqrt.(1:dim-1))
+      num(d::Int) = diagm(0  => 0:dim-1)
+      id(d::Int)  = Matrix{Int}(I, dim, dim)
+
       HoscL = (ω̃₁ * num(hotoscdim) ⊗ id(hotoscdim) +
                ω̃₂ * id(hotoscdim) ⊗ num(hotoscdim) +
                κ̃₂ * (a⁺(hotoscdim) ⊗ a⁻(hotoscdim) +

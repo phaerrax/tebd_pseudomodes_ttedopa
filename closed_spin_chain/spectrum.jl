@@ -1,7 +1,9 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV
+using LinearAlgebra, LaTeXStrings, DataFrames, CSV
 using PseudomodesTTEDOPA
+
+const ⊗ = kron
 
 disablegrifqtech()
 
@@ -12,6 +14,10 @@ let
   n_sites = 10
   ελ = [(1,0), (100,1), (10,1), (1,1), (0.01,1), (0,1)]
 
+  σᶻ = [1 0; 0 -1]
+  σ⁺ = [0 1; 0  0]
+  σ⁻ = [0 0; 1  0]
+  I₂ = [1 0; 0  1]
   h1 = sum([reduce(⊗, [i == n ? σᶻ : I₂ for i ∈ 1:n_sites];
                    init=1.0)
             for n ∈ 1:n_sites];
