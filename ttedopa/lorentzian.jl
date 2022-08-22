@@ -1,7 +1,7 @@
 #!/usr/bin/julia
 
-using ITensors, DataFrames, LaTeXStrings, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using PolyChaos, DataFrames, LaTeXStrings, CSV, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
 
 disablegrifqtech()
 
@@ -192,11 +192,7 @@ let
     # Gli oscillatori partono tutti dallo stato vuoto; mi riservo di decidere
     # volta per volta come inizializzare l'oscillatore più a destra nella
     # catena a sinistra, per motivi di diagnostica.
-    osc_sx_init_state = chain(MPS(sites[1:n_osc_left-1], "0"),
-                              parse_init_state_osc(
-                                    sites[n_osc_left],
-                                    parameters["left_oscillator_initial_state"]
-                                   ))
+    osc_sx_init_state = MPS(sites[1:n_osc_left], "0")
     spin_init_state = parse_init_state(sites[range_spins],
                                        parameters["chain_initial_state"])
     osc_dx_init_state = MPS(sites[range_osc_right], "0")
@@ -408,11 +404,11 @@ let
                            bond_dimensions_super,
                            parameter_lists)
       ax = Axis({title = filenamett(p)})
-      nsites = size(data, 2) - 2
-      sitelabels = ["L1"; string.("S", 1:nsites); "R1"]
+      nspins = size(data, 2) - 2
+      sitelabels = ["L1"; string.("S", 1:nspins); "R1"]
       for (y, c, ls) ∈ zip(eachcol(data),
-                           readablecolours(nsites+2),
-                           [repeat(["solid"], nsites+1); "dashed"])
+                           readablecolours(nspins+2),
+                           [repeat(["solid"], nspins+1); "dashed"])
         plot = Plot({ color = c }, Table([t, y]))
  plot[ls] = nothing
         push!(ax, plot)
@@ -436,7 +432,7 @@ let
       ax = Axis({title = filenamett(p)})
       nspins = size(data, 2) - 1
       sitelabels = ["L"; string.("S", 1:nspins); "R"]
-      for (y, c) ∈ zip(eachcol(data), readablecolours(nsites+1))
+      for (y, c) ∈ zip(eachcol(data), readablecolours(nspins+1))
         plot = Plot({ color = c }, Table([t, y]))
         push!(ax, plot)
       end
