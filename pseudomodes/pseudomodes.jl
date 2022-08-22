@@ -590,7 +590,7 @@ let
         plot = Plot({ color = c }, Table([t, y]))
         push!(ax, plot)
       end
-      push!(ax, Legend( string.([1:N]) ))
+      push!(ax, Legend( string.(1:N) ))
       push!(grp, ax)
     end
     pgfsave("particle_current_from_1st_spin.pdf", grp)
@@ -612,7 +612,7 @@ let
         plot = Plot({ color = c }, Table([t, y]))
         push!(ax, plot)
       end
-      push!(ax, Legend( string.([0:N-1]) ))
+      push!(ax, Legend( string.(0:N-1) ))
       push!(grp, ax)
     end
     pgfsave("spin_chain_number_eigenspaces.pdf", grp)
@@ -636,7 +636,7 @@ let
           plot = Plot({ color = c }, Table([t, y]))
           push!(ax, plot)
         end
-        push!(ax, Legend( string.([0:N-1]) ))
+        push!(ax, Legend( string.(0:N-1) ))
         push!(grp, ax)
       end
       pgfsave("$(pos)_pmode_number_eigenspaces.pdf", grp)

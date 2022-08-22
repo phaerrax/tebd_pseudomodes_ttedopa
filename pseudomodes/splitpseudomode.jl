@@ -523,7 +523,7 @@ let
  plot[ls] = nothing
           push!(ax, plot)
         end
-        push!(ax, Legend( [string.([0:N-1]); "total"] ))
+        push!(ax, Legend( [string.(0:N-1); "total"] ))
         push!(grp, ax)
       end
       pgfsave("$(site)_pmode_number_eigenspaces.pdf", grp)

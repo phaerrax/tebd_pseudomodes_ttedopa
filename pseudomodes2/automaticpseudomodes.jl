@@ -478,7 +478,7 @@ let
         plot = Plot({ color = c }, Table([t, y]))
         push!(ax, plot)
       end
-      push!(ax, Legend( string.([1:N]) ))
+      push!(ax, Legend( string.(1:N) ))
       push!(grp, ax)
     end
     pgfsave("particle_current_from_1st_spin.pdf", grp)
