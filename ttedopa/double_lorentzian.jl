@@ -1,7 +1,7 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using PolyChaos, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
 
 disablegrifqtech()
 
@@ -408,11 +408,11 @@ let
                            bond_dimensions_super,
                            parameter_lists)
       ax = Axis({title = filenamett(p)})
-      nsites = size(data, 2) - 2
-      sitelabels = ["L1"; string.("S", 1:nsites); "R1"]
+      nspins = size(data, 2) - 2
+      sitelabels = ["L1"; string.("S", 1:nspins); "R1"]
       for (y, c, ls) ∈ zip(eachcol(data),
-                           readablecolours(nsites+2),
-                           [repeat(["solid"], nsites+1); "dashed"])
+                           readablecolours(nspins+2),
+                           [repeat(["solid"], nspins+1); "dashed"])
         plot = Plot({ color = c }, Table([t, y]))
  plot[ls] = nothing
         push!(ax, plot)
@@ -436,7 +436,7 @@ let
       ax = Axis({title = filenamett(p)})
       nspins = size(data, 2) - 1
       sitelabels = ["L"; string.("S", 1:nspins); "R"]
-      for (y, c) ∈ zip(eachcol(data), readablecolours(nsites+1))
+      for (y, c) ∈ zip(eachcol(data), readablecolours(nspins+1))
         plot = Plot({ color = c }, Table([t, y]))
         push!(ax, plot)
       end
