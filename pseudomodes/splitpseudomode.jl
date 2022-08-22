@@ -464,7 +464,7 @@ let
   @pgf begin
     ax = Axis({
                xlabel       = L"\lambda t",
-               ylabel       = L"\operatorname{tr}\rho(t)",
+               ylabel       = L"\mathrm{tr}\rho(t)",
                "legend pos" = "outer north east"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
