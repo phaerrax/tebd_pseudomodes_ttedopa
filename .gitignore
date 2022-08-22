@@ -3,6 +3,7 @@
 *.dat
 *.json
 *.csv
+*.pdf
 
 # File di slurm
 *.out
