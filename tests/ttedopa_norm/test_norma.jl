@@ -75,10 +75,10 @@ let
 
     filename = parameters["filename"]
 
-    a⁻(d::Int)  = diagm(1  => sqrt.(1:dim-1))
-    a⁺(d::Int)  = diagm(-1 => sqrt.(1:dim-1))
-    num(d::Int) = diagm(0 =>  sqrt.(0:dim-1))
-    id(d::Int)  = Matrix{Int}(I, dim, dim)
+    a⁻(dim::Int)  = diagm(1  => sqrt.(1:dim-1))
+    a⁺(dim::Int)  = diagm(-1 => sqrt.(1:dim-1))
+    num(dim::Int) = diagm(0 =>  sqrt.(0:dim-1))
+    id(dim::Int)  = Matrix{Int}(I, dim, dim)
     σˣ          = [0 1; 1  0]
     σᶻ          = [1 0; 0 -1]
 

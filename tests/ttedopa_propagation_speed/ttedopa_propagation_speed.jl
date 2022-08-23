@@ -1,7 +1,7 @@
 #!/usr/bin/julia
 
-using ITensors, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using LinearAlgebra, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
+using PolyChaos, ITensors, PseudomodesTTEDOPA
 
 disablegrifqtech()
 
@@ -121,7 +121,7 @@ let
                xlabel       = L"i",
                ylabel       = L"\Omega_i",
                "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+"every axis plot/.append style" = "thick",
                title        = "T-TEDOPA frequency coefficients",
               })
     for (t, y, p, col) ∈ zip(chainranges,
@@ -140,7 +140,7 @@ let
                xlabel       = L"i",
                ylabel       = L"\kappa_i",
                "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+"every axis plot/.append style" = "thick",
                title        = "T-TEDOPA interaction coefficients",
               })
     for (t, y, p, col) ∈ zip([rn[1:end-1] for rn ∈ chainranges],
@@ -159,11 +159,11 @@ let
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)\rangle",
                "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+"every axis plot/.append style" = "thick",
                title        = "Evolution using real coefficients",
               })
     for (t, y, p, col) ∈ zip(timeranges,
-                             firstsitesevos,
+                             firstsiteevos,
                              parameter_lists,
                              readablecolours(length(parameter_lists)))
       plot = PlotInc({color = col}, Table([t, y]))
@@ -178,7 +178,7 @@ let
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)+n_2(t)\rangle",
                "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+"every axis plot/.append style" = "thick",
                title        = "Evolution using real coefficients",
               })
     for (t, y, p, col) ∈ zip(timeranges,
@@ -197,7 +197,7 @@ let
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)\rangle",
                "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+"every axis plot/.append style" = "thick",
                title        = "Evolution using asymptotic coefficients",
               })
     for (t, y, p, col) ∈ zip(timeranges,

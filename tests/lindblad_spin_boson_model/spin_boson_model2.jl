@@ -1,7 +1,7 @@
 #!/usr/bin/julia
 
-using ITensors, DataFrames, LaTeXStrings, CSV, PGFPlotsX, Colors
-using PseudomodesTTEDOPA
+using QuantumOptics, DataFrames, LaTeXStrings, CSV, PGFPlotsX, Colors
+using ITensors, PseudomodesTTEDOPA
 
 disablegrifqtech()
 

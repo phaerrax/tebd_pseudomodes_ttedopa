@@ -77,7 +77,7 @@ let
     support = (0, ωc)
     J(ω) = b * ℯ^(-ω/Ω) * (ω/Ω)^a
 
-    (Ω, κ, η) = chainmapcoefficients(J, support, ωc, n_osc_left-1; Nquad=nquad)
+    (Ω, κ, η) = chainmapcoefficients(J, support, n_osc_left-1; Nquad=nquad)
     @assert length(Ω) == n_osc_left
     @assert length(κ) == n_osc_left-1
     # Mi assicuro di avere il numero giusto di coefficienti (magari per
@@ -298,7 +298,7 @@ let
         ylabel = "Coefficient",
        })
     for (i, data, p) ∈ zip([reverse(1:length(chain[:,1]))
-                            for chain ∈ osc_chain_coefficients_left_super]
+                            for chain ∈ osc_chain_coefficients_left_super],
                            osc_chain_coefficients_left_super,
                            parameter_lists)
       ax = Axis({title = filenamett(p)})

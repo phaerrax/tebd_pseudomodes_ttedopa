@@ -99,7 +99,7 @@ let
     grp = GroupPlot({
         group_opts...,
         xlabel = L"\lambda t",
-        ylabel = L"\langle n_i(t)\rangle_\rm{TTEDOPA}-\langle n_i(t)\rangle_\rm{PM}",
+        ylabel = L"\langle n_i(t)\rangle_\mathrm{TTEDOPA}-\langle n_i(t)\rangle_\mathrm{PM}",
     })
     for (t, data, p) ∈ zip(timesteps_super,
                            occn_abserr_super,
@@ -121,7 +121,7 @@ let
     grp = GroupPlot({
         group_opts...,
         xlabel = L"\lambda t",
-        ylabel = L"1-\langle n_i(t)\rangle_\rm{TTEDOPA}/\langle n_i(t)\rangle_\rm{PM})",
+        ylabel = L"1-\langle n_i(t)\rangle_\mathrm{TTEDOPA}/\langle n_i(t)\rangle_\mathrm{PM})",
         ymin = -1,
         ymax = 1
     })

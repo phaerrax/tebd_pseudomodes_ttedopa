@@ -152,7 +152,7 @@ let
       push!(dict, name => occnlist[:,j])
     end
     for (j, name) in enumerate([Symbol("bond_dim$n")
-                                for n ∈ 1:len-1])
+                                for n ∈ 1:length(sites)-1])
       push!(dict, name => ranks[:,j])
     end
     push!(dict, :full_trace => normalisation)

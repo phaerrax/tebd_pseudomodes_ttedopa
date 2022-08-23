@@ -250,7 +250,7 @@ let
 "every axis plot/.append style" = "thick"
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
-                             normalisation_PM,super,
+                             normalisation_PM_super,
                              parameter_lists,
                              readablecolours(length(parameter_lists)))
       plot = PlotInc({color = col}, Table([t, y]))
