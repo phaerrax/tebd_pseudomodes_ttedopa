@@ -59,14 +59,20 @@ let
   # Plots
   # -----
   @info "Drawing plots."
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+  }
 
   # State norm
   @pgf begin
     ax = Axis({
-               xlabel       = L"\lambda t",
-               ylabel       = "Residual",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+               xlabel = L"\lambda t",
+               ylabel = "Energy",
+               title  = "Neglected relative reorganisation energy" 
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(cutoffs,
                              [clamp!(values, 0, 1e-4) for values ∈ residuals],

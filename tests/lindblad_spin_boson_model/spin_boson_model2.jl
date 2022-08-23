@@ -226,6 +226,12 @@ let
 
   # Common options for group plots
   nrows = Int(ceil(tot_sim_n / 2))
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+  }
   group_opts = @pgf {
     group_style = {
       group_size        = "$nrows by 2",
@@ -233,10 +239,7 @@ let
       horizontal_sep    = "2cm",
       vertical_sep      = "2cm"
     },
-    no_markers,
-    grid       = "major",
-    legend_pos = "outer north east",
-"every axis plot/.append style" = "thick"
+    common_opts...
   }
 
   # Occupation numbers
@@ -296,10 +299,10 @@ let
   # Trace of the density matrix
   @pgf begin
     ax = Axis({
-               xlabel       = L"\lambda t",
-               ylabel       = L"\mathrm{tr}\rho(t)",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+               xlabel = L"\lambda t",
+               ylabel = L"\mathrm{tr}\rho(t)",
+               title  = "Normalisation",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              normalisation_super,

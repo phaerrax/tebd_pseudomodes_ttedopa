@@ -260,6 +260,12 @@ let
 
   # Common options for group plots
   nrows = Int(ceil(tot_sim_n / 2))
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+   }
   group_opts = @pgf {
     group_style = {
       group_size        = "$nrows by 2",
@@ -267,10 +273,7 @@ let
       horizontal_sep    = "2cm",
       vertical_sep      = "2cm"
     },
-    no_markers,
-    grid       = "major",
-    legend_pos = "outer north east",
-"every axis plot/.append style" = "thick"
+    common_opts...
   }
 
   # Occupation numbers, left chain
@@ -453,8 +456,7 @@ let
                xlabel       = L"i",
                ylabel       = L"n_i(t_\mathrm{end})",
                title        = "Snapshot of the population at the end",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+               common_opts...
               })
     for (i, y, p, col) ∈ zip(vcat.(range_osc_left_super,
                                    range_spins_super,
@@ -475,8 +477,7 @@ let
                xlabel       = L"\lambda t",
                ylabel       = L"\Vert\psi(t)\Vert",
                title        = "State norm",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              normalisation_super,

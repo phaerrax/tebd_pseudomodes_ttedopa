@@ -255,14 +255,20 @@ let
   # Plots
   # -----
   @info "Drawing plots."
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+  }
 
   # Trace of the density matrix
   @pgf begin
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\mathrm{tr}\rho(t)",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+               title = "Normalisation",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(timesteps_super,
                              normalisation_super,

@@ -198,6 +198,12 @@ let
 
   # Common options for group plots
   nrows = Int(ceil(tot_sim_n / 2))
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+   }
   group_opts = @pgf {
     group_style = {
       group_size        = "$nrows by 2",
@@ -205,10 +211,7 @@ let
       horizontal_sep    = "2cm",
       vertical_sep      = "2cm"
     },
-    no_markers,
-    grid       = "major",
-    legend_pos = "outer north east",
-"every axis plot/.append style" = "thick"
+    common_opts...
   }
 
   # Occupation numbers
@@ -284,8 +287,7 @@ let
                xlabel       = L"i",
                ylabel       = L"n_i(t_\mathrm{end})",
                title        = "Snapshot of the population at the end",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick"
+               common_opts...
               })
     inds = [reverse(range_osc_left); range_spins; range_osc_right]
     for (y, p, col) ∈ zip(snapshot_super,

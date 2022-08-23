@@ -115,14 +115,19 @@ let
   # Plots
   # -----
   @info "Drawing plots."
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+   }
 
   @pgf begin
     ax = Axis({
                xlabel       = L"i",
                ylabel       = L"\Omega_i",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick",
                title        = "T-TEDOPA frequency coefficients",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(chainranges,
                              frequencies,
@@ -139,9 +144,8 @@ let
     ax = Axis({
                xlabel       = L"i",
                ylabel       = L"\kappa_i",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick",
                title        = "T-TEDOPA interaction coefficients",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip([rn[1:end-1] for rn ∈ chainranges],
                              couplingcoeffs,
@@ -158,9 +162,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)\rangle",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick",
                title        = "Evolution using real coefficients",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(timeranges,
                              firstsiteevos,
@@ -177,9 +180,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)+n_2(t)\rangle",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick",
                title        = "Evolution using real coefficients",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(timeranges,
                              first2sitesevos,
@@ -196,9 +198,8 @@ let
     ax = Axis({
                xlabel       = L"\lambda t",
                ylabel       = L"\langle n_1(t)\rangle",
-               "legend pos" = "outer north east",
-"every axis plot/.append style" = "thick",
                title        = "Evolution using asymptotic coefficients",
+               common_opts...
               })
     for (t, y, p, col) ∈ zip(timeranges,
                              asymptoticevos,
