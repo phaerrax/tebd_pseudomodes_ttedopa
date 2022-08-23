@@ -3,14 +3,14 @@
 using LinearAlgebra, LaTeXStrings, DataFrames, CSV
 using PseudomodesTTEDOPA
 
-const ⊗ = kron
-
 disablegrifqtech()
 
 # Questo programma calcola l'evoluzione della catena di spin isolata,
 # usando le tecniche dei MPS ed MPO.
 
 let
+const ⊗ = kron
+
   n_sites = 10
   ελ = [(1,0), (100,1), (10,1), (1,1), (0.01,1), (0,1)]
 

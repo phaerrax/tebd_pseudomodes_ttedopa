@@ -3,11 +3,11 @@
 using LinearAlgebra, LaTeXStrings, DataFrames, CSV, PGFPlotsX, Colors
 using ITensors, PseudomodesTTEDOPA
 
-const ⊗ = kron
-
 disablegrifqtech()
 
 let  
+const ⊗ = kron
+
   @info "Lettura dei file con i parametri."
   parameter_lists = load_parameters(ARGS)
   tot_sim_n = length(parameter_lists)
