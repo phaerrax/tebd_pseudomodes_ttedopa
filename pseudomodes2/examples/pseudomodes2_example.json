@@ -3,7 +3,7 @@
   "number_of_spin_sites": 10,
   "simulation_end_time": 4,
   "simulation_time_step": 0.01,
-  "skip_steps": 20,
+  "skip_steps": 10,
   "chain_initial_state": "empty",
   "left_oscillator_initial_state": "thermal",
   "MP_maximum_bond_dimension": 50,

@@ -1,6 +1,6 @@
 {
   "left_bath": {
-    "chain_coefficients_file": "examples/spectral_densities/asym_lorentzian_cold.ttedopa.dat",
+    "chain_coefficients_file": "/data/davide/Progetti/tebd_pseudomodes_ttedopa/ttedopa/examples/spectral_densities/asym_lorentzian_cold.ttedopa.dat",
     "number_of_oscillators": 20,
     "maximum_oscillator_space_dimension": 5,
     "oscillator_space_dimensions_decay": 1,
@@ -20,10 +20,10 @@
   "spin_excitation_energy": 10,
   "number_of_spin_sites": 10,
   "simulation_end_time": 1,
-  "simulation_time_step": 0.02,
+  "simulation_time_step": 0.01,
   "skip_steps": 10,
   "chain_initial_state": "empty",
   "MP_maximum_bond_dimension": 50,
-  "MP_compression_error": 1e-10,
+  "MP_compression_error": 1e-8,
   "TS_expansion_order": 2
 }

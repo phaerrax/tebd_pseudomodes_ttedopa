@@ -2,7 +2,7 @@
   "spin_excitation_energy": 10,
   "number_of_spin_sites": 10,
   "simulation_end_time": 1,
-  "simulation_time_step": 0.02,
+  "simulation_time_step": 0.01,
   "skip_steps": 10,
   "chain_initial_state": "empty",
   "left_oscillator_initial_state": "thermal",

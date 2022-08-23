@@ -1,18 +1,18 @@
 {
-  "spin_excitation_energy": 150,
+  "spin_excitation_energy": 10,
   "number_of_spin_sites": 1,
-  "simulation_end_time": 2,
-  "simulation_time_step": 0.001,
+  "simulation_end_time": 1,
+  "simulation_time_step": 0.01,
   "skip_steps": 2,
   "spin_initial_state": "up",
   "left_oscillator_initial_state": "thermal",
-  "MP_maximum_bond_dimension": 100,
-  "MP_compression_error": 1e-12,
+  "MP_maximum_bond_dimension": 50,
+  "MP_compression_error": 1e-8,
   "TS_expansion_order": 2,
   "oscillator_space_dimension": 5,
   "oscillator_spin_interaction_coefficient": 0.5,
   "oscillator_damping_coefficient_left": 1,
   "oscillator_damping_coefficient_right": 1,
-  "oscillator_frequency": 150,
-  "temperature": 40
+  "oscillator_frequency": 10,
+  "temperature": 20
 }
