@@ -30,10 +30,6 @@ let
     timesteps_super = []
 
     for (current_sim_n, parameters) in enumerate(parameter_lists)
-        # - parametri per ITensors
-        max_err = parameters["MP_compression_error"]
-        max_dim = parameters["MP_maximum_bond_dimension"]
-
         # - parametri fisici
         ε = parameters["spin_excitation_energy"]
         # λ = 1
@@ -41,7 +37,6 @@ let
         # - intervallo temporale delle simulazioni
         timestep = parameters["simulation_time_step"]
         endtime = parameters["simulation_end_time"]
-        skip_steps = parameters["skip_steps"]
 
         # Costruzione della catena
         # ========================
@@ -102,12 +97,19 @@ let
             end
             return nothing
         end
+        function bonddimensions(; psi, bond, half_sweep)
+            if bond == 1 && half_sweep == 2
+                return linkdims(psi)
+            end
+            return nothing
+        end
 
         obs = Observer(
             "times" => currenttime,
             "occn" => occn,
             "entropy" => entropy,
             "current" => spincurrent,
+            "ranks" => bonddimensions,
         )
 
         @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
@@ -117,10 +119,11 @@ let
             -im * endtime,
             ψ₀;
             time_step=-im * timestep,
-            outputlevel=0,
-            cutoff=parameters["MP_compression_error"],
             normalize=false,
             (observer!)=obs,
+            cutoff=parameters["MP_compression_error"],
+            mindim=parameters["MP_minimum_bond_dimension"],
+            maxdim=parameters["MP_maximum_bond_dimension"],
         )
 
         function groupresults(obs::Observer, name::String)
@@ -133,10 +136,11 @@ let
         occnlist = groupresults(obs, "occn")
         entropylist = groupresults(obs, "entropy")
         currentlist = groupresults(obs, "current")
+        ranks = groupresults(obs, "ranks")
 
         push!(timesteps_super, tout)
         push!(occ_n_super, occnlist)
-        #push!(bond_dimensions_super, ranks)
+        push!(bond_dimensions_super, ranks)
         push!(current_allsites_super, currentlist)
         push!(entropy_super, entropylist)
     end
@@ -181,28 +185,26 @@ let
     end
 
     # Bond dimensions
-    #=
     @pgf begin
-    grp = GroupPlot({
-    group_opts...,
-    xlabel = L"\lambda t",
-    ylabel = L"\chi_{i,i+1}(t)",
-    })
-    for (t, data, p) ∈ zip(timesteps_super,
-    bond_dimensions_super,
-    parameter_lists)
-    ax = Axis({title = filenamett(p)})
-    N = size(data, 2)
-    for (y, c) ∈ zip(eachcol(data), readablecolours(N))
-    plot = Plot({ color = c }, Table([t, y]))
-    push!(ax, plot)
+        grp = GroupPlot({
+                         group_opts...,
+                         xlabel = L"\lambda t",
+                         ylabel = L"\chi_{i,i+1}(t)",
+                        })
+        for (t, data, p) ∈ zip(timesteps_super,
+                               bond_dimensions_super,
+                               parameter_lists)
+            ax = Axis({title = filenamett(p)})
+            N = size(data, 2)
+            for (y, c) ∈ zip(eachcol(data), readablecolours(N))
+                plot = Plot({ color = c }, Table([t, y]))
+                push!(ax, plot)
+            end
+            push!(ax, Legend( ["($j,$(j+1))" for j ∈ 1:N] ))
+            push!(grp, ax)
+        end
+        pgfsave("bond_dimensions.pdf", grp)
     end
-    push!(ax, Legend( ["($j,$(j+1))" for j ∈ 1:N] ))
-    push!(grp, ax)
-    end
-    pgfsave("bond_dimensions.pdf", grp)
-    end
-    =#
 
     # Entanglement entropy
     @pgf begin
