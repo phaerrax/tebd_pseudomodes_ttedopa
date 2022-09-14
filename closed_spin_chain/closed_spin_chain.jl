@@ -28,6 +28,7 @@ let
     entropy_super = []
     current_allsites_super = []
     timesteps_super = []
+    norm_super = []
 
     for (current_sim_n, parameters) in enumerate(parameter_lists)
         # - parametri fisici
@@ -103,13 +104,20 @@ let
             end
             return nothing
         end
+        function normalization(; psi, bond, half_sweep)
+            if bond == 1 && half_sweep == 2
+                return norm(psi)
+            end
+            return nothing
+        end
 
         obs = Observer(
-            "times" => currenttime,
-            "occn" => occn,
+            "norm"    => normalization,
+            "times"   => currenttime,
+            "occn"    => occn,
             "entropy" => entropy,
             "current" => spincurrent,
-            "ranks" => bonddimensions,
+            "ranks"   => bonddimensions,
         )
 
         @info "($current_sim_n di $tot_sim_n) Avvio della simulazione."
@@ -132,23 +140,31 @@ let
 
         # A partire dai risultati costruisco delle matrici da dare poi in pasto
         # alle funzioni per i grafici e le tabelle di output
-        tout = results(obs, "times")
-        occnlist = groupresults(obs, "occn")
+        tout        = results(obs, "times")
+        statenorm   = results(obs, "norm")
+        occnlist    = groupresults(obs, "occn")
         entropylist = groupresults(obs, "entropy")
         currentlist = groupresults(obs, "current")
-        ranks = groupresults(obs, "ranks")
+        ranks       = groupresults(obs, "ranks")
 
         push!(timesteps_super, tout)
         push!(occ_n_super, occnlist)
         push!(bond_dimensions_super, ranks)
         push!(current_allsites_super, currentlist)
         push!(entropy_super, entropylist)
+        push!(norm_super, statenorm)
     end
 
     # Plots
     # -----
     # Common options for group plots
     nrows = Int(ceil(tot_sim_n / 2))
+  common_opts = @pgf {
+    no_markers,
+    grid       = "major",
+    legend_pos = "outer north east",
+    "every axis plot/.append style" = "thick"
+  }
     group_opts = @pgf {
                        group_style = {
                                       group_size        = "$nrows by 2",
@@ -161,6 +177,24 @@ let
                        legend_pos = "outer north east",
                        "every axis plot/.append style" = "thick"
                       }
+
+    # Norm of the state
+    @pgf begin
+        ax = Axis({
+                   xlabel       = L"\lambda t",
+                   ylabel       = L"\Vert\psi(t)\Vert",
+                   common_opts...,
+                  })
+        for (t, y, p, col) ∈ zip(timesteps_super,
+                                 norm_super,
+                                 parameter_lists,
+                                 readablecolours(length(parameter_lists)))
+            plot = PlotInc({color = col}, Table([t, y]))
+            push!(ax, plot)
+            push!(ax, LegendEntry(filenamett(p)))
+        end
+        pgfsave("normalization.pdf", ax)
+    end
 
     # Occupation numbers
     @pgf begin
