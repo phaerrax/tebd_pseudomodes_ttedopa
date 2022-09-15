@@ -1,13 +1,12 @@
 {
   "spin_excitation_energy": 10,
   "number_of_spin_sites": 10,
-  "simulation_end_time": 10,
+  "simulation_end_time": 5,
   "simulation_time_step": 0.01,
-  "skip_steps": 10,
   "chain_initial_state": "1loc1",
-  "MP_maximum_bond_dimension": 50,
-  "MP_compression_error": 1e-8,
-  "TS_expansion_order": 2,
+  "MP_maximum_bond_dimension": 100,
+  "MP_minimum_bond_dimension": 100,
+  "MP_compression_error": 1e-10,
   "spin_damping_coefficient": 1,
   "temperature": 10
 }
