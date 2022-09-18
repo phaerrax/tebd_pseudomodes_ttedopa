@@ -45,10 +45,11 @@ let
         # Costruzione dell'operatore di evoluzione
         # ========================================
 
-       L = (
-           MPO(lindbladian_xy(n_sites, ε, 1), sites) +
-           MPO(dissipator_symmetric(1, ε, κ, 0), sites) +
-           MPO(dissipator_symmetric(n_sites, ε, κ, T), sites)
+       L = MPO(
+           lindbladian_xy(n_sites, ε, 1) +
+           dissipator_symmetric(1, ε, κ, T) +
+           dissipator_symmetric(n_sites, ε, κ, 0),
+           sites,
        )
 
         # Osservabili da misurare
