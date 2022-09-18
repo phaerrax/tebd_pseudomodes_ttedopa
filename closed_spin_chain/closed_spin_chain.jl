@@ -47,17 +47,6 @@ let
 
         # Costruzione dell'operatore di evoluzione
         # ========================================
-        function hamiltonian_xy(N, energy, coupling)
-            op = OpSum()
-            for j in 1:(N-1)
-                op += -0.5coupling, "S+", j, "S-", j + 1
-                op += -0.5coupling, "S-", j, "S+", j + 1
-            end
-            for j in 1:N
-                op += energy, "Sz", j
-            end
-            return op
-        end
         H = MPO(hamiltonian_xy(n_sites, ε, 1), sites)
 
         # Simulazione
@@ -133,10 +122,6 @@ let
             mindim=parameters["MP_minimum_bond_dimension"],
             maxdim=parameters["MP_maximum_bond_dimension"],
         )
-
-        function groupresults(obs::Observer, name::String)
-            return mapreduce(permutedims, vcat, results(obs, name))
-        end
 
         # A partire dai risultati costruisco delle matrici da dare poi in pasto
         # alle funzioni per i grafici e le tabelle di output
